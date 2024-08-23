@@ -1,0 +1,1074 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Time-addressable Media Store API implementation (uksb-yzlyq9dyct)
+
+Parameters:
+  EnableWebHooks:
+    Description: Configure whether this platform will support webhooks or not.
+    Type: String
+    AllowedValues:
+      - "Yes"
+      - "No"
+    Default: "Yes"
+
+Mappings:
+  Solution:
+    Constants:
+      Version: "0.1"
+
+Conditions:
+  SupportWebHooks: !Equals [!Ref EnableWebHooks, "Yes"]
+
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Tracing: Active
+    Timeout: 30
+    MemorySize: 1024
+    Handler: app.lambda_handler
+    Runtime: python3.12
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        POWERTOOLS_LOG_LEVEL: INFO
+
+  Api:
+    OpenApiVersion: 3.0.1
+    EndpointConfiguration:
+      Type: REGIONAL
+    TracingEnabled: true
+    MethodSettings:
+      - ResourcePath: /*
+        HttpMethod: '*'
+        DataTraceEnabled: True
+        LoggingLevel: INFO
+        MetricsEnabled: True
+    Cors:
+      AllowMethods: '''*'''
+      AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+      AllowOrigin: '''*'''
+
+Resources:
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name: TAMS-API
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName: !Ref ApplicationResourceGroup
+      AutoConfigurationEnabled: True
+
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Mode: overwrite
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: api/openapi.yaml
+
+  MainTable:
+    Type: AWS::DynamoDB::Table
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W74
+            reason: Encryption not required
+          - id: W78
+            reason: Backup not required
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: record_type
+          AttributeType: S
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: source_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: record_type
+          KeyType: HASH
+        - AttributeName: id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: source-id-index
+          KeySchema:
+            - AttributeName: source_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - flow_collection
+              - collected_by
+
+  FlowSegmentsTable:
+    Type: AWS::DynamoDB::Table
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W74
+            reason: Encryption not required
+          - id: W78
+            reason: Backup not required
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: flow_id
+          AttributeType: S
+        - AttributeName: timerange_start
+          AttributeType: "N"
+        - AttributeName: object_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: flow_id
+          KeyType: HASH
+        - AttributeName: timerange_start
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: object-id-index
+          KeySchema:
+            - AttributeName: object_id
+              KeyType: HASH
+            - AttributeName: flow_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  WebHooksTable:
+    Type: AWS::DynamoDB::Table
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W74
+            reason: Encryption not required
+          - id: W78
+            reason: Backup not required
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: True
+      AttributeDefinitions:
+        - AttributeName: event
+          AttributeType: S
+        - AttributeName: url
+          AttributeType: S
+      KeySchema:
+        - AttributeName: event
+          KeyType: HASH
+        - AttributeName: url
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: url-index
+          KeySchema:
+            - AttributeName: url
+              KeyType: HASH
+            - AttributeName: event
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+    Condition: SupportWebHooks
+
+  MediaStorageBucket:
+    Type: AWS::S3::Bucket
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: Access logging not required
+          - id: W41
+            reason: Encryption not required
+          - id: W51
+            reason: Bucket policy not required
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+            AllowedOrigins:
+              - '*'
+
+  DeleteRequestQueue:
+    Type: AWS::SQS::Queue
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W48
+            reason: Encryption not required
+    Properties:
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 86400
+
+  CleanupS3Queue:
+    Type: AWS::SQS::Queue
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W48
+            reason: Encryption not required
+    Properties:
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 86400
+
+  EventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: !Ref AWS::StackName
+
+  UtilsLayer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: arm64
+    Properties:
+      RetentionPolicy: Delete
+      ContentUri: api/
+      CompatibleRuntimes:
+        - python3.12
+      CompatibleArchitectures:
+        - arm64
+
+  ServiceFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/api_service/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-service
+          WEBHOOKS_ENABLED: !Ref EnableWebHooks
+          TABLE: !Ref MainTable
+          WEBHOOKS_TABLE: !If [SupportWebHooks, !Ref WebHooksTable, ""]
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource:
+                - !GetAtt MainTable.Arn
+        - !If
+          - SupportWebHooks
+          - Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !GetAtt WebHooksTable.Arn
+                  - !Sub ${WebHooksTable.Arn}/index/url-index
+          - !Ref AWS::NoValue
+      Events:
+        getService:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service
+            Method: get
+        postService:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service
+            Method: post
+        headServiceWebhooks:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks
+            Method: head
+        getServiceWebhooks:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks
+            Method: get
+        postServiceWebhooks:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks
+            Method: post
+
+  SourcesFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/api_sources/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-sources
+          EVENT_BUS: !Ref EventBus
+          TABLE: !Ref MainTable
+          USER_POOL_ID: !Ref UserPool
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource: !GetAtt EventBus.Arn
+            - Effect: Allow
+              Action:
+                - cognito-idp:DescribeUserPool
+                - cognito-idp:AdminGetUser
+                - cognito-idp:DescribeUserPoolClient
+              Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource:
+                - !GetAtt MainTable.Arn
+                - !Sub ${MainTable.Arn}/index/source-id-index
+      Events:
+        headSources:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources
+            Method: head
+        getSources:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources
+            Method: get
+        headSourcesSourceid:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}
+            Method: head
+        getSourcesSourceid:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}
+            Method: get
+        headSourcesSourceidTags:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/tags
+            Method: head
+        getSourcesSourceidTags:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/tags
+            Method: get
+        headSourcesSourceidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/tags/{name}
+            Method: head
+        getSourcesSourceidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/tags/{name}
+            Method: get
+        putSourcesSourceidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/tags/{name}
+            Method: put
+        deleteSourcesSourceidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/tags/{name}
+            Method: delete
+        headSourcesSourceidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/description
+            Method: head
+        getSourcesSourceidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/description
+            Method: get
+        putSourcesSourceidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/description
+            Method: put
+        deleteSourcesSourceidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/description
+            Method: delete
+        headSourcesSourceidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/label
+            Method: head
+        getSourcesSourceidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/label
+            Method: get
+        putSourcesSourceidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/label
+            Method: put
+        deleteSourcesSourceidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /sources/{sourceId}/label
+            Method: delete
+
+  FlowsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W76
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/api_flows/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-flows
+          EVENT_BUS: !Ref EventBus
+          TABLE: !Ref MainTable
+          SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          USER_POOL_ID: !Ref UserPool
+          BUCKET: !Ref MediaStorageBucket
+          DELETE_QUEUE_URL: !Ref DeleteRequestQueue
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource: !GetAtt EventBus.Arn
+            - Effect: Allow
+              Action:
+                - cognito-idp:DescribeUserPool
+                - cognito-idp:AdminGetUser
+                - cognito-idp:DescribeUserPoolClient
+              Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt MainTable.Arn
+                - !Sub ${MainTable.Arn}/index/source-id-index
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !GetAtt FlowSegmentsTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - !GetAtt DeleteRequestQueue.Arn
+      Events:
+        headFlows:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows
+            Method: head
+        getFlows:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows
+            Method: get
+        headFlowsFlowid:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}
+            Method: head
+        getFlowsFlowid:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}
+            Method: get
+        putFlowsFlowid:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}
+            Method: put
+        deleteFlowsFlowid:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}
+            Method: delete
+        getFlowsFlowidTags:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/tags
+            Method: get
+        headFlowsFlowidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/tags/{name}
+            Method: head
+        getFlowsFlowidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/tags/{name}
+            Method: get
+        putFlowsFlowidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/tags/{name}
+            Method: put
+        deleteFlowsFlowidTagsName:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/tags/{name}
+            Method: delete
+        headFlowsFlowidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/description
+            Method: head
+        getFlowsFlowidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/description
+            Method: get
+        putFlowsFlowidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/description
+            Method: put
+        deleteFlowsFlowidDescription:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/description
+            Method: delete
+        headFlowsFlowidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/label
+            Method: head
+        getFlowsFlowidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/label
+            Method: get
+        putFlowsFlowidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/label
+            Method: put
+        deleteFlowsFlowidLabel:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/label
+            Method: delete
+        headFlowsFlowidReadonly:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/read_only
+            Method: head
+        getFlowsFlowidReadonly:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/read_only
+            Method: get
+        putFlowsFlowidReadonly:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/read_only
+            Method: put
+        postFlowsFlowidStorage:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/storage
+            Method: post
+
+  FlowSegmentsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W76
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/api_flow_segments/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-segments
+          EVENT_BUS: !Ref EventBus
+          SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          TABLE: !Ref MainTable
+          BUCKET: !Ref MediaStorageBucket
+          S3_QUEUE_URL: !Ref CleanupS3Queue
+          DELETE_QUEUE_URL: !Ref DeleteRequestQueue
+          USER_POOL_ID: !Ref UserPool
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource: !GetAtt EventBus.Arn
+            - Effect: Allow
+              Action:
+                - cognito-idp:DescribeUserPool
+                - cognito-idp:AdminGetUser
+                - cognito-idp:DescribeUserPoolClient
+              Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource:
+                - !GetAtt MainTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt FlowSegmentsTable.Arn
+                - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - !GetAtt DeleteRequestQueue.Arn
+                - !GetAtt CleanupS3Queue.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
+      Events:
+        headFlowsFlowidSegments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/segments
+            Method: head
+        getFlowsFlowidSegments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/segments
+            Method: get
+        postFlowsFlowidSegments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/segments
+            Method: post
+        deleteFlowsFlowidSegments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/segments
+            Method: delete
+
+  FlowDeleteRequestsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/api_flow_delete_requests/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-deletion
+          TABLE: !Ref MainTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+              Resource:
+                - !GetAtt MainTable.Arn
+      Events:
+        getFlowDeleteRequests:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flow-delete-requests
+            Method: get
+        headFlowDeleteRequestsRequestId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flow-delete-requests/{request-id}
+            Method: head
+        getFlowDeleteRequestsRequestId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flow-delete-requests/{request-id}
+            Method: get
+
+  WebhooksFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/webhooks/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+      Timeout: 900
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-webhooks
+          WEBHOOKS_TABLE: !Ref WebHooksTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !GetAtt WebHooksTable.Arn
+      Events:
+        EventBridge:
+          Type: EventBridgeRule
+          Properties:
+            RuleName: !Sub ${AWS::StackName}-events
+            EventBusName: !Ref EventBus
+            Pattern:
+              source:
+                - tams.api
+    Condition: SupportWebHooks
+
+  SqsDeleteRequestsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/sqs_delete_requests/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+        - !Ref UtilsLayer
+      Timeout: 900
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-sqs-delete-requests
+          EVENT_BUS: !Ref EventBus
+          SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          TABLE: !Ref MainTable
+          S3_QUEUE_URL: !Ref CleanupS3Queue
+          DELETE_QUEUE_URL: !Ref DeleteRequestQueue
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource: !GetAtt EventBus.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt MainTable.Arn
+                - !Sub ${MainTable.Arn}/index/source-id-index
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt FlowSegmentsTable.Arn
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - !GetAtt CleanupS3Queue.Arn
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DeleteRequestQueue.Arn
+            BatchSize: 10
+            Enabled: True
+
+  SqsObjectCleanupFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/sqs_object_cleanup/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:73
+      Timeout: 900
+      Environment:
+        Variables:
+          POWERTOOLS_SERVICE_NAME: tams-cleanup
+          SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          BUCKET: !Ref MediaStorageBucket
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+            - Effect: Allow
+              Action:
+                - s3:DeleteObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt CleanupS3Queue.Arn
+            BatchSize: 10
+            Enabled: True
+
+  CustomResourceFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/custom_resource/
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE: !Ref MainTable
+          SOLUTION_VERSION: !FindInMap [Solution, Constants, Version]
+          API_ID: !Ref Api
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt MainTable.Arn
+            - Effect: Allow
+              Action:
+                - apigateway:GET
+              Resource:
+                - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}
+
+  InitialiseDatabase:
+    Type: Custom::Setup
+    Properties:
+      ServiceToken: !GetAtt CustomResourceFunction.Arn
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref AWS::StackName
+      Schema:
+        - Name: email
+          Required: True
+          Mutable: True
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: True
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Priority: 1
+            Name: verified_email
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Sub ${AWS::AccountId}-tams-api
+
+  UserPoolResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Name: tams-api
+      Identifier: tams-api
+      Scopes:
+        - ScopeName: read
+          ScopeDescription: Read access
+        - ScopeName: write
+          ScopeDescription: Write access
+        - ScopeName: delete
+          ScopeDescription: Delete access
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: server-to-server
+      GenerateSecret: True
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      AuthSessionValidity: 3
+      RefreshTokenValidity: 30
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      TokenValidityUnits:
+        RefreshToken: days
+        AccessToken: minutes
+        IdToken: minutes
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthFlowsUserPoolClient: True
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthFlows:
+        - client_credentials
+      AllowedOAuthScopes:
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Api.Stage}
+
+  UserPoolId:
+    Value: !Ref UserPool
+
+  TokenUrl:
+    Value: !Sub https://${AWS::AccountId}-tams-api.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+
+  MediaStorageBucket:
+    Value: !Ref MediaStorageBucket
+
+  MainTable:
+    Value: !Ref MainTable
+
+  FlowSegmentsTable:
+    Value: !Ref FlowSegmentsTable
+
+  WebHooksTable:
+    Value: !If [SupportWebHooks, !Ref WebHooksTable, ""]
+
+  CleanupS3QueueUrl:
+    Value: !Ref CleanupS3Queue

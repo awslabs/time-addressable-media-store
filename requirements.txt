@@ -1,0 +1,4 @@
+requests
+pytest
+boto3
+mediatimestamp
