@@ -20,43 +20,63 @@ metrics = Metrics(namespace="Powertools")
 
 
 dynamodb = boto3.resource("dynamodb")
-webhooks_enabled = os.environ["WEBHOOKS_ENABLED"].lower() == "yes"
-table = dynamodb.Table(os.environ["TABLE"])
-record_type = "service"
-webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
+table_name = os.environ.get("WEBHOOKS_TABLE", None)
 
 
 @app.get("/service")
 @tracer.capture_method(capture_response=False)
 def get_service():
-    item = table.get_item(
-        Key={"record_type": record_type, "id": "1"}, ProjectionExpression="information"
-    )
-    if "Item" not in item:
-        raise NotFoundError  # 404
-    service: Service = parse(event=item["Item"]["information"], model=Service)
-    if webhooks_enabled:
-        if service.event_stream_mechanisms:
-            service.event_stream_mechanisms.append({"name": "webhooks"})
-        else:
-            service.event_stream_mechanisms = [{"name": "webhooks"}]
-    return get_clean_item(service), HTTPStatus.OK.value  # 200
+    try:
+        stage_variables = app.current_event.stage_variables
+        service_dict = {
+            "type": "urn:x-tams:service.example",
+            "api_version": stage_variables["api_version"],
+            "service_version": stage_variables["service_version"],
+            "media_store": {"type": "http_object_store"},
+        }
+        service: Service = parse(event=service_dict, model=Service)
+        if "name" in stage_variables:
+            service.name = stage_variables["name"]
+        if "description" in stage_variables:
+            service.description = stage_variables["description"]
+        webhooks_enabled = (
+            stage_variables.get("webhooks_enabled", "false").lower() == "yes"
+        )
+        if webhooks_enabled:
+            if service.event_stream_mechanisms:
+                service.event_stream_mechanisms.append({"name": "webhooks"})
+            else:
+                service.event_stream_mechanisms = [{"name": "webhooks"}]
+        return get_clean_item(service), HTTPStatus.OK.value  # 200
+    except Exception as e:
+        raise NotFoundError from e  # 404
 
 
 @app.post("/service")
 @tracer.capture_method(capture_response=False)
 def post_service(service_post: Servicepost):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": "1"}, ProjectionExpression="information"
-    )
-    if "Item" not in item:
-        raise NotFoundError  # 404
-    service: Service = parse(event=item["Item"]["information"], model=Service)
-    service.name = service_post.name
-    service.description = service_post.description
-    item_dict = get_clean_item(service)
-    table.put_item(
-        Item={"record_type": record_type, "id": "1", "information": item_dict}
+    patch_operations = []
+    if service_post.name is not None:
+        operation = {
+            "path": "/variables/name",
+            "op": "remove" if service_post.name == "" else "replace",
+        }
+        if service_post.name != "":
+            operation["value"] = service_post.name
+        patch_operations.append(operation)
+    if service_post.description is not None:
+        operation = {
+            "path": "/variables/description",
+            "op": "remove" if service_post.description == "" else "replace",
+        }
+        if service_post.description != "":
+            operation["value"] = service_post.description
+        patch_operations.append(operation)
+    agw = boto3.client("apigateway")
+    agw.update_stage(
+        restApiId=app.current_event.request_context.api_id,
+        stageName=app.current_event.request_context.stage,
+        patchOperations=patch_operations,
     )
     return None, HTTPStatus.OK.value  # 200
 
@@ -65,12 +85,13 @@ def post_service(service_post: Servicepost):
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def get_webhooks():
-    if not webhooks_enabled:
+    if table_name is None:
         raise NotFoundError(
             "Webhooks are not supported by this API implementation"
         )  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
+    webhooks_table = dynamodb.Table(table_name)
     scan = webhooks_table.scan()
     # Group records to match API schema
     schema_dict = {}
@@ -90,7 +111,7 @@ def get_webhooks():
 @app.post("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def post_webhooks(webhook: Webhookpost):
-    if not webhooks_enabled:
+    if table_name is None:
         raise NotFoundError(
             "Webhooks are not supported by this API implementation"
         )  # 404
@@ -98,6 +119,7 @@ def post_webhooks(webhook: Webhookpost):
     request_events = []
     if "events" in item_dict:
         request_events = item_dict.pop("events")
+    webhooks_table = dynamodb.Table(table_name)
     query = webhooks_table.query(
         IndexName="url-index",
         KeyConditionExpression=Key("url").eq(item_dict["url"]),

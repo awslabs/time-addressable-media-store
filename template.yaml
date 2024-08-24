@@ -15,6 +15,8 @@ Mappings:
   Solution:
     Constants:
       Version: "0.1"
+      ApiVersion: "5.1"
+      ServiceVersion: "0.1"
 
 Conditions:
   SupportWebHooks: !Equals [!Ref EnableWebHooks, "Yes"]
@@ -69,6 +71,12 @@ Resources:
     Properties:
       StageName: Prod
       Mode: overwrite
+      Variables:
+        api_version: !FindInMap [Solution, Constants, ApiVersion]
+        service_version: !Sub
+          - aws.${ServiceVersion}
+          - ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
+        webhooks_enabled: !Ref EnableWebHooks
       DefinitionBody:
         Fn::Transform:
           Name: AWS::Include
@@ -254,31 +262,7 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-service
-          WEBHOOKS_ENABLED: !Ref EnableWebHooks
-          TABLE: !Ref MainTable
-          WEBHOOKS_TABLE: !If [SupportWebHooks, !Ref WebHooksTable, ""]
-      Policies:
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-              Resource:
-                - !GetAtt MainTable.Arn
-        - !If
-          - SupportWebHooks
-          - Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:Scan
-                  - dynamodb:Query
-                  - dynamodb:BatchWriteItem
-                Resource:
-                  - !GetAtt WebHooksTable.Arn
-                  - !Sub ${WebHooksTable.Arn}/index/url-index
-          - !Ref AWS::NoValue
+          WEBHOOKS_TABLE: !If [SupportWebHooks, !Ref WebHooksTable, !Ref 'AWS::NoValue']
       Events:
         getService:
           Type: Api
@@ -310,6 +294,38 @@ Resources:
             RestApiId: !Ref Api
             Path: /service/webhooks
             Method: post
+
+  ServiceFunctionRoleApiPolicy:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      RoleName: !Ref ServiceFunctionRole
+      PolicyName: apigateway-PATCH
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - apigateway:PATCH
+            Resource:
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}/stages/${Api.Stage}
+
+  ServiceFunctionRoleWebhooksPolicy:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      RoleName: !Ref ServiceFunctionRole
+      PolicyName: dynamodb-WebHooksTable
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:Scan
+              - dynamodb:Query
+              - dynamodb:BatchWriteItem
+            Resource:
+              - !GetAtt WebHooksTable.Arn
+              - !Sub ${WebHooksTable.Arn}/index/url-index
+    Condition: SupportWebHooks
 
   SourcesFunction:
     Type: AWS::Serverless::Function
@@ -934,43 +950,6 @@ Resources:
             Queue: !GetAtt CleanupS3Queue.Arn
             BatchSize: 10
             Enabled: True
-
-  CustomResourceFunction:
-    Type: AWS::Serverless::Function
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W89
-            reason: VPC not required
-          - id: W92
-            reason: ReservedConcurrentExecutions not required
-    Properties:
-      CodeUri: functions/custom_resource/
-      MemorySize: 128
-      Environment:
-        Variables:
-          TABLE: !Ref MainTable
-          SOLUTION_VERSION: !FindInMap [Solution, Constants, Version]
-          API_ID: !Ref Api
-      Policies:
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-                - dynamodb:DeleteItem
-              Resource:
-                - !GetAtt MainTable.Arn
-            - Effect: Allow
-              Action:
-                - apigateway:GET
-              Resource:
-                - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}
-
-  InitialiseDatabase:
-    Type: Custom::Setup
-    Properties:
-      ServiceToken: !GetAtt CustomResourceFunction.Arn
 
   UserPool:
     Type: AWS::Cognito::UserPool

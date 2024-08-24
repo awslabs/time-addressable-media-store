@@ -188,9 +188,7 @@ def test_Main_Table_Empty(stack):
     # Act
     scan = table.scan(Select="COUNT")
     # Assert
-    assert (
-        1 == scan["Count"]
-    )  # Main table will always contain a single "service" record
+    assert 0 == scan["Count"]
 
 
 def test_S3_Bucket_Empty(stack):
