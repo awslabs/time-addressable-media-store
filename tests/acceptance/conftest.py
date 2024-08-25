@@ -5,6 +5,7 @@ import pytest
 import requests
 
 STACK_NAME = "tams-api"
+REGION = "eu-west-1"
 
 
 ############
@@ -14,8 +15,14 @@ STACK_NAME = "tams-api"
 
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def stack():
-    cloudformation = boto3.resource("cloudformation")
+def region():
+    return REGION
+
+
+@pytest.fixture(scope="session")
+# pylint: disable=redefined-outer-name
+def stack(region):
+    cloudformation = boto3.resource("cloudformation", region_name=region)
     get_stack = cloudformation.Stack(STACK_NAME)
     return {
         "outputs": {o["OutputKey"]: o["OutputValue"] for o in get_stack.outputs},
@@ -40,10 +47,10 @@ def webhooks_enabled(stack):
 
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def access_token(stack):
+def access_token(stack, region):
     user_pool_id = stack["outputs"]["UserPoolId"]
     client_id = stack["outputs"]["UserPoolClientId"]
-    client_secret = get_client_secret(user_pool_id, client_id)
+    client_secret = get_client_secret(user_pool_id, client_id, region)
     form_data = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -105,8 +112,8 @@ def delete_requests():
 #############
 
 
-def get_client_secret(user_pool_id, client_id):
-    idp = boto3.client("cognito-idp")
+def get_client_secret(user_pool_id, client_id, client_region):
+    idp = boto3.client("cognito-idp", region_name=client_region)
     user_pool_client = idp.describe_user_pool_client(
         UserPoolId=user_pool_id, ClientId=client_id
     )
