@@ -1,5 +1,3 @@
-# pylint: disable=no-name-in-module
-# pylint: disable=no-member
 import json
 import math
 import os
@@ -10,6 +8,8 @@ from functools import reduce
 from itertools import batched
 
 import boto3
+
+# pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
@@ -402,7 +402,7 @@ def delete_segment_items(
                     f"Delete Segment Key: {json.dumps(key, default=str)}",
                     json.dumps(e.response["ResponseMetadata"], default=str),
                 ],
-                "time": "2019-08-24T14:15:22Z",
+                "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
             break
     return delete_error
