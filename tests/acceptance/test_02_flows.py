@@ -2012,7 +2012,10 @@ def test_Set_Flow_Read_Only_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid flow description." == response.json()["message"]
+    assert (
+        "Bad request. Invalid flow read_only value. Value must be boolean."
+        == response.json()["message"]
+    )
 
 
 def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
