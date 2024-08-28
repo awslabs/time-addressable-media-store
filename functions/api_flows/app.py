@@ -491,7 +491,7 @@ def delete_flow_label(flowId: str):
     )
     if "Item" not in item:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
-    flow: Source = parse(event=item["Item"], model=Flow)
+    flow: Flow = parse(event=item["Item"], model=Flow)
     flow.__root__.label = None
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
@@ -531,7 +531,9 @@ def put_flow_read_only(flowId: str):
     except json.decoder.JSONDecodeError:
         body = None
     if not isinstance(body, bool):
-        raise BadRequestError("Bad request. Invalid flow description.")  # 400
+        raise BadRequestError(
+            "Bad request. Invalid flow read_only value. Value must be boolean."
+        )  # 400
     flow.__root__.read_only = body
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
