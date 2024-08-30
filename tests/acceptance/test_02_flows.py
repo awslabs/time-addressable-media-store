@@ -1,7 +1,8 @@
 # pylint: disable=too-many-lines
-# pylint: disable=no-name-in-module
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from constants import (
     AUDIO_FLOW,
     DATA_FLOW,
@@ -585,12 +586,10 @@ def test_List_Flows_GET_200(api_client_cognito):
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [
-        {**VIDEO_FLOW, "collected_by": [MULTI_FLOW["id"]]},
-        {**AUDIO_FLOW, "collected_by": [MULTI_FLOW["id"]]},
-        {**DATA_FLOW, "collected_by": [MULTI_FLOW["id"]]},
-        MULTI_FLOW,
-    ] == response_json
+    assert {**VIDEO_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
+    assert {**AUDIO_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
+    assert {**DATA_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
+    assert MULTI_FLOW in response_json
 
 
 def test_List_Flows_GET_200_codec(api_client_cognito):

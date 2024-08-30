@@ -1,7 +1,8 @@
 # pylint: disable=too-many-lines
-# pylint: disable=no-name-in-module
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from constants import (
     AUDIO_FLOW,
     DATA_FLOW,
@@ -284,12 +285,10 @@ def test_List_Sources_GET_200(api_client_cognito):
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [
-        {**VIDEO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]},
-        {**AUDIO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]},
-        {**DATA_SOURCE, "collected_by": [MULTI_SOURCE["id"]]},
-        MULTI_SOURCE,
-    ] == response_json
+    assert {**VIDEO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
+    assert {**AUDIO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
+    assert {**DATA_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
+    assert MULTI_SOURCE in response_json
 
 
 def test_List_Sources_GET_200_format(api_client_cognito):

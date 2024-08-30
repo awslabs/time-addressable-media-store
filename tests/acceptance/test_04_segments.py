@@ -1,7 +1,8 @@
 # pylint: disable=too-many-lines
-# pylint: disable=no-name-in-module
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from constants import (
     AUDIO_FLOW,
     DATA_FLOW,
@@ -253,6 +254,36 @@ def test_Flow_Details_GET_200_timerange(api_client_cognito):
         "collected_by": [MULTI_FLOW["id"]],
         "timerange": "[1:0_3:0)",
     } == response_json
+
+
+@pytest.mark.flows
+def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
+    """List flows with timerange query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"timerange": "_"})
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 2 == len(response.json())
+
+
+@pytest.mark.flows
+def test_List_Flows_GET_200_timerange_never(api_client_cognito):
+    """List flows with timerange query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"timerange": "()"})
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 2 == len(response.json())
 
 
 @pytest.mark.segments
@@ -1149,7 +1180,7 @@ def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito):
 def test_Delete_Flow_Segment_DELETE_202_timerange(
     api_client_cognito, delete_requests, api_endpoint
 ):
-    """List segments with timerange query specified"""
+    """Delete segments with timerange query specified"""
     # Arrange
     path = f'/flows/{VIDEO_FLOW["id"]}/segments'
     # Act
