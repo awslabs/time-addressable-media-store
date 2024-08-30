@@ -84,13 +84,24 @@ def get_flows():
     items = query["Items"]
     if parameters and "timerange" in parameters:
         timerange_filter = TimeRange.from_str(parameters["timerange"])
-        items = [
-            item
-            for item in items
-            if TimeRange.from_str(
-                get_flow_timerange(segments_table, item["id"])
-            ).overlaps_with_timerange(timerange_filter)
-        ]
+        if timerange_filter.is_empty():
+            items = [
+                item
+                for item in items
+                if TimeRange.from_str(
+                    get_flow_timerange(segments_table, item["id"])
+                ).is_empty()
+            ]
+        else:
+            items = [
+                item
+                for item in items
+                if not TimeRange.from_str(
+                    get_flow_timerange(segments_table, item["id"])
+                )
+                .intersect_with(timerange_filter)
+                .is_empty()
+            ]
     while "LastEvaluatedKey" in query and len(items) < args["Limit"]:
         query = table.query(
             KeyConditionExpression=Key("record_type").eq(record_type),
@@ -99,13 +110,24 @@ def get_flows():
         )
         if parameters and "timerange" in parameters:
             timerange_filter = TimeRange.from_str(parameters["timerange"])
-            query["Items"] = [
-                item
-                for item in query["Items"]
-                if TimeRange.from_str(
-                    get_flow_timerange(segments_table, item["id"])
-                ).overlaps_with_timerange(timerange_filter)
-            ]
+            if timerange_filter.is_empty():
+                items = [
+                    item
+                    for item in query["Items"]
+                    if TimeRange.from_str(
+                        get_flow_timerange(segments_table, item["id"])
+                    ).is_empty()
+                ]
+            else:
+                query["Items"] = [
+                    item
+                    for item in query["Items"]
+                    if not TimeRange.from_str(
+                        get_flow_timerange(segments_table, item["id"])
+                    )
+                    .intersect_with(timerange_filter)
+                    .is_empty()
+                ]
         items.extend(query["Items"])
     # Remove record_type and timerange field from results
     items = [
