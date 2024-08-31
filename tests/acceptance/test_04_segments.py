@@ -250,6 +250,7 @@ def test_Flow_Details_GET_200_timerange(api_client_cognito):
             del response_json[prop]
     assert {
         **VIDEO_FLOW,
+        "label": "pytest",
         "description": "pytest",
         "collected_by": [MULTI_FLOW["id"]],
         "timerange": "[1:0_3:0)",

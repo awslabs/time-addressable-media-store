@@ -494,7 +494,7 @@ def put_flow_label(flowId: str):
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow label.")  # 400
     flow: Flow = parse(event=item["Item"], model=Flow)
-    flow.__root__.description = body
+    flow.__root__.label = body
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
     flow.__root__.metadata_updated = now
