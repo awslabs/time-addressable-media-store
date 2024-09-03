@@ -1,6 +1,7 @@
-# pylint: disable=no-name-in-module
 import json
 import os
+
+# pylint: disable=no-name-in-module
 from itertools import batched
 
 import boto3

@@ -1,10 +1,11 @@
-# pylint: disable=no-name-in-module
 import time
 from collections import deque
 
 import boto3
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from constants import ID_404
 
 pytestmark = [
