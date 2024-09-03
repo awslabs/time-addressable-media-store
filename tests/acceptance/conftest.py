@@ -41,7 +41,7 @@ def api_endpoint(stack):
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
 def webhooks_enabled(stack):
-    enable_webHooks = stack["parameters"]["EnableWebHooks"]
+    enable_webHooks = stack["parameters"]["EnableWebhooks"]
     return enable_webHooks.lower() == "yes"
 
 

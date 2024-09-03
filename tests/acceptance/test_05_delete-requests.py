@@ -165,7 +165,7 @@ def test_Webhooks_Table_Empty(region, stack, webhooks_enabled):
     if webhooks_enabled:
         # Arrange
         dynamodb = boto3.resource("dynamodb", region_name=region)
-        webhooks_table = dynamodb.Table(stack["outputs"]["WebHooksTable"])
+        webhooks_table = dynamodb.Table(stack["outputs"]["WebhooksTable"])
         # Act
         scan = webhooks_table.scan(Select="COUNT")
         # Assert

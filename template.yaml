@@ -3,7 +3,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Time-addressable Media Store API implementation (uksb-yzlyq9dyct)
 
 Parameters:
-  EnableWebHooks:
+  EnableWebhooks:
     Description: Configure whether this platform will support webhooks or not.
     Type: String
     AllowedValues:
@@ -19,7 +19,7 @@ Mappings:
       ServiceVersion: "0.1"
 
 Conditions:
-  SupportWebHooks: !Equals [!Ref EnableWebHooks, "Yes"]
+  SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
 
 Transform: AWS::Serverless-2016-10-31
 
@@ -76,7 +76,7 @@ Resources:
         service_version: !Sub
           - aws.${ServiceVersion}
           - ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
-        webhooks_enabled: !Ref EnableWebHooks
+        webhooks_enabled: !Ref EnableWebhooks
       DefinitionBody:
         Fn::Transform:
           Name: AWS::Include
@@ -150,7 +150,7 @@ Resources:
           Projection:
             ProjectionType: ALL
 
-  WebHooksTable:
+  WebhooksTable:
     Type: AWS::DynamoDB::Table
     Metadata:
       cfn_nag:
@@ -182,7 +182,7 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: KEYS_ONLY
-    Condition: SupportWebHooks
+    Condition: SupportWebhooks
 
   MediaStorageBucket:
     Type: AWS::S3::Bucket
@@ -262,7 +262,7 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-service
-          WEBHOOKS_TABLE: !If [SupportWebHooks, !Ref WebHooksTable, !Ref 'AWS::NoValue']
+          WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
       Events:
         getService:
           Type: Api
@@ -313,7 +313,7 @@ Resources:
     Type: AWS::IAM::RolePolicy
     Properties:
       RoleName: !Ref ServiceFunctionRole
-      PolicyName: dynamodb-WebHooksTable
+      PolicyName: dynamodb
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -323,9 +323,9 @@ Resources:
               - dynamodb:Query
               - dynamodb:BatchWriteItem
             Resource:
-              - !GetAtt WebHooksTable.Arn
-              - !Sub ${WebHooksTable.Arn}/index/url-index
-    Condition: SupportWebHooks
+              - !GetAtt WebhooksTable.Arn
+              - !Sub ${WebhooksTable.Arn}/index/url-index
+    Condition: SupportWebhooks
 
   SourcesFunction:
     Type: AWS::Serverless::Function
@@ -832,7 +832,7 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-webhooks
-          WEBHOOKS_TABLE: !Ref WebHooksTable
+          WEBHOOKS_TABLE: !Ref WebhooksTable
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -840,7 +840,7 @@ Resources:
               Action:
                 - dynamodb:Query
               Resource:
-                - !GetAtt WebHooksTable.Arn
+                - !GetAtt WebhooksTable.Arn
       Events:
         EventBridge:
           Type: EventBridgeRule
@@ -850,7 +850,7 @@ Resources:
             Pattern:
               source:
                 - tams.api
-    Condition: SupportWebHooks
+    Condition: SupportWebhooks
 
   SqsDeleteRequestsFunction:
     Type: AWS::Serverless::Function
@@ -1046,8 +1046,8 @@ Outputs:
   FlowSegmentsTable:
     Value: !Ref FlowSegmentsTable
 
-  WebHooksTable:
-    Value: !If [SupportWebHooks, !Ref WebHooksTable, ""]
+  WebhooksTable:
+    Value: !If [SupportWebhooks, !Ref WebhooksTable, ""]
 
   CleanupS3QueueUrl:
     Value: !Ref CleanupS3Queue
