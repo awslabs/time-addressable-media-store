@@ -96,7 +96,8 @@ def get_webhooks():
     # Group records to match API schema
     schema_dict = {}
     for item in scan["Items"]:
-        item.pop("api_key_value")  # api key value not to be returnable as per spec.
+        if "api_key_value" in item:
+            item.pop("api_key_value")  # api key value not to be returnable as per spec.
         event = item.pop("event")
         if item["url"] in schema_dict:
             schema_dict[item["url"]]["events"].append(event)
