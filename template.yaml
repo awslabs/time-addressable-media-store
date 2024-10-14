@@ -40,7 +40,7 @@ Globals:
     OpenApiVersion: 3.0.1
     EndpointConfiguration:
       Type: REGIONAL
-    TracingEnabled: true
+    TracingEnabled: True
     MethodSettings:
       - ResourcePath: /*
         HttpMethod: '*'
@@ -77,6 +77,14 @@ Resources:
           - aws.${ServiceVersion}
           - ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
         webhooks_enabled: !Ref EnableWebhooks
+      Auth:
+        AddDefaultAuthorizerToCorsPreflight: False
+        DefaultAuthorizer: Cognito
+        Authorizers:
+          Cognito:
+            UserPoolArn: !GetAtt UserPool.Arn
+            Identity:
+              Header: Authorization
       DefinitionBody:
         Fn::Transform:
           Name: AWS::Include
