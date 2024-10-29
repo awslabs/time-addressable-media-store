@@ -5,7 +5,7 @@ import pytest
 import requests
 
 STACK_NAME = "tams-api"
-REGION = "eu-west-1"
+REGION = "eu-west-2"
 
 
 ############

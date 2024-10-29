@@ -141,6 +141,8 @@ Resources:
           AttributeType: S
         - AttributeName: timerange_start
           AttributeType: "N"
+        - AttributeName: timerange_end
+          AttributeType: "N"
         - AttributeName: object_id
           AttributeType: S
       KeySchema:
@@ -149,6 +151,14 @@ Resources:
         - AttributeName: timerange_start
           KeyType: RANGE
       GlobalSecondaryIndexes:
+        - IndexName: timerange-end-index
+          KeySchema:
+            - AttributeName: flow_id
+              KeyType: HASH
+            - AttributeName: timerange_end
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
         - IndexName: object-id-index
           KeySchema:
             - AttributeName: object_id
@@ -739,6 +749,7 @@ Resources:
               Resource:
                 - !GetAtt FlowSegmentsTable.Arn
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+                - !Sub ${FlowSegmentsTable.Arn}/index/timerange-end-index
             - Effect: Allow
               Action:
                 - sqs:SendMessage

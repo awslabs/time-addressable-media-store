@@ -165,7 +165,7 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flowId, segment_timerange):
         raise BadRequestError(
-            "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
+            "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow."
         )  # 400
     item_dict["timerange_start"] = segment_timerange.start.to_nanosec() + (
         0 if segment_timerange.includes_start() else 1
@@ -264,18 +264,18 @@ def check_overlapping_segments(flow_id, segment_timerange):
         "KeyConditionExpression": And(
             Key("flow_id").eq(flow_id),
             (
-                Key("timerange_start").lte(segment_timerange.end.to_nanosec())
-                if segment_timerange.includes_end()
-                else Key("timerange_start").lt(segment_timerange.end.to_nanosec())
+                Key("timerange_end").gte(segment_timerange.start.to_nanosec())
+                if segment_timerange.includes_start()
+                else Key("timerange_end").gt(segment_timerange.start.to_nanosec())
             ),
         ),
         "FilterExpression": (
-            Attr("timerange_end").gte(segment_timerange.start.to_nanosec())
-            if segment_timerange.includes_start()
-            else Attr("timerange_end").gt(segment_timerange.start.to_nanosec())
+            Attr("timerange_start").lte(segment_timerange.end.to_nanosec())
+            if segment_timerange.includes_end()
+            else Attr("timerange_start").lt(segment_timerange.end.to_nanosec())
         ),
     }
-    query = segments_table.query(**args)
+    query = segments_table.query(IndexName="timerange-end-index", **args)
     items = query["Items"]
     while "LastEvaluatedKey" in query:
         query = segments_table.query(

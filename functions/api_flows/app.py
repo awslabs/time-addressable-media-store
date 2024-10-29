@@ -576,7 +576,6 @@ def post_flow_storage_by_id(flow_storage_post: Flowstoragepost, flowId: str):
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    flow: Flow = parse(event=item["Item"], model=Flow)
     if flow.__root__.container is None:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."

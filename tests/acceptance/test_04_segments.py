@@ -1071,7 +1071,7 @@ def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert (
-        "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
+        "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow."
         == response.json()["message"]
     )
 
