@@ -48,6 +48,7 @@ dynamodb = boto3.resource("dynamodb")
 segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
 table = dynamodb.Table(os.environ["TABLE"])
 bucket = os.environ["BUCKET"]
+bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
@@ -129,11 +130,12 @@ def get_flow_segments_by_id(flowId: str):
         set(item["object_id"] for item in schema_items)
     )
     # Add url to items
+    stage_variables = app.current_event.stage_variables
     for item in schema_items:
         item["get_urls"] = [
             *item.get("get_urls", []),
             {
-                "label": "s3_presigned",
+                "label": f"aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}",
                 "url": presigned_urls[item["object_id"]],
             },
         ]

@@ -719,6 +719,7 @@ Resources:
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           TABLE: !Ref MainTable
           BUCKET: !Ref MediaStorageBucket
+          BUCKET_REGION: !Ref AWS::Region
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
           USER_POOL_ID: !Ref UserPool
