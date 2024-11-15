@@ -51,14 +51,14 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
                 # Delete source if no longer referenced by any other flows
                 check_delete_source(table, delete_item["Attributes"]["source_id"])
                 # Update collections that either referenced this flow or were referenced by it
-                if flow.__root__.flow_collection:
-                    for collection in flow.__root__.flow_collection:
+                if flow.root.flow_collection:
+                    for collection in flow.root.flow_collection:
                         collection_flow = get_model_by_id(table, "flow", collection.id)
                         update_collected_by(
                             table, body["flow_id"], collection_flow, False
                         )
-                if flow.__root__.collected_by:
-                    for collected_by_id in flow.__root__.collected_by:
+                if flow.root.collected_by:
+                    for collected_by_id in flow.root.collected_by:
                         update_flow_collection(table, body["flow_id"], collected_by_id)
         # Now proceed with deleting the flow segments
         body["status"] = "started"

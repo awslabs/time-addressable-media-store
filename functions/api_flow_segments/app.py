@@ -61,7 +61,7 @@ def get_flow_segments_by_id(flowId: str):
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400
     try:
-        parse(event={"__root__": flowId}, model=Uuid)
+        parse(event=json.dumps(flowId), model=Uuid)
     except ValidationError as ex:
         raise NotFoundError("The flow ID in the path is invalid.") from ex  # 404
     item = table.get_item(
@@ -135,7 +135,7 @@ def get_flow_segments_by_id(flowId: str):
         item["get_urls"] = [
             *item.get("get_urls", []),
             {
-                "label": f"aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}",
+                "label": f'aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}',
                 "url": presigned_urls[item["object_id"]],
             },
         ]
@@ -154,12 +154,12 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
     if "Item" not in item:
         raise NotFoundError("The flow does not exist.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    if flow.__root__.read_only:
+    if flow.root.read_only:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    if flow.__root__.container is None:
+    if flow.root.container is None:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
         )  # 400
@@ -200,7 +200,7 @@ def delete_flow_segments_by_id(flowId: str):
     if "Item" not in item:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    if flow.__root__.read_only:
+    if flow.root.read_only:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",

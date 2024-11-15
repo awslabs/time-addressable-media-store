@@ -166,7 +166,7 @@ def put_source_tag_value(sourceId: str, name: str):
     if source.tags is None:
         source.tags = {name: body}
     else:
-        source.tags.__root__[name] = body
+        source.tags.root[name] = body
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
     source.updated = now
@@ -188,13 +188,13 @@ def delete_source_tag(sourceId: str, name: str):
             "The requested Source ID or tag in the path is invalid."
         )  # 404
     source: Source = parse(event=item["Item"], model=Source)
-    if source.tags is None or name not in source.tags.__root__:
+    if source.tags is None or name not in source.tags.root:
         raise NotFoundError(
             "The requested Source ID or tag in the path is invalid."
         )  # 404
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     source.updated = now
-    del source.tags.__root__[name]
+    del source.tags.root[name]
     item_dict = get_clean_item(source)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])

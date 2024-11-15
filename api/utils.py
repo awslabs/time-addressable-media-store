@@ -532,17 +532,15 @@ def update_collected_by(
     add_to: bool,
 ) -> None:
     """update the collected by field on the specified flow"""
-    if flow.__root__.collected_by:
+    if flow.root.collected_by:
         if add_to:
-            flow.__root__.collected_by.append(flow_id)
-            flow.__root__.collected_by = list(set(flow.__root__.collected_by))
+            flow.root.collected_by.append(flow_id)
+            flow.root.collected_by = list(set(flow.root.collected_by))
         else:
-            flow.__root__.collected_by = [
-                c for c in flow.__root__.collected_by if c != flow_id
-            ]
+            flow.root.collected_by = [c for c in flow.root.collected_by if c != flow_id]
     else:
         if add_to:
-            flow.__root__.collected_by = [flow_id]
+            flow.root.collected_by = [flow_id]
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": "flow", **item_dict})
     publish_event("flows/updated", {"flow": item_dict}, [flow_id])
@@ -556,10 +554,10 @@ def update_flow_collection(
     item = table.get_item(Key={"record_type": "flow", "id": collected_by_id})
     if "Item" in item:
         flow: Flow = parse(event=item["Item"], model=Flow)
-        if flow.__root__.flow_collection:
-            flow.__root__.flow_collection = [
+        if flow.root.flow_collection:
+            flow.root.flow_collection = [
                 collection
-                for collection in flow.__root__.flow_collection
+                for collection in flow.root.flow_collection
                 if collection.id != flow_id
             ]
             item_dict = get_clean_item(flow)
@@ -578,7 +576,7 @@ def update_flow_segments_updated(
         return
     flow: Flow = parse(event=item["Item"], model=Flow)
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
-    flow.__root__.segments_updated = now
+    flow.root.segments_updated = now
     item_dict = get_clean_item(flow)
     try:
         table.put_item(
@@ -587,7 +585,7 @@ def update_flow_segments_updated(
                 Key("record_type").eq(record_type), Key("id").eq(flow_id)
             ),
         )
-        publish_event("flows/updated", {"flow": item_dict}, [flow.__root__.id])
+        publish_event("flows/updated", {"flow": item_dict}, [flow.root.id])
     except boto3.resource(
         "dynamodb"
     ).meta.client.exceptions.ConditionalCheckFailedException:
