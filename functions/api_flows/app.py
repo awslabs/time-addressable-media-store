@@ -184,10 +184,10 @@ def get_flow_by_id(flowId: str):
 @app.put("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
 def put_flow_by_id(flow: Flow, flowId: str):
-    if flow.__root__.id != flowId:
+    if flow.root.id != flowId:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
-    if flow.__root__.flow_collection:
-        for collection in flow.__root__.flow_collection:
+    if flow.root.flow_collection:
+        for collection in flow.root.flow_collection:
             collection_flow = get_model_by_id(table, record_type, collection.id)
             if collection_flow is None:
                 raise BadRequestError(
@@ -266,12 +266,12 @@ def delete_flow_by_id(flowId: str):
         # Delete source if no longer referenced by any other flows
         check_delete_source(table, delete_item["Attributes"]["source_id"])
         # Update collections that either referenced this flow or were referenced by it
-        if flow.__root__.flow_collection:
-            for collection in flow.__root__.flow_collection:
+        if flow.root.flow_collection:
+            for collection in flow.root.flow_collection:
                 collection_flow = get_model_by_id(table, record_type, collection.id)
                 update_collected_by(table, flowId, collection_flow, False)
-        if flow.__root__.collected_by:
-            for collected_by_id in flow.__root__.collected_by:
+        if flow.root.collected_by:
+            for collected_by_id in flow.root.collected_by:
                 update_flow_collection(table, flowId, collected_by_id)
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request
@@ -335,7 +335,7 @@ def put_flow_tag_value(flowId: str, name: str):
     if "Item" not in item:
         raise NotFoundError("The requested flow does not exist.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    if flow.__root__.read_only:
+    if flow.root.read_only:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -346,14 +346,14 @@ def put_flow_tag_value(flowId: str, name: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow tag value.")  # 400
-    if flow.__root__.tags is None:
-        flow.__root__.tags = {name: body}
+    if flow.root.tags is None:
+        flow.root.tags = {name: body}
     else:
-        flow.__root__.tags.__root__[name] = body
+        flow.root.tags.root[name] = body
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
-    flow.__root__.metadata_updated = now
-    flow.__root__.updated_by = username
+    flow.root.metadata_updated = now
+    flow.root.updated_by = username
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
@@ -369,18 +369,18 @@ def delete_flow_tag_value(flowId: str, name: str):
     if "Item" not in item:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    if flow.__root__.read_only:
+    if flow.root.read_only:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    if flow.__root__.tags is None or name not in flow.__root__.tags.__root__:
+    if flow.root.tags is None or name not in flow.root.tags.root:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
-    del flow.__root__.tags.__root__[name]
+    del flow.root.tags.root[name]
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
-    flow.__root__.metadata_updated = now
-    flow.__root__.updated_by = username
+    flow.root.metadata_updated = now
+    flow.root.updated_by = username
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
@@ -413,7 +413,7 @@ def put_flow_description(flowId: str):
     if "Item" not in item:
         raise NotFoundError("The requested flow does not exist.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    if flow.__root__.read_only:
+    if flow.root.read_only:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -424,11 +424,11 @@ def put_flow_description(flowId: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow description.")  # 400
-    flow.__root__.description = body
+    flow.root.description = body
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
-    flow.__root__.metadata_updated = now
-    flow.__root__.updated_by = username
+    flow.root.metadata_updated = now
+    flow.root.updated_by = username
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
@@ -444,16 +444,16 @@ def delete_flow_description(flowId: str):
     if "Item" not in item:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    if flow.__root__.read_only:
+    if flow.root.read_only:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    flow.__root__.description = None
+    flow.root.description = None
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
-    flow.__root__.metadata_updated = now
-    flow.__root__.updated_by = username
+    flow.root.metadata_updated = now
+    flow.root.updated_by = username
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
@@ -493,11 +493,11 @@ def put_flow_label(flowId: str):
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow label.")  # 400
     flow: Flow = parse(event=item["Item"], model=Flow)
-    flow.__root__.label = body
+    flow.root.label = body
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
-    flow.__root__.metadata_updated = now
-    flow.__root__.updated_by = username
+    flow.root.metadata_updated = now
+    flow.root.updated_by = username
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event("sources/updated", {"source": item_dict}, [flowId])
@@ -513,11 +513,11 @@ def delete_flow_label(flowId: str):
     if "Item" not in item:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    flow.__root__.label = None
+    flow.root.label = None
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
-    flow.__root__.metadata_updated = now
-    flow.__root__.updated_by = username
+    flow.root.metadata_updated = now
+    flow.root.updated_by = username
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
@@ -555,7 +555,7 @@ def put_flow_read_only(flowId: str):
         raise BadRequestError(
             "Bad request. Invalid flow read_only value. Value must be boolean."
         )  # 400
-    flow.__root__.read_only = body
+    flow.root.read_only = body
     item_dict = get_clean_item(flow)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
@@ -571,19 +571,18 @@ def post_flow_storage_by_id(flow_storage_post: Flowstoragepost, flowId: str):
     if "Item" not in item:
         raise NotFoundError("The requested flow does not exist.")  # 404
     flow: Flow = parse(event=item["Item"], model=Flow)
-    if flow.__root__.read_only:
+    if flow.root.read_only:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    if flow.__root__.container is None:
+    if flow.root.container is None:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
         )  # 400
     response = parse(event={}, model=Flowstorage)
     response.media_objects = [
-        get_presigned_put(flow.__root__.container)
-        for _ in range(flow_storage_post.limit)
+        get_presigned_put(flow.root.container) for _ in range(flow_storage_post.limit)
     ]
     return get_clean_item(response), HTTPStatus.CREATED.value  # 201
 
