@@ -14,9 +14,8 @@ Parameters:
 Mappings:
   Solution:
     Constants:
-      Version: "0.1"
       ApiVersion: "5.1"
-      ServiceVersion: "0.1"
+      ServiceVersion: "2.0"
 
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
