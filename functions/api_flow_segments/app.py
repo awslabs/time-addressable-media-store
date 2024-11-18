@@ -102,10 +102,10 @@ def get_flow_segments_by_id(flowId: str):
                 )
             )
         custom_headers["X-Paging-NextKey"] = str(
-            query["LastEvaluatedKey"]["timerange_start"]
+            query["LastEvaluatedKey"]["timerange_end"]
         )
         custom_headers["Link"] = generate_link_url(
-            app.current_event, str(query["LastEvaluatedKey"]["timerange_start"])
+            app.current_event, str(query["LastEvaluatedKey"]["timerange_end"])
         )
     # Set Paging Limit header if paging limit being used is not the one specified
     if (
@@ -277,7 +277,7 @@ def check_overlapping_segments(flow_id, segment_timerange):
             else Attr("timerange_start").lt(segment_timerange.end.to_nanosec())
         ),
     }
-    query = segments_table.query(IndexName="timerange-end-index", **args)
+    query = segments_table.query(**args)
     items = query["Items"]
     while "LastEvaluatedKey" in query:
         query = segments_table.query(

@@ -163,7 +163,7 @@ def delete_segment_items(
     for item in items:
         key = {
             "flow_id": item["flow_id"],
-            "timerange_start": item["timerange_start"],
+            "timerange_end": item["timerange_end"],
         }
         try:
             delete_item = segments_table.delete_item(
@@ -261,7 +261,7 @@ def get_ddb_args(
             # record_type field is used for flow_id when query is related to flow segments.
             args["ExclusiveStartKey"] = {
                 "flow_id": record_type,
-                "timerange_start": int(params["page"]),
+                "timerange_end": int(params["page"]),
             }
     if "limit" in valid_params:
         if "limit" in params:
@@ -280,17 +280,17 @@ def get_ddb_args(
     if "timerange" in valid_params and "timerange" in params:
         valid_params.remove("timerange")
         timerange_filter = TimeRange.from_str(params["timerange"])
-        if timerange_filter.end and "object_id" in params:
-            filter_expressions.append(
-                Attr("timerange_start").lte(timerange_filter.end.to_nanosec())
-                if timerange_filter.includes_end()
-                else Attr("timerange_start").lt(timerange_filter.end.to_nanosec())
-            )
-        if timerange_filter.start:
+        if timerange_filter.start and "object_id" in params:
             filter_expressions.append(
                 Attr("timerange_end").gte(timerange_filter.start.to_nanosec())
                 if timerange_filter.includes_start()
                 else Attr("timerange_end").gt(timerange_filter.start.to_nanosec())
+            )
+        if timerange_filter.end:
+            filter_expressions.append(
+                Attr("timerange_start").lte(timerange_filter.end.to_nanosec())
+                if timerange_filter.includes_end()
+                else Attr("timerange_start").lt(timerange_filter.end.to_nanosec())
             )
     for key in valid_params:
         if key in params:
@@ -387,13 +387,13 @@ def get_key_and_args(
             key,
             Key("object_id").eq(parameters["object_id"]),
         )
-    elif timerange_filter and timerange_filter.end:
+    elif timerange_filter and timerange_filter.start:
         key = And(
             key,
             (
-                Key("timerange_start").lte(timerange_filter.end.to_nanosec())
+                Key("timerange_end").gte(timerange_filter.start.to_nanosec())
                 if timerange_filter.includes_end()
-                else Key("timerange_start").lt(timerange_filter.end.to_nanosec())
+                else Key("timerange_end").gt(timerange_filter.start.to_nanosec())
             ),
         )
     args["KeyConditionExpression"] = key
