@@ -14,9 +14,8 @@ Parameters:
 Mappings:
   Solution:
     Constants:
-      Version: "0.1"
       ApiVersion: "5.1"
-      ServiceVersion: "0.1"
+      ServiceVersion: "2.0"
 
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
@@ -92,6 +91,8 @@ Resources:
             Location: api/openapi.yaml
 
   MainTable:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Metadata:
       cfn_nag:
@@ -126,6 +127,8 @@ Resources:
               - collected_by
 
   FlowSegmentsTable:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Metadata:
       cfn_nag:
@@ -139,8 +142,6 @@ Resources:
       AttributeDefinitions:
         - AttributeName: flow_id
           AttributeType: S
-        - AttributeName: timerange_start
-          AttributeType: "N"
         - AttributeName: timerange_end
           AttributeType: "N"
         - AttributeName: object_id
@@ -148,17 +149,9 @@ Resources:
       KeySchema:
         - AttributeName: flow_id
           KeyType: HASH
-        - AttributeName: timerange_start
+        - AttributeName: timerange_end
           KeyType: RANGE
       GlobalSecondaryIndexes:
-        - IndexName: timerange-end-index
-          KeySchema:
-            - AttributeName: flow_id
-              KeyType: HASH
-            - AttributeName: timerange_end
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
         - IndexName: object-id-index
           KeySchema:
             - AttributeName: object_id
@@ -203,6 +196,8 @@ Resources:
     Condition: SupportWebhooks
 
   MediaStorageBucket:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::S3::Bucket
     Metadata:
       cfn_nag:
@@ -750,7 +745,6 @@ Resources:
               Resource:
                 - !GetAtt FlowSegmentsTable.Arn
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
-                - !Sub ${FlowSegmentsTable.Arn}/index/timerange-end-index
             - Effect: Allow
               Action:
                 - sqs:SendMessage

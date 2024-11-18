@@ -213,80 +213,6 @@ def test_Create_Flow_Segment_POST_201_negative(api_client_cognito):
     assert 201 == response.status_code
 
 
-@pytest.mark.flows
-def test_Flow_Details_GET_200_include_timerange(api_client_cognito):
-    # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
-    # Act
-    response = api_client_cognito.request(
-        "GET", path, params={"include_timerange": "true"}
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "timerange" in response.json()
-    assert "segments_updated" in response.json()
-
-
-@pytest.mark.flows
-def test_Flow_Details_GET_200_timerange(api_client_cognito):
-    # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}'
-    # Act
-    response = api_client_cognito.request(
-        "GET", path, params={"include_timerange": "true", "timerange": "[1:0_3:0)"}
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "segments_updated" in response.json()
-    for prop in DYNAMIC_PROPS:
-        if prop in response_json:
-            del response_json[prop]
-    assert {
-        **VIDEO_FLOW,
-        "label": "pytest",
-        "description": "pytest",
-        "collected_by": [MULTI_FLOW["id"]],
-        "timerange": "[1:0_3:0)",
-    } == response_json
-
-
-@pytest.mark.flows
-def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
-    """List flows with timerange query specified"""
-    # Arrange
-    path = "/flows"
-    # Act
-    response = api_client_cognito.request("GET", path, params={"timerange": "_"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 2 == len(response.json())
-
-
-@pytest.mark.flows
-def test_List_Flows_GET_200_timerange_never(api_client_cognito):
-    """List flows with timerange query specified"""
-    # Arrange
-    path = "/flows"
-    # Act
-    response = api_client_cognito.request("GET", path, params={"timerange": "()"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 2 == len(response.json())
-
-
 @pytest.mark.segments
 def test_List_Flow_Segments_HEAD_200(api_client_cognito):
     # Arrange
@@ -627,6 +553,80 @@ def test_List_Flow_Segments_HEAD_404_timerange(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+
+
+@pytest.mark.flows
+def test_Flow_Details_GET_200_include_timerange(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"include_timerange": "true"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "timerange" in response.json()
+    assert "segments_updated" in response.json()
+
+
+@pytest.mark.flows
+def test_Flow_Details_GET_200_timerange(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"include_timerange": "true", "timerange": "[1:0_3:0)"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "segments_updated" in response.json()
+    for prop in DYNAMIC_PROPS:
+        if prop in response_json:
+            del response_json[prop]
+    assert {
+        **VIDEO_FLOW,
+        "label": "pytest",
+        "description": "pytest",
+        "collected_by": [MULTI_FLOW["id"]],
+        "timerange": "[1:0_3:0)",
+    } == response_json
+
+
+@pytest.mark.flows
+def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
+    """List flows with timerange query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"timerange": "_"})
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 2 == len(response.json())
+
+
+@pytest.mark.flows
+def test_List_Flows_GET_200_timerange_never(api_client_cognito):
+    """List flows with timerange query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"timerange": "()"})
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 2 == len(response.json())
 
 
 @pytest.mark.segments
