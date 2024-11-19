@@ -20,7 +20,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.parser import parse
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
-from schema import Source
+from schema import Source, Tags
 from utils import (
     generate_link_url,
     get_clean_item,
@@ -164,7 +164,7 @@ def put_source_tag_value(sourceId: str, name: str):
         raise BadRequestError("Bad request. Invalid Source tag value.")  # 400
     source: Source = parse(event=item["Item"], model=Source)
     if source.tags is None:
-        source.tags = {name: body}
+        source.tags = Tags(root={name: body})
     else:
         source.tags.root[name] = body
     now = datetime.now().strftime(constants.DATETIME_FORMAT)

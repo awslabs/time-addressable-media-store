@@ -23,7 +23,7 @@ from aws_lambda_powertools.utilities.parser import parse
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from mediatimestamp.immutable import TimeRange
-from schema import Deletionrequest, Flow, Flowstorage, Flowstoragepost, Source
+from schema import Deletionrequest, Flow, Flowstorage, Flowstoragepost, Source, Tags
 from utils import (
     base_delete_request_dict,
     check_delete_source,
@@ -347,7 +347,7 @@ def put_flow_tag_value(flowId: str, name: str):
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow tag value.")  # 400
     if flow.root.tags is None:
-        flow.root.tags = {name: body}
+        flow.root.tags = Tags(root={name: body})
     else:
         flow.root.tags.root[name] = body
     now = datetime.now().strftime(constants.DATETIME_FORMAT)

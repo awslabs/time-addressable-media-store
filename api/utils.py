@@ -231,7 +231,7 @@ def generate_presigned_url(
 @tracer.capture_method(capture_response=False)
 def get_clean_item(obj: any) -> dict:
     """Converts a Pydantic model to 'clean' dict (no null or empty properties)"""
-    obj_dict = json.loads(obj.json())
+    obj_dict = json.loads(obj.model_dump_json())
     remove_null(obj_dict)
     return obj_dict
 
