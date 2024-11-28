@@ -229,14 +229,6 @@ def generate_presigned_url(
 
 
 @tracer.capture_method(capture_response=False)
-def get_clean_item(obj: any) -> dict:
-    """Converts a Pydantic model to 'clean' dict (no null or empty properties)"""
-    obj_dict = json.loads(obj.model_dump_json())
-    remove_null(obj_dict)
-    return obj_dict
-
-
-@tracer.capture_method(capture_response=False)
 def get_ddb_args(
     params: None | dict,
     valid_params: list,
@@ -462,6 +454,23 @@ def json_number(x: any) -> float | int:
 
 
 @tracer.capture_method(capture_response=False)
+def model_dump(model, **kwargs):
+    args = {"by_alias": True, "exclude_unset": True, "exclude_none": True, **kwargs}
+    model_dict = model.model_dump(mode="json", **args)
+    remove_null(model_dict)
+    return model_dict
+
+
+@tracer.capture_method(capture_response=False)
+def model_dump_json(model, **kwargs):
+    if isinstance(model, list):
+        model_dict = [model_dump(m, **kwargs) for m in model]
+    else:
+        model_dict = model_dump(model, **kwargs)
+    return json.dumps(model_dict)
+
+
+@tracer.capture_method(capture_response=False)
 def pop_outliers(timerange: TimeRange, items: list) -> None:
     """Remove ends of a list of Timerange items if they do not fully cover teh supplied Timerange"""
     if len(items) > 1:
@@ -513,13 +522,14 @@ def remove_null(d: any) -> None:
             if v is None or v == {} or v == []:
                 d.pop(k)
             elif isinstance(v, str):
-                try:
-                    dt = datetime.strptime(v, "%Y-%m-%dT%H:%M:%S%z")
-                    d[k] = dt.astimezone(timezone.utc).strftime(
-                        constants.DATETIME_FORMAT
-                    )
-                except ValueError:
-                    pass
+                for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%f"):
+                    try:
+                        dt = datetime.strptime(v, fmt)
+                        d[k] = dt.astimezone(timezone.utc).strftime(
+                            constants.DATETIME_FORMAT
+                        )
+                    except ValueError:
+                        pass
             else:
                 remove_null(v)
 
@@ -541,7 +551,7 @@ def update_collected_by(
     else:
         if add_to:
             flow.root.collected_by = [flow_id]
-    item_dict = get_clean_item(flow)
+    item_dict = model_dump(flow)
     table.put_item(Item={"record_type": "flow", **item_dict})
     publish_event("flows/updated", {"flow": item_dict}, [flow_id])
 
@@ -553,14 +563,14 @@ def update_flow_collection(
     """update the flow_collection on the specified flow"""
     item = table.get_item(Key={"record_type": "flow", "id": collected_by_id})
     if "Item" in item:
-        flow: Flow = parse(event=item["Item"], model=Flow)
+        flow: Flow = Flow(**item["Item"])
         if flow.root.flow_collection:
             flow.root.flow_collection = [
                 collection
                 for collection in flow.root.flow_collection
                 if collection.id != flow_id
             ]
-            item_dict = get_clean_item(flow)
+            item_dict = model_dump(flow)
             table.put_item(Item={"record_type": "flow", **item_dict})
             publish_event("flows/updated", {"flow": item_dict}, [flow_id])
 
@@ -574,10 +584,10 @@ def update_flow_segments_updated(
     item = table.get_item(Key={"record_type": record_type, "id": flow_id})
     if "Item" not in item:
         return
-    flow: Flow = parse(event=item["Item"], model=Flow)
+    flow: Flow = Flow(**item["Item"])
     now = datetime.now().strftime(constants.DATETIME_FORMAT)
     flow.root.segments_updated = now
-    item_dict = get_clean_item(flow)
+    item_dict = model_dump(flow)
     try:
         table.put_item(
             Item={"record_type": record_type, **item_dict},

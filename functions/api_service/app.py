@@ -1,4 +1,3 @@
-import json
 import os
 from http import HTTPStatus
 
@@ -7,11 +6,17 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.parser import parse
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
-from schema import Service, Servicepost, Webhookpost
-from utils import get_clean_item
+from schema import (
+    Eventstreamcommon,
+    MediaStore,
+    Service,
+    Servicepost,
+    Webhook,
+    Webhookpost,
+)
+from utils import model_dump_json
 
 tracer = Tracer()
 logger = Logger()
@@ -28,13 +33,12 @@ table_name = os.environ.get("WEBHOOKS_TABLE", None)
 def get_service():
     try:
         stage_variables = app.current_event.stage_variables
-        service_dict = {
-            "type": "urn:x-tams:service.example",
-            "api_version": stage_variables["api_version"],
-            "service_version": stage_variables["service_version"],
-            "media_store": {"type": "http_object_store"},
-        }
-        service: Service = parse(event=service_dict, model=Service)
+        service = Service(
+            type="urn:x-tams:service.example",
+            api_version=stage_variables["api_version"],
+            service_version=stage_variables["service_version"],
+            media_store=MediaStore(type="http_object_store"),
+        )
         if "name" in stage_variables:
             service.name = stage_variables["name"]
         if "description" in stage_variables:
@@ -44,10 +48,15 @@ def get_service():
         )
         if webhooks_enabled:
             if service.event_stream_mechanisms:
-                service.event_stream_mechanisms.append({"name": "webhooks"})
+                service.event_stream_mechanisms.append(
+                    Eventstreamcommon(name="webhooks")
+                )
             else:
-                service.event_stream_mechanisms = [{"name": "webhooks"}]
-        return get_clean_item(service), HTTPStatus.OK.value  # 200
+                service.event_stream_mechanisms = [Eventstreamcommon(name="webhooks")]
+        return (
+            service.model_dump_json(by_alias=True, exclude_unset=True),
+            HTTPStatus.OK.value,
+        )  # 200
     except Exception as e:
         raise NotFoundError from e  # 404
 
@@ -104,7 +113,7 @@ def get_webhooks():
         else:
             schema_dict[item["url"]] = {**item, "events": [event]}
     return (
-        json.dumps(list(schema_dict.values())),
+        model_dump_json([Webhook(**v) for v in schema_dict.values()]),
         HTTPStatus.OK.value,
     )  # 200
 
@@ -116,29 +125,35 @@ def post_webhooks(webhook: Webhookpost):
         raise NotFoundError(
             "Webhooks are not supported by this API implementation"
         )  # 404
-    item_dict = get_clean_item(webhook)
-    request_events = []
-    if "events" in item_dict:
-        request_events = item_dict.pop("events")
     webhooks_table = dynamodb.Table(table_name)
     query = webhooks_table.query(
         IndexName="url-index",
-        KeyConditionExpression=Key("url").eq(item_dict["url"]),
+        KeyConditionExpression=Key("url").eq(webhook.url),
     )
     existing_events = [item["event"] for item in query["Items"]]
     delete_events = [
-        {"event": e, "url": item_dict["url"]}
+        {"event": e, "url": webhook.url}
         for e in existing_events
-        if e not in request_events
+        if e not in webhook.events
     ]
     with webhooks_table.batch_writer() as batch:
-        for event in request_events:
-            batch.put_item(Item={**item_dict, "event": event})
+        for event in webhook.events:
+            batch.put_item(
+                Item={
+                    **webhook.model_dump(
+                        by_alias=True, exclude_unset=True, exclude={"events"}
+                    ),
+                    "event": event,
+                }
+            )
         for item in delete_events:
             batch.delete_item(Key=item)
-    if len(request_events) == 0:
+    if len(webhook.events) == 0:
         return None, HTTPStatus.NO_CONTENT.value  # 204
-    return get_clean_item(webhook), HTTPStatus.CREATED.value  # 201
+    return (
+        webhook.model_dump_json(by_alias=True, exclude_unset=True),
+        HTTPStatus.CREATED.value,
+    )  # 201
 
 
 @logger.inject_lambda_context(

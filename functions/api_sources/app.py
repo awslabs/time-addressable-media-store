@@ -4,7 +4,6 @@ from datetime import datetime
 from http import HTTPStatus
 
 import boto3
-import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
@@ -17,16 +16,15 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
 )
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.parser import parse
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from schema import Source, Tags
 from utils import (
     generate_link_url,
-    get_clean_item,
     get_ddb_args,
     get_username,
-    json_number,
+    model_dump,
+    model_dump_json,
     publish_event,
     validate_query_string,
 )
@@ -82,16 +80,12 @@ def list_sources():
             body=None,
             headers=custom_headers,
         )
-    schema_items = [
-        get_clean_item(
-            parse(event={**item, **get_collections(item["id"])}, model=Source)
-        )
-        for item in items
-    ]
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=json.dumps(schema_items, default=json_number),
+        body=model_dump_json(
+            [Source(**item, **get_collections(item["id"])) for item in items]
+        ),
         headers=custom_headers,
     )
 
@@ -108,8 +102,11 @@ def get_source_details(sourceId: str):
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
     item["Item"] = {**item["Item"], **get_collections(sourceId)}
-    source: Source = parse(event=item["Item"], model=Source)
-    return get_clean_item(source), HTTPStatus.OK.value  # 200
+    source: Source = Source(**item["Item"])
+    return (
+        model_dump_json(source),
+        HTTPStatus.OK.value,
+    )  # 200
 
 
 @app.route("/sources/<sourceId>/tags", method=["HEAD"])
@@ -123,9 +120,10 @@ def get_source_tags(sourceId: str):
         raise NotFoundError("The requested Source does not exist.")  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    if "tags" not in item["Item"]:
-        return json.dumps({}), HTTPStatus.OK.value  # 200
-    return json.dumps(item["Item"]["tags"]), HTTPStatus.OK.value  # 200
+    return (
+        model_dump_json(Tags(**(item["Item"].get("tags", {})))),
+        HTTPStatus.OK.value,
+    )  # 200
 
 
 @app.route("/sources/<sourceId>/tags/<name>", method=["HEAD"])
@@ -162,16 +160,15 @@ def put_source_tag_value(sourceId: str, name: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source tag value.")  # 400
-    source: Source = parse(event=item["Item"], model=Source)
+    source: Source = Source(**item["Item"])
     if source.tags is None:
         source.tags = Tags(root={name: body})
     else:
         source.tags.root[name] = body
-    now = datetime.now().strftime(constants.DATETIME_FORMAT)
     username = get_username(app.current_event.request_context)
-    source.updated = now
+    source.updated = datetime.now()  # now
     source.updated_by = username
-    item_dict = get_clean_item(source)
+    item_dict = model_dump(source)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -187,15 +184,14 @@ def delete_source_tag(sourceId: str, name: str):
         raise NotFoundError(
             "The requested Source ID or tag in the path is invalid."
         )  # 404
-    source: Source = parse(event=item["Item"], model=Source)
+    source: Source = Source(**item["Item"])
     if source.tags is None or name not in source.tags.root:
         raise NotFoundError(
             "The requested Source ID or tag in the path is invalid."
         )  # 404
-    now = datetime.now().strftime(constants.DATETIME_FORMAT)
-    source.updated = now
+    source.updated = datetime.now()  # now
     del source.tags.root[name]
-    item_dict = get_clean_item(source)
+    item_dict = model_dump(source)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -232,13 +228,12 @@ def put_source_description(sourceId: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source description.")  # 400
-    source: Source = parse(event=item["Item"], model=Source)
-    now = datetime.now().strftime(constants.DATETIME_FORMAT)
+    source: Source = Source(**item["Item"])
     username = get_username(app.current_event.request_context)
-    source.updated = now
+    source.updated = datetime.now()  # now
     source.updated_by = username
     source.description = body
-    item_dict = get_clean_item(source)
+    item_dict = model_dump(source)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -252,11 +247,10 @@ def delete_source_description(sourceId: str):
     )
     if "Item" not in item:
         raise NotFoundError("The Source ID in the path is invalid.")  # 404
-    source: Source = parse(event=item["Item"], model=Source)
-    now = datetime.now().strftime(constants.DATETIME_FORMAT)
-    source.updated = now
+    source: Source = Source(**item["Item"])
+    source.updated = datetime.now()  # now
     source.description = None
-    item_dict = get_clean_item(source)
+    item_dict = model_dump(source)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -294,13 +288,12 @@ def put_source_label(sourceId: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source label.")  # 400
-    source: Source = parse(event=item["Item"], model=Source)
-    now = datetime.now().strftime(constants.DATETIME_FORMAT)
+    source: Source = Source(**item["Item"])
     username = get_username(app.current_event.request_context)
-    source.updated = now
+    source.updated = datetime.now()  # now
     source.updated_by = username
     source.label = body
-    item_dict = get_clean_item(source)
+    item_dict = model_dump(source)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -314,11 +307,10 @@ def delete_source_label(sourceId: str):
     )
     if "Item" not in item:
         raise NotFoundError("The requested Source ID in the path is invalid.")  # 404
-    source: Source = parse(event=item["Item"], model=Source)
-    now = datetime.now().strftime(constants.DATETIME_FORMAT)
-    source.updated = now
+    source: Source = Source(**item["Item"])
+    source.updated = datetime.now()  # now
     source.label = None
-    item_dict = get_clean_item(source)
+    item_dict = model_dump(source)
     table.put_item(Item={"record_type": record_type, **item_dict})
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204

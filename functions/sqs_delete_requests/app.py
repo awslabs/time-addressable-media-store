@@ -4,7 +4,6 @@ import os
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.data_classes.sqs_event import SQSEvent
-from aws_lambda_powertools.utilities.parser import parse
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from mediatimestamp.immutable import TimeRange
 from schema import Flow
@@ -47,7 +46,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
                 publish_event(
                     "flows/deleted", {"flow_id": body["flow_id"]}, [body["flow_id"]]
                 )
-                flow: Flow = parse(event=delete_item["Attributes"], model=Flow)
+                flow: Flow = Flow(**delete_item["Attributes"])
                 # Delete source if no longer referenced by any other flows
                 check_delete_source(table, delete_item["Attributes"]["source_id"])
                 # Update collections that either referenced this flow or were referenced by it
