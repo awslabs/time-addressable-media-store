@@ -17,7 +17,6 @@ from aws_lambda_powertools.event_handler.exceptions import (
     ServiceError,
 )
 from aws_lambda_powertools.logging import correlation_paths
-from aws_lambda_powertools.utilities.parser import parse
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from mediatimestamp.immutable import TimeRange
@@ -28,10 +27,10 @@ from utils import (
     delete_flow_segments,
     generate_link_url,
     generate_presigned_url,
-    get_clean_item,
     get_flow_timerange,
     get_key_and_args,
-    json_number,
+    model_dump,
+    model_dump_json,
     publish_event,
     put_deletion_request,
     update_flow_segments_updated,
@@ -61,7 +60,7 @@ def get_flow_segments_by_id(flowId: str):
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400
     try:
-        parse(event=json.dumps(flowId), model=Uuid)
+        Uuid(root=flowId)
     except ValidationError as ex:
         raise NotFoundError("The flow ID in the path is invalid.") from ex  # 404
     item = table.get_item(
@@ -123,26 +122,25 @@ def get_flow_segments_by_id(flowId: str):
             body=None,
             headers=custom_headers,
         )
-    schema_items = [
-        get_clean_item(parse(event=item, model=Flowsegment)) for item in items
-    ]
+    schema_items = [Flowsegment(**item) for item in items]
     presigned_urls = generate_urls_parallel(
-        set(item["object_id"] for item in schema_items)
+        set(item.object_id for item in schema_items)
     )
     # Add url to items
     stage_variables = app.current_event.stage_variables
     for item in schema_items:
-        item["get_urls"] = [
-            *item.get("get_urls", []),
-            {
-                "label": f'aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}',
-                "url": presigned_urls[item["object_id"]],
-            },
-        ]
+        get_url = {
+            "label": f'aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}',
+            "url": presigned_urls[item.object_id],
+        }
+        if item.get_urls:
+            item.get_urls.append(get_url)
+        else:
+            item.get_urls = [get_url]
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=json.dumps(schema_items, default=json_number),
+        body=model_dump_json(schema_items),
         headers=custom_headers,
     )
 
@@ -153,7 +151,7 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
     item = table.get_item(Key={"record_type": "flow", "id": flowId})
     if "Item" not in item:
         raise NotFoundError("The flow does not exist.")  # 404
-    flow: Flow = parse(event=item["Item"], model=Flow)
+    flow: Flow = Flow(**item["Item"])
     if flow.root.read_only:
         raise ServiceError(
             403,
@@ -163,7 +161,7 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
         )  # 400
-    item_dict = get_clean_item(flow_segment)
+    item_dict = model_dump(flow_segment)
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flowId, segment_timerange):
         raise BadRequestError(
@@ -187,7 +185,7 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
         {"flow_id": flowId, "timerange": item_dict["timerange"]},
         [flowId],
     )
-    return get_clean_item(flow_segment), HTTPStatus.CREATED.value  # 201
+    return model_dump_json(flow_segment), HTTPStatus.CREATED.value  # 201
 
 
 @app.delete("/flows/<flowId>/segments")
@@ -199,7 +197,7 @@ def delete_flow_segments_by_id(flowId: str):
     item = table.get_item(Key={"record_type": "flow", "id": flowId})
     if "Item" not in item:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
-    flow: Flow = parse(event=item["Item"], model=Flow)
+    flow: Flow = Flow(**item["Item"])
     if flow.root.read_only:
         raise ServiceError(
             403,
@@ -239,11 +237,7 @@ def delete_flow_segments_by_id(flowId: str):
         return Response(
             status_code=HTTPStatus.ACCEPTED.value,  # 202
             content_type=content_types.APPLICATION_JSON,
-            body=json.dumps(
-                get_clean_item(
-                    parse(event=deletion_request_dict, model=Deletionrequest)
-                )
-            ),
+            body=model_dump_json(Deletionrequest(**deletion_request_dict)),
             headers={
                 "Location": f'https://{app.current_event.request_context.domain_name}{app.current_event.request_context.path.split("/flows/")[0]}/flow-delete-requests/{deletion_request_dict["id"]}'
             },
