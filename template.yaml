@@ -55,7 +55,7 @@ Resources:
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
-      Name: TAMS-API
+      Name: !Ref AWS::StackName
       ResourceQuery:
         Type: CLOUDFORMATION_STACK_1_0
 
@@ -993,7 +993,7 @@ Resources:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
       UserPoolId: !Ref UserPool
-      Domain: !Sub ${AWS::AccountId}-tams-api
+      Domain: !Sub ${AWS::AccountId}-${AWS::StackName}
 
   UserPoolResourceServer:
     Type: AWS::Cognito::UserPoolResourceServer
@@ -1108,7 +1108,7 @@ Outputs:
     Value: !Ref UserPool
 
   TokenUrl:
-    Value: !Sub https://${AWS::AccountId}-tams-api.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+    Value: !Sub https://${AWS::AccountId}-${AWS::StackName}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
 
   UserPoolClientId:
     Value: !Ref UserPoolClient
