@@ -11,20 +11,29 @@ Parameters:
       - "No"
     Default: "Yes"
 
-  ExistingVpc:
+  VpcId:
     Description: The ID of an existing VPC, if one exists. Leave blank to have one created.
     Type: String
     Default: ""
+    AllowedPattern: '|vpc-[a-z0-9]+'
 
-  ExistingVpcAZs:
-    Description: Comma-separated list of availability zones to use when deploying to an existing VPC. Must match number of subnets supplied.
+  VpcAZs:
+    Description: Comma-separated list of availability zones (e.g. `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds.
     Type: CommaDelimitedList
     Default: ""
 
-  ExistingVpcPrivateSubnets:
-    Description: Comma-separated list of private subnets to use when deploying to an existing VPC. Must match number of AZs supplied.
+  PrivateSubnetIds:
+    Description: Comma-separated list of private subnets (e.g. subnet-abc123,subnet-def456) to use when a VPC is specified. Must provide exactly one subnet per Availability Zone specified in VpcAZs.
     Type: CommaDelimitedList
     Default: ""
+    AllowedPattern: '|subnet-[a-z0-9]+'
+
+  NeptuneServerlessConfiguration:
+    Description: Neptune Serverless Scaling Configuration.
+    Type: String
+    Default: 1,128
+    ConstraintDescription: ServerlessScalingConfiguration must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1-128.
+    AllowedPattern: (12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9]),(12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9])
 
 Mappings:
   Solution:
@@ -35,7 +44,7 @@ Mappings:
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
 
-  CreateVpc: !Equals [!Ref ExistingVpc, ""]
+  CreateVpc: !Equals [!Ref VpcId, ""]
 
 Transform: AWS::Serverless-2016-10-31
 
@@ -53,7 +62,7 @@ Globals:
         POWERTOOLS_LOG_LEVEL: INFO
         NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
     VpcConfig:
-      SubnetIds: !If [CreateVpc, !Split [',', !GetAtt VpcStack.Outputs.PrivateSubnets], !Ref ExistingVpcPrivateSubnets]
+      SubnetIds: !If [CreateVpc, !Split [',', !GetAtt VpcStack.Outputs.PrivateSubnetIds], !Ref PrivateSubnetIds]
       SecurityGroupIds:
         - !Ref LambdaSecurityGroup
 
@@ -289,7 +298,7 @@ Resources:
             reason: Outbound https to all epxected
     Properties:
       GroupDescription: Security group for Vpc Lambdas
-      VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VPCId, !Ref ExistingVpc]
+      VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcId, !Ref VpcId]
       SecurityGroupEgress:
         - Description: Explicit egress group locking down outbound access to only HTTPS
           CidrIp: 0.0.0.0/0
@@ -1155,10 +1164,11 @@ Resources:
     Properties:
       TemplateURL: templates/neptune.yaml
       Parameters:
-        VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VPCId, !Ref ExistingVpc]
-        VpcAZs: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcAZs, !Join [',', !Ref ExistingVpcAZs]]
-        PrivateSubnetIds: !If [CreateVpc, !GetAtt VpcStack.Outputs.PrivateSubnets, !Join [',', !Ref ExistingVpcPrivateSubnets]]
+        VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcId, !Ref VpcId]
+        VpcAZs: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcAZs, !Join [',', !Ref VpcAZs]]
+        PrivateSubnetIds: !If [CreateVpc, !GetAtt VpcStack.Outputs.PrivateSubnetIds, !Join [',', !Ref PrivateSubnetIds]]
         LambdaSecurityGroupId: !Ref LambdaSecurityGroup
+        ServerlessScalingConfiguration: !Ref NeptuneServerlessConfiguration
 
 Outputs:
   ApiEndpoint:

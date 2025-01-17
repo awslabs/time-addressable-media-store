@@ -20,6 +20,13 @@ Parameters:
     Description: Lambda Security Group ID
     Type: AWS::EC2::SecurityGroup::Id
 
+  ServerlessScalingConfiguration:
+    Description: Neptune Serverless Scaling Configuration.
+    Type: String
+    ConstraintDescription: "ServerlessScalingConfiguration must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1-128."
+    AllowedPattern: (12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9]),(12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9])
+    Default: 1,128
+
 Resources:
 
   DBSubnetGroup:
@@ -60,8 +67,8 @@ Resources:
       VpcSecurityGroupIds:
         - !Ref NeptuneSecurityGroup
       ServerlessScalingConfiguration:
-        MinCapacity: 1
-        MaxCapacity: 128
+        MinCapacity: !Select [0, !Split [",", !Ref ServerlessScalingConfiguration]]
+        MaxCapacity: !Select [1, !Split [",", !Ref ServerlessScalingConfiguration]]
 
   TAMSNeptuneInstance:
     Type: AWS::Neptune::DBInstance
