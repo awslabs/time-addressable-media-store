@@ -11,6 +11,21 @@ Parameters:
       - "No"
     Default: "Yes"
 
+  ExistingVpc:
+    Description: The ID of an existing VPC, if one exists. Leave blank to have one created.
+    Type: String
+    Default: ""
+
+  ExistingVpcAZs:
+    Description: Comma-separated list of availability zones to use when deploying to an existing VPC. Must match number of subnets supplied.
+    Type: CommaDelimitedList
+    Default: ""
+
+  ExistingVpcPrivateSubnets:
+    Description: Comma-separated list of private subnets to use when deploying to an existing VPC. Must match number of AZs supplied.
+    Type: CommaDelimitedList
+    Default: ""
+
 Mappings:
   Solution:
     Constants:
@@ -19,6 +34,8 @@ Mappings:
 
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
+
+  CreateVpc: !Equals [!Ref ExistingVpc, ""]
 
 Transform: AWS::Serverless-2016-10-31
 
@@ -34,6 +51,11 @@ Globals:
     Environment:
       Variables:
         POWERTOOLS_LOG_LEVEL: INFO
+        NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+    VpcConfig:
+      SubnetIds: !If [CreateVpc, !Split [',', !GetAtt VpcStack.Outputs.PrivateSubnets], !Ref ExistingVpcPrivateSubnets]
+      SecurityGroupIds:
+        - !Ref LambdaSecurityGroup
 
   Api:
     OpenApiVersion: 3.0.1
@@ -258,13 +280,35 @@ Resources:
       CompatibleArchitectures:
         - arm64
 
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W5
+            reason: Outbound https to all epxected
+    Properties:
+      GroupDescription: Security group for Vpc Lambdas
+      VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VPCId, !Ref ExistingVpc]
+      SecurityGroupEgress:
+        - Description: Explicit egress group locking down outbound access to only HTTPS
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: 443
+          FromPort: 443
+        - Description: Explicit egress group locking down outbound access to only Neptune
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: 8182
+          FromPort: 8182
+
   ServiceFunction:
     Type: AWS::Serverless::Function
     Metadata:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -346,7 +390,7 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -498,7 +542,7 @@ Resources:
         rules_to_suppress:
           - id: W76
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -699,7 +743,7 @@ Resources:
         rules_to_suppress:
           - id: W76
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -788,7 +832,7 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -835,7 +879,7 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -872,7 +916,7 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -931,7 +975,7 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
@@ -1099,6 +1143,22 @@ Resources:
       IdentityPoolId: !Ref IdentityPool
       Roles:
         authenticated: !GetAtt AuthRole.Arn
+
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/vpc.yaml
+    Condition: CreateVpc
+
+  NeptuneStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/neptune.yaml
+      Parameters:
+        VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VPCId, !Ref ExistingVpc]
+        VpcAZs: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcAZs, !Join [',', !Ref ExistingVpcAZs]]
+        PrivateSubnetIds: !If [CreateVpc, !GetAtt VpcStack.Outputs.PrivateSubnets, !Join [',', !Ref ExistingVpcPrivateSubnets]]
+        LambdaSecurityGroupId: !Ref LambdaSecurityGroup
 
 Outputs:
   ApiEndpoint:
