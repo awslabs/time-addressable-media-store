@@ -18,7 +18,7 @@ Mappings:
 
 Resources:
 
-  VPC:
+  Vpc:
     Type: AWS::EC2::VPC
     Metadata:
       cfn_nag:
@@ -41,7 +41,7 @@ Resources:
           - id: W33
             reason: Public Subnet
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       AvailabilityZone:
         Fn::Select:
           - 0
@@ -60,7 +60,7 @@ Resources:
           - id: W33
             reason: Public Subnet
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       AvailabilityZone:
         Fn::Select:
           - 1
@@ -74,7 +74,7 @@ Resources:
   PrivateSubnet0:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       AvailabilityZone:
         Fn::Select:
           - 0
@@ -88,7 +88,7 @@ Resources:
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       AvailabilityZone:
         Fn::Select:
           - 1
@@ -109,13 +109,13 @@ Resources:
   GatewayToInternet:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       InternetGatewayId: !Ref InternetGateway
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-public
@@ -177,7 +177,7 @@ Resources:
   PrivateRouteTable0:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-private-0
@@ -185,7 +185,7 @@ Resources:
   PrivateRouteTable1:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-private-1
@@ -219,7 +219,7 @@ Resources:
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
       RouteTableIds:
         - !Ref PublicRouteTable
@@ -229,7 +229,7 @@ Resources:
   DynamoDbEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref Vpc
       ServiceName: !Sub com.amazonaws.${AWS::Region}.dynamodb
       RouteTableIds:
         - !Ref PublicRouteTable
@@ -238,14 +238,14 @@ Resources:
 
 Outputs:
 
-  VPCId:
-    Description: VPCId of VPC
-    Value: !Ref VPC
+  VpcId:
+    Description: The Id of the Vpc
+    Value: !Ref Vpc
 
   VpcAZs:
     Description: The AWS AZs used by this VPC
     Value: !Join [",", [!GetAtt PrivateSubnet0.AvailabilityZone, !GetAtt PrivateSubnet1.AvailabilityZone]]
 
-  PrivateSubnets:
+  PrivateSubnetIds:
     Description: SubnetId of private subnets
     Value: !Join [",", [!Ref PrivateSubnet0, !Ref PrivateSubnet1]]
