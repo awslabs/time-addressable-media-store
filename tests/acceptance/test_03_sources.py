@@ -276,6 +276,11 @@ def test_List_Sources_GET_200(api_client_cognito):
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
+    for record in response_json:
+        if "source_collection" in record:
+            record["source_collection"] = sorted(
+                record["source_collection"], key=lambda sc: sc["id"]
+            )
     # Assert
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
@@ -327,6 +332,11 @@ def test_List_Sources_GET_200_label(api_client_cognito):
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
+    for record in response_json:
+        if "source_collection" in record:
+            record["source_collection"] = sorted(
+                record["source_collection"], key=lambda sc: sc["id"]
+            )
     # Assert
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
@@ -390,6 +400,11 @@ def test_List_Sources_GET_200_tag_name(api_client_cognito):
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
+    for record in response_json:
+        if "source_collection" in record:
+            record["source_collection"] = sorted(
+                record["source_collection"], key=lambda sc: sc["id"]
+            )
     # Assert
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower

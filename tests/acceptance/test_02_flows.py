@@ -577,6 +577,11 @@ def test_List_Flows_GET_200(api_client_cognito):
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
+    for record in response_json:
+        if "flow_collection" in record:
+            record["flow_collection"] = sorted(
+                record["flow_collection"], key=lambda fc: fc["id"]
+            )
     # Assert
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
@@ -682,6 +687,11 @@ def test_List_Flows_GET_200_label(api_client_cognito):
     response = api_client_cognito.request("GET", path, params={"label": "pytest"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
+    for record in response_json:
+        if "flow_collection" in record:
+            record["flow_collection"] = sorted(
+                record["flow_collection"], key=lambda fc: fc["id"]
+            )
     # Assert
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
@@ -757,6 +767,11 @@ def test_List_Flows_GET_200_tag_name(api_client_cognito):
     response = api_client_cognito.request("GET", path, params={"tag.test": "this"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
+    for record in response_json:
+        if "flow_collection" in record:
+            record["flow_collection"] = sorted(
+                record["flow_collection"], key=lambda fc: fc["id"]
+            )
     # Assert
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
