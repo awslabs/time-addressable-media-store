@@ -19,6 +19,7 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
 from aws_lambda_powertools.utilities.parser import parse
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from mediatimestamp.immutable import TimeRange
 from params import essence_params, query_params
@@ -28,7 +29,9 @@ tracer = Tracer()
 
 events = boto3.client("events")
 sqs = boto3.client("sqs")
-s3 = boto3.client("s3")
+s3 = boto3.client(
+    "s3", config=Config(s3={"addressing_style": "virtual"})
+)  # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 
 
 @tracer.capture_method(capture_response=False)
