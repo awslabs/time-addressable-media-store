@@ -5,6 +5,7 @@ DELETE_BATCH_SIZE = 100
 MAX_MESSAGE_SIZE = 250000
 LAMBDA_TIME_REMAINING = 5000
 DEFAULT_PUT_LIMIT = 100
+SERIALISE_PREFIX = "SERIALISE_"
 RETURN_LITERAL = {
     "source": "source {.*, tags: t {.*}, source_collection: collect(DISTINCT c {.*, id: sc.id}), collected_by: collect(DISTINCT cb.id)}",
     "flow": "flow {.*, source_id: s.id, essence_parameters: e {.*}, tags: t {.*}, flow_collection: collect(c {.*, id: fc.id}), collected_by: collect(cb.id)}",

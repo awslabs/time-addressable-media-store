@@ -4,10 +4,13 @@ import math
 import os
 import urllib.parse
 import uuid
+from copy import deepcopy
 from datetime import datetime, timezone
+from enum import Enum
 
 # pylint: disable=no-name-in-module
 from itertools import batched
+from typing import Type
 
 import boto3
 import constants
@@ -39,6 +42,11 @@ neptune = boto3.client(
 qb = QueryBuilder()
 
 
+class TimeRangeBoundary(Enum):
+    START = "start"
+    END = "end"
+
+
 @tracer.capture_method(capture_response=False)
 def base_delete_request_dict(
     flow_id: str, request_context: APIGatewayEventRequestContext
@@ -62,19 +70,11 @@ def check_delete_source(source_id: str) -> None:
         qb.match()
         .node(ref_name="source", labels="source", properties={"id": source_id})
         .where_literal("NOT exists((source)<-[:represents]-(:flow))")
+        .detach_delete(ref_name="source")
         .return_literal("source.id AS source_id")
         .get()
     )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    if len(results["results"]) != 0:
-        query = (
-            qb.match()
-            .node(ref_name="source", labels="source", properties={"id": source_id})
-            .detach_delete(ref_name="source")
-            .return_literal("source.id AS source_id")
-            .get()
-        )
-        neptune.execute_open_cypher_query(openCypherQuery=query)
+    neptune.execute_open_cypher_query(openCypherQuery=query)
 
 
 @tracer.capture_method(capture_response=False)
@@ -95,7 +95,7 @@ def delete_flow_segments(
     query = segments_table.query(**args)
     object_ids = set()
     # Pop first and/or last item in array if they are not entirely covered by the deletion timerange
-    pop_outliers(timerange_to_delete, query["Items"])
+    query["Items"] = pop_outliers(timerange_to_delete, query["Items"])
     if len(query["Items"]) > 0:
         delete_error = delete_segment_items(
             segments_table,
@@ -114,7 +114,7 @@ def delete_flow_segments(
             ExclusiveStartKey=query["LastEvaluatedKey"],
         )
         # Pop first and/or last item in array if they are not entirely covered by the deletion timerange
-        pop_outliers(timerange_to_delete, query["Items"])
+        query["Items"] = pop_outliers(timerange_to_delete, query["Items"])
         if len(query["Items"]) > 0:
             delete_error = delete_segment_items(
                 segments_table,
@@ -272,6 +272,33 @@ def get_flow_timerange(
 
 
 @tracer.capture_method(capture_response=False)
+def get_timerange_expression(
+    expression_type: Type[Attr] | Type[Key],
+    boundary: TimeRangeBoundary,
+    filter_value: TimeRange,
+):
+    """Returns a DynamoDB expression, for Key or Filter, to add the specfied timerange condition."""
+    other_boundary = (
+        TimeRangeBoundary.START
+        if boundary == TimeRangeBoundary.END
+        else TimeRangeBoundary.END
+    )
+    include_method = getattr(filter_value, f"includes_{other_boundary.value}")
+    nanosec_value = getattr(filter_value, other_boundary.value).to_nanosec()
+    match boundary:
+        case TimeRangeBoundary.START:
+            if include_method():
+                return expression_type(f"timerange_{boundary.value}").lte(nanosec_value)
+            else:
+                return expression_type(f"timerange_{boundary.value}").lt(nanosec_value)
+        case TimeRangeBoundary.END:
+            if include_method():
+                return expression_type(f"timerange_{boundary.value}").gte(nanosec_value)
+            else:
+                return expression_type(f"timerange_{boundary.value}").gt(nanosec_value)
+
+
+@tracer.capture_method(capture_response=False)
 def get_key_and_args(flow_id: str, parameters: None | dict) -> tuple[dict, bool]:
     """Generate key expression and args for a dynamodb query operation"""
     args = {
@@ -281,16 +308,11 @@ def get_key_and_args(flow_id: str, parameters: None | dict) -> tuple[dict, bool]
     }
     if parameters is None:
         return args
-    args["ScanIndexForward"] = (
-        not parameters.get("reverse_order", "false").lower() == "true"
-    )
+    reverse_order = parameters.get("reverse_order", "false").lower() == "true"
+    args["ScanIndexForward"] = not reverse_order
     # Pagination query string parameters
     if "limit" in parameters:
-        args["Limit"] = (
-            int(parameters["limit"])
-            if int(parameters["limit"]) < constants.MAX_PAGE_LIMIT
-            else constants.MAX_PAGE_LIMIT
-        )
+        args["Limit"] = min(int(parameters["limit"]), constants.MAX_PAGE_LIMIT)
     if "page" in parameters:
         args["ExclusiveStartKey"] = {
             "flow_id": flow_id,
@@ -312,25 +334,17 @@ def get_key_and_args(flow_id: str, parameters: None | dict) -> tuple[dict, bool]
     elif timerange_filter and timerange_filter.start:
         args["KeyConditionExpression"] = And(
             args["KeyConditionExpression"],
-            (
-                Key("timerange_end").gte(timerange_filter.start.to_nanosec())
-                if timerange_filter.includes_end()
-                else Key("timerange_end").gt(timerange_filter.start.to_nanosec())
-            ),
+            get_timerange_expression(Key, TimeRangeBoundary.END, timerange_filter),
         )
     # Build Filter expression
     if timerange_filter:
         if timerange_filter.start and "object_id" in parameters:
-            args["FilterExpression"] = (
-                Attr("timerange_end").gte(timerange_filter.start.to_nanosec())
-                if timerange_filter.includes_start()
-                else Attr("timerange_end").gt(timerange_filter.start.to_nanosec())
+            args["FilterExpression"] = get_timerange_expression(
+                Attr, TimeRangeBoundary.END, timerange_filter
             )
         if timerange_filter.end:
-            args["FilterExpression"] = (
-                Attr("timerange_start").lte(timerange_filter.end.to_nanosec())
-                if timerange_filter.includes_end()
-                else Attr("timerange_start").lt(timerange_filter.end.to_nanosec())
+            args["FilterExpression"] = get_timerange_expression(
+                Attr, TimeRangeBoundary.START, timerange_filter
             )
     return args
 
@@ -395,14 +409,15 @@ def model_dump_json(model: BaseModel | list[BaseModel], **kwargs: None | dict):
 
 
 @tracer.capture_method(capture_response=False)
-def pop_outliers(timerange: TimeRange, items: list) -> None:
-    """Remove ends of a list of Timerange items if they do not fully cover teh supplied Timerange"""
+def pop_outliers(timerange: TimeRange, items: list) -> list:
+    """Remove ends of a list of Timerange items if they do not fully cover the supplied Timerange"""
     if len(items) > 1:
         if not timerange.contains_subrange(TimeRange.from_str(items[-1]["timerange"])):
-            items.pop(-1)
+            return items[:-1]
     if len(items) > 0:
         if not timerange.contains_subrange(TimeRange.from_str(items[0]["timerange"])):
-            items.pop(0)
+            return items[1:]
+    return items
 
 
 @tracer.capture_method(capture_response=False)
@@ -430,24 +445,24 @@ def put_deletion_request(queue: str, item: dict) -> None:
         QueueUrl=queue,
         MessageBody=json.dumps(item),
     )
-    merge_delete_request(item.copy())
+    merge_delete_request(item)
 
 
 @tracer.capture_method(capture_response=False)
-def remove_null(d: any) -> None:
-    """Removes null and other "empty" keys from a dict recursively"""
-    if isinstance(d, list):
-        for i in d:
+def remove_null(obj: dict | list) -> None:
+    """Removes null and other "empty" keys from a dict/list recursively"""
+    if isinstance(obj, list):
+        for i in obj:
             remove_null(i)
-    elif isinstance(d, dict):
-        for k, v in d.copy().items():
+    elif isinstance(obj, dict):
+        for k, v in list(obj.items()):
             if v is None or v == {} or v == []:
-                d.pop(k)
+                obj.pop(k)
             elif isinstance(v, str):
                 for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%f"):
                     try:
                         dt = datetime.strptime(v, fmt)
-                        d[k] = dt.astimezone(timezone.utc).strftime(
+                        obj[k] = dt.astimezone(timezone.utc).strftime(
                             constants.DATETIME_FORMAT
                         )
                     except ValueError:
@@ -471,6 +486,9 @@ def update_flow_segments_updated(flow_id: str) -> None:
         )
         publish_event("flows/updated", {"flow": item_dict}, [flow_id])
     except ValueError:
+        # The set_node_property_base function will throw an exception
+        # if specified flow does not exist. When setting the segments_updated
+        # field in the database don't need to worry if the flow does not exist.
         return
 
 
@@ -492,14 +510,151 @@ def validate_query_string(
 
 
 @tracer.capture_method(capture_response=False)
-def serialise_neptune_obj(obj: dict) -> None:
+def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
+    """Return a new dict with properties of type dict/list serialised into string"""
+    return {
+        f"{key_prefix}{constants.SERIALISE_PREFIX if isinstance(v, (list, dict)) else ''}{k}": (
+            json.dumps(v) if isinstance(v, (list, dict)) else v
+        )
+        for k, v in obj.items()
+    }
+
+
+@tracer.capture_method(capture_response=False)
+def deserialise_neptune_obj(obj: dict) -> dict:
     """Modifies Neptune JSON response back to hierachical JSON structure required by API"""
-    for p in list(obj.keys()):
-        if p.startswith("SERIALISE_"):
-            prop_value = obj.pop(p)
-            obj[p[len("SERIALISE_") :]] = json.loads(prop_value)
-        elif isinstance(obj[p], dict):
-            serialise_neptune_obj(obj[p])
+    _obj = deepcopy(obj)  # Work on a copy to avoid mutation
+    for prop_name, prop_value in list(_obj.items()):
+        if prop_name.startswith(constants.SERIALISE_PREFIX):
+            actual_name = prop_name[len(constants.SERIALISE_PREFIX) :]
+            _obj[actual_name] = json.loads(prop_value)
+            del _obj[prop_name]
+        elif isinstance(prop_value, dict):
+            _obj[prop_name] = deserialise_neptune_obj(prop_value)
+    return _obj
+
+
+@tracer.capture_method(capture_response=False)
+# pylint: disable=dangerous-default-value
+def generate_source_query(
+    properties: dict, set_dict: dict = None, where_literals: list = []
+) -> cymple.builder.NodeAvailable:
+    """Returns an Open Cypher Match query to return specified Source"""
+    query = (
+        qb.match()
+        .node(ref_name="f", labels="flow", properties=properties.get("flow", {}))
+        .related_to(label="represents")
+        .node(
+            ref_name="source",
+            labels="source",
+            properties=properties.get("source", {}),
+        )
+        .related_to(
+            ref_name="t",
+            label="has_tags",
+            properties=properties.get("tags", {}),
+        )
+        .node(labels="tags")
+    )
+    if set_dict:
+        query = query.set(set_dict).with_("*")
+    if len(where_literals) > 0:
+        query = query.where_literal(" AND ".join(where_literals))
+    query = (
+        query.match_optional()
+        .node(ref_name="f")
+        .related_from(ref_name="c", label="collected_by")
+        .node(labels="flow")
+        .related_to(label="represents")
+        .node(ref_name="sc", labels="source")
+        .match_optional()
+        .node(ref_name="f")
+        .related_to(label="collected_by")
+        .node(labels="flow")
+        .related_to(label="represents")
+        .node(ref_name="cb", labels="source")
+    )
+    return query
+
+
+@tracer.capture_method(capture_response=False)
+# pylint: disable=dangerous-default-value
+def generate_flow_query(
+    properties: dict, set_dict: dict = None, where_literals: list = []
+) -> cymple.builder.NodeAvailable:
+    """Returns an Open Cypher Match query to return specified Flow"""
+    query = (
+        qb.match()
+        .node(
+            ref_name="flow",
+            labels="flow",
+            properties=properties.get("flow", {}),
+        )
+        .related_to(label="represents")
+        .node(
+            ref_name="s",
+            labels="source",
+            properties=properties.get("source", {}),
+        )
+        .match()
+        .node(ref_name="flow")
+        .related_to(
+            ref_name="e",
+            label="has_essence_parameters",
+            properties=properties.get("essence_parameters", {}),
+        )
+        .node(labels="essence_parameters")
+        .match()
+        .node(ref_name="flow")
+        .related_to(
+            ref_name="t",
+            label="has_tags",
+            properties=properties.get("tags", {}),
+        )
+        .node(labels="tags")
+    )
+    if set_dict:
+        query = query.set(set_dict).with_("*")
+    if len(where_literals) > 0:
+        query = query.where_literal(" AND ".join(where_literals))
+    query = (
+        query.match_optional()
+        .node(ref_name="flow")
+        .related_from(ref_name="c", label="collected_by")
+        .node(ref_name="fc", labels="flow")
+        .match_optional()
+        .node(ref_name="flow")
+        .related_to(label="collected_by")
+        .node(ref_name="cb", labels="flow")
+    )
+    return query
+
+
+@tracer.capture_method(capture_response=False)
+# pylint: disable=dangerous-default-value
+def generate_delete_request_query(
+    properties: dict, set_dict: dict = None, where_literals: list = []
+) -> cymple.builder.NodeAvailable:
+    """Returns an Open Cypher Match query to return specified Delete Request"""
+    query = (
+        qb.match()
+        .node(
+            ref_name="delete_request",
+            labels="delete_request",
+            properties=properties.get("delete_request", {}),
+        )
+        .related_to(
+            ref_name="e",
+            label="has_error",
+            properties=properties.get("error", {}),
+        )
+        .node(labels="error")
+    )
+    if set_dict:
+        query = query.set(set_dict).with_("*")
+    if len(where_literals) > 0:
+        query = query.where_literal(" AND ".join(where_literals))
+    return query
 
 
 @tracer.capture_method(capture_response=False)
@@ -507,112 +662,14 @@ def serialise_neptune_obj(obj: dict) -> None:
 def generate_match_query(
     record_type: str, properties: dict, set_dict: dict = None, where_literals: list = []
 ) -> cymple.builder.NodeAvailable:
-    """Returns an Open Cypher Match query to return specified data"""
+    """Returns an Open Cypher Match query to return specified record type"""
     match record_type:
         case "source":
-            query = (
-                qb.match()
-                .node(
-                    ref_name="f", labels="flow", properties=properties.get("flow", {})
-                )
-                .related_to(label="represents")
-                .node(
-                    ref_name=record_type,
-                    labels="source",
-                    properties=properties.get("source", {}),
-                )
-                .related_to(
-                    ref_name="t",
-                    label="has_tags",
-                    properties=properties.get("tags", {}),
-                )
-                .node(labels="tags")
-            )
-            if set_dict:
-                query = query.set(set_dict).with_("*")
-            if len(where_literals) > 0:
-                query = query.where_literal(" AND ".join(where_literals))
-            query = (
-                query.match_optional()
-                .node(ref_name="f")
-                .related_from(ref_name="c", label="collected_by")
-                .node(labels="flow")
-                .related_to(label="represents")
-                .node(ref_name="sc", labels="source")
-                .match_optional()
-                .node(ref_name="f")
-                .related_to(label="collected_by")
-                .node(labels="flow")
-                .related_to(label="represents")
-                .node(ref_name="cb", labels="source")
-            )
-            return query
+            return generate_source_query(properties, set_dict, where_literals)
         case "flow":
-            query = (
-                qb.match()
-                .node(
-                    ref_name=record_type,
-                    labels="flow",
-                    properties=properties.get("flow", {}),
-                )
-                .related_to(label="represents")
-                .node(
-                    ref_name="s",
-                    labels="source",
-                    properties=properties.get("source", {}),
-                )
-                .match()
-                .node(ref_name=record_type)
-                .related_to(
-                    ref_name="e",
-                    label="has_essence_parameters",
-                    properties=properties.get("essence_parameters", {}),
-                )
-                .node(labels="essence_parameters")
-                .match()
-                .node(ref_name=record_type)
-                .related_to(
-                    ref_name="t",
-                    label="has_tags",
-                    properties=properties.get("tags", {}),
-                )
-                .node(labels="tags")
-            )
-            if set_dict:
-                query = query.set(set_dict).with_("*")
-            if len(where_literals) > 0:
-                query = query.where_literal(" AND ".join(where_literals))
-            query = (
-                query.match_optional()
-                .node(ref_name=record_type)
-                .related_from(ref_name="c", label="collected_by")
-                .node(ref_name="fc", labels="flow")
-                .match_optional()
-                .node(ref_name=record_type)
-                .related_to(label="collected_by")
-                .node(ref_name="cb", labels="flow")
-            )
-            return query
+            return generate_flow_query(properties, set_dict, where_literals)
         case "delete_request":
-            query = (
-                qb.match()
-                .node(
-                    ref_name=record_type,
-                    labels="delete_request",
-                    properties=properties.get("delete_request", {}),
-                )
-                .related_to(
-                    ref_name="e",
-                    label="has_error",
-                    properties=properties.get("error", {}),
-                )
-                .node(labels="error")
-            )
-            if set_dict:
-                query = query.set(set_dict).with_("*")
-            if len(where_literals) > 0:
-                query = query.where_literal(" AND ".join(where_literals))
-            return query
+            return generate_delete_request_query(properties, set_dict, where_literals)
 
 
 @tracer.capture_method(capture_response=False)
@@ -625,84 +682,110 @@ def check_node_exists(record_type: str, record_id: str) -> bool:
         .get()
     )
     results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    return False if len(results["results"]) == 0 else True
+    return len(results["results"]) > 0
 
 
 @tracer.capture_method(capture_response=False)
 def query_node_tags(record_type: str, record_id: str) -> dict:
     """Returns the TAMS Tags for the specified Node"""
-    query = (
-        qb.match()
-        .node(labels=record_type, properties={"id": record_id})
-        .related_to(ref_name="t", label="has_tags")
-        .node(labels="tags")
-        .return_literal("t {.*} AS tags")
-        .get()
-    )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    if len(results["results"]) == 0:
-        raise ValueError("No results returned from the database query.")
-    else:
+    try:
+        query = (
+            qb.match()
+            .node(labels=record_type, properties={"id": record_id})
+            .related_to(ref_name="t", label="has_tags")
+            .node(labels="tags")
+            .return_literal("t {.*} AS tags")
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
         return results["results"][0]["tags"]
+    except IndexError as e:
+        raise ValueError("No results returned from the database query.") from e
 
 
 @tracer.capture_method(capture_response=False)
 def query_node_property(record_type: str, record_id: str, prop_name: str) -> any:
     """Returns the value of the specified Node property"""
-    query = (
-        qb.match()
-        .node(ref_name="n", labels=record_type, properties={"id": record_id})
-        .return_literal(f"n.{prop_name} AS property")
-        .get()
-    )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    if len(results["results"]) == 0:
-        raise ValueError("No results returned from the database query.")
-    else:
+    try:
+        query = (
+            qb.match()
+            .node(ref_name="n", labels=record_type, properties={"id": record_id})
+            .return_literal(f"n.{prop_name} AS property")
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
         return results["results"][0]["property"]
+    except IndexError as e:
+        raise ValueError("No results returned from the database query.") from e
 
 
 @tracer.capture_method(capture_response=False)
 def query_node(record_type: str, record_id: str) -> dict:
     """Returns the specified Node from the Neptune Database"""
-    query = (
-        generate_match_query(record_type, {record_type: {"id": record_id}})
-        .return_literal(constants.RETURN_LITERAL[record_type])
-        .get()
+    try:
+        query = (
+            generate_match_query(record_type, {record_type: {"id": record_id}})
+            .return_literal(constants.RETURN_LITERAL[record_type])
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        deserialised_results = [
+            deserialise_neptune_obj(result[record_type])
+            for result in results["results"]
+        ]
+        return deserialised_results[0]
+    except IndexError as e:
+        raise ValueError("No results returned from the database query.") from e
+
+
+@tracer.capture_method(capture_response=False)
+def parse_parameters(parameters: dict) -> tuple[int, int, dict, list]:
+    """Parses API Gateway parameters into the structure used by OpenCypher query"""
+    source_id = parameters.get("source_id", None)
+    page = int(parameters.get("page", 0))
+    limit = min(
+        int(parameters.get("limit", constants.DEFAULT_PAGE_LIMIT)),
+        constants.MAX_PAGE_LIMIT,
     )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    for result in results["results"]:
-        serialise_neptune_obj(result[record_type])
-    if len(results["results"]) == 0:
-        raise ValueError("No results returned from the database query.")
-    else:
-        return results["results"][0][record_type]
+    where_literals = []
+    return_dict = {
+        "source_properties": {"id": source_id} if source_id else {},
+        "properties": {},
+        "essence_properties": {},
+        "tag_properties": {},
+    }
+    for key, value in parameters.items():
+        if key not in ["page", "limit", "source_id", "timerange"]:
+            if key in essence_params:
+                if essence_params[key] == "int":
+                    return_dict["essence_properties"][key] = int(value)
+                elif essence_params[key] == "float":
+                    return_dict["essence_properties"][key] = float(value)
+                elif essence_params[key] == "bool":
+                    return_dict["essence_properties"][key] = value.lower() == "true"
+            elif key.startswith("tag.") or key.startswith("tag_exists."):
+                tag_name = key.split(".", 1)[-1]
+                if key.startswith("tag."):
+                    return_dict["tag_properties"][tag_name] = value
+                elif key.startswith("tag_exists."):
+                    if value.lower() in ["true", "false"]:
+                        if value.lower() == "true":
+                            where_literals.append(f"t.{tag_name} IS NOT NULL")
+                        else:
+                            where_literals.append(f"t.{tag_name} IS NULL")
+            else:
+                return_dict["properties"][key] = value
+    return page, limit, return_dict, where_literals
 
 
 @tracer.capture_method(capture_response=False)
 def query_sources(parameters: dict) -> tuple[list, int]:
     """Returns a list of the TAMS Sources from the Neptune Database"""
-    page = int(parameters.pop("page", 0))
-    limit = int(parameters.pop("limit", constants.DEFAULT_PAGE_LIMIT))
-    if limit > constants.MAX_PAGE_LIMIT:
-        limit = constants.MAX_PAGE_LIMIT
-    tag_properties = {}
-    where_literals = []
-    for key in list(parameters.keys()):
-        if key.startswith("tag."):
-            tag_properties[key.split(".", 1)[-1]] = parameters.pop(key)
-        elif key.startswith("tag_exists."):
-            value = parameters.pop(key).lower()
-            if value in ["true", "false"]:
-                if value == "true":
-                    where_literals.append(f"t.{key.split(".", 1)[-1]} IS NOT NULL")
-                else:
-                    where_literals.append(f"t.{key.split(".", 1)[-1]} IS NULL")
-    query = generate_match_query(
-        "source",
+    page, limit, props, where_literals = parse_parameters(parameters)
+    query = generate_source_query(
         {
-            "source": parameters,
-            "tags": tag_properties,
+            "source": props["properties"],
+            "tags": props["tag_properties"],
         },
         where_literals=where_literals,
     )
@@ -714,51 +797,23 @@ def query_sources(parameters: dict) -> tuple[list, int]:
         .get()
     )
     results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    for result in results["results"]:
-        serialise_neptune_obj(result["source"])
-    next_page = page + limit if len(results["results"]) == limit else None
-    return [item["source"] for item in results["results"]], next_page
+    deserialised_results = [
+        deserialise_neptune_obj(result["source"]) for result in results["results"]
+    ]
+    next_page = page + limit if len(deserialised_results) == limit else None
+    return deserialised_results, next_page
 
 
 @tracer.capture_method(capture_response=False)
 def query_flows(parameters: dict) -> tuple[list, int]:
     """Returns a list of the TAMS Flows from the Neptune Database"""
-    parameters.pop("timerange", None)
-    page = int(parameters.pop("page", 0))
-    limit = int(parameters.pop("limit", constants.DEFAULT_PAGE_LIMIT))
-    if limit > constants.MAX_PAGE_LIMIT:
-        limit = constants.MAX_PAGE_LIMIT
-    source_id = parameters.pop("source_id", None)
-    source_properties = {"id": source_id} if source_id else {}
-    essence_properties = {}
-    tag_properties = {}
-    where_literals = []
-    for key in list(parameters.keys()):
-        if key in essence_params:
-            value = parameters.pop(key)
-            if essence_params[key] == "int":
-                value = int(value)
-            elif essence_params[key] == "float":
-                value = float(value)
-            elif essence_params[key] == "bool":
-                value = value.lower() == "true"
-            essence_properties[key] = value
-        elif key.startswith("tag."):
-            tag_properties[key.split(".", 1)[-1]] = parameters.pop(key)
-        elif key.startswith("tag_exists."):
-            value = parameters.pop(key).lower()
-            if value in ["true", "false"]:
-                if value == "true":
-                    where_literals.append(f"t.{key.split(".", 1)[-1]} IS NOT NULL")
-                else:
-                    where_literals.append(f"t.{key.split(".", 1)[-1]} IS NULL")
-    query = generate_match_query(
-        "flow",
+    page, limit, props, where_literals = parse_parameters(parameters)
+    query = generate_flow_query(
         {
-            "flow": parameters,
-            "source": source_properties,
-            "essence_parameters": essence_properties,
-            "tags": tag_properties,
+            "flow": props["properties"],
+            "source": props["source_properties"],
+            "essence_parameters": props["essence_properties"],
+            "tags": props["tag_properties"],
         },
         where_literals=where_literals,
     )
@@ -770,49 +825,48 @@ def query_flows(parameters: dict) -> tuple[list, int]:
         .get()
     )
     results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    for result in results["results"]:
-        serialise_neptune_obj(result["flow"])
-    next_page = page + limit if len(results["results"]) == limit else None
-    return [item["flow"] for item in results["results"]], next_page
+    deserialised_results = [
+        deserialise_neptune_obj(result["flow"]) for result in results["results"]
+    ]
+    next_page = page + limit if len(deserialised_results) == limit else None
+    return deserialised_results, next_page
 
 
 @tracer.capture_method(capture_response=False)
 def query_delete_requests() -> list:
     """Returns a list of the TAMS Delete Request from the Neptune Database"""
-    query = generate_match_query(
-        "delete_request",
-        {},
-    )
+    query = generate_delete_request_query({})
     query = (
         query.return_literal(constants.RETURN_LITERAL["delete_request"])
         .order_by("delete_request.id")
         .get()
     )
     results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    for result in results["results"]:
-        serialise_neptune_obj(result["delete_request"])
-    return [item["delete_request"] for item in results["results"]]
+    deserialised_results = [
+        deserialise_neptune_obj(result["delete_request"])
+        for result in results["results"]
+    ]
+    return deserialised_results
+
+
+@tracer.capture_method(capture_response=False)
+def filter_dict(obj: dict, keys: list) -> dict:
+    """Returns a dictionary with specific keys removed"""
+    return {k: v for k, v in obj.items() if v not in keys}
 
 
 @tracer.capture_method(capture_response=False)
 def merge_source(source_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Source record"""
-    tags = source_dict.pop("tags", {})
+    tags = source_dict.get("tags", {})
     query = (
         qb.merge()
         .node(
             ref_name="s",
             labels="source",
-            properties={"id": source_dict.pop("id")},
+            properties={"id": source_dict["id"]},
         )
-        .set(
-            {
-                f"s.{k}": (
-                    json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
-                )
-                for k, v in source_dict.items()
-            }
-        )
+        .set(serialise_neptune_obj(filter_dict(source_dict, ["id", "tags"]), "s."))
         .merge()
         .node(labels="tags", ref_name="t")
         .merge()
@@ -827,31 +881,29 @@ def merge_source(source_dict: dict) -> None:
 @tracer.capture_method(capture_response=False)
 def merge_flow(flow_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Flow record"""
-    tags = flow_dict.pop("tags", {})
-    essence_parameters = flow_dict.pop("essence_parameters", {})
-    flow_collection = flow_dict.pop("flow_collection", [])
-    essence_parameters_properties = {
-        (f"SERIALISE_{k}" if isinstance(v, list) or isinstance(v, dict) else k): (
-            json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
-        )
-        for k, v in essence_parameters.items()
-    }
+    tags = flow_dict.get("tags", {})
+    essence_parameters = flow_dict.get("essence_parameters", {})
+    flow_collection = flow_dict.get("flow_collection", [])
+    essence_parameters_properties = serialise_neptune_obj(essence_parameters)
     query = (
         qb.match()
-        .node(
-            ref_name="s", labels="source", properties={"id": flow_dict.pop("source_id")}
-        )
+        .node(ref_name="s", labels="source", properties={"id": flow_dict["source_id"]})
         .merge()
-        .node(ref_name="f", labels="flow", properties={"id": flow_dict.pop("id")})
+        .node(ref_name="f", labels="flow", properties={"id": flow_dict["id"]})
         .set(
-            {
-                (
-                    f"f.SERIALISE_{k}"
-                    if isinstance(v, list) or isinstance(v, dict)
-                    else f"f.{k}"
-                ): (json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v)
-                for k, v in flow_dict.items()
-            }
+            serialise_neptune_obj(
+                filter_dict(
+                    flow_dict,
+                    [
+                        "id",
+                        "source_id",
+                        "tags",
+                        "essence_parameters",
+                        "flow_collection",
+                    ],
+                ),
+                "f.",
+            )
         )
         .merge()
         .node(labels="tags", ref_name="t")
@@ -882,7 +934,7 @@ def merge_flow(flow_dict: dict) -> None:
             qb.match().node(
                 labels="flow",
                 ref_name=node_ref,
-                properties={"id": collection.pop("id")},
+                properties={"id": collection["id"]},
             )
             + query
             + qb.merge()
@@ -896,27 +948,19 @@ def merge_flow(flow_dict: dict) -> None:
 @tracer.capture_method(capture_response=False)
 def merge_delete_request(delete_request_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Delete Request record"""
-    error = delete_request_dict.pop("error", {})
-    error_properties = {
-        (f"SERIALISE_{k}" if isinstance(v, list) or isinstance(v, dict) else k): (
-            json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
-        )
-        for k, v in error.items()
-    }
+    error = delete_request_dict.get("error", {})
+    error_properties = serialise_neptune_obj(error)
     query = (
         qb.merge()
         .node(
             ref_name="d",
             labels="delete_request",
-            properties={"id": delete_request_dict.pop("id")},
+            properties={"id": delete_request_dict["id"]},
         )
         .set(
-            {
-                f"d.{k}": (
-                    json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
-                )
-                for k, v in delete_request_dict.items()
-            }
+            serialise_neptune_obj(
+                filter_dict(delete_request_dict, ["id", "error"]), "d."
+            )
         )
         .merge()
         .node(labels="error", ref_name="e")
@@ -932,41 +976,43 @@ def merge_delete_request(delete_request_dict: dict) -> None:
 @tracer.capture_method(capture_response=False)
 def delete_flow(flow_id: str) -> str | None:
     """Deletes the specified Flow from the Neptune Database"""
-    query = (
-        qb.match()
-        .node(ref_name="flow", labels="flow", properties={"id": flow_id})
-        .related_to(label="represents")
-        .node(ref_name="s", labels="source")
-        .detach_delete(ref_name="flow")
-        .return_literal("s.id AS source_id")
-        .get()
-    )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    if len(results["results"]) == 0:
-        return None
-    else:
+    try:
+        query = (
+            qb.match()
+            .node(ref_name="flow", labels="flow", properties={"id": flow_id})
+            .related_to(label="represents")
+            .node(ref_name="s", labels="source")
+            .detach_delete(ref_name="flow")
+            .return_literal("s.id AS source_id")
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
         return results["results"][0]["source_id"]
+    except IndexError:
+        return None
 
 
 @tracer.capture_method(capture_response=False)
 def set_node_property_base(record_type: str, record_id: str, props: dict) -> dict:
     """Performs an OpenCypher Set operation on the specified Node and properties"""
-    query = (
-        generate_match_query(
-            record_type,
-            {record_type: {"id": record_id}},
-            set_dict=props,
+    try:
+        query = (
+            generate_match_query(
+                record_type,
+                {record_type: {"id": record_id}},
+                set_dict=props,
+            )
+            .return_literal(constants.RETURN_LITERAL[record_type])
+            .get()
         )
-        .return_literal(constants.RETURN_LITERAL[record_type])
-        .get()
-    )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
-    for result in results["results"]:
-        serialise_neptune_obj(result[record_type])
-    if len(results["results"]) == 0:
-        raise ValueError("No results returned from the database query.")
-    else:
-        return results["results"][0][record_type]
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        deserialised_results = [
+            deserialise_neptune_obj(result[record_type])
+            for result in results["results"]
+        ]
+        return deserialised_results
+    except IndexError as e:
+        raise ValueError("No results returned from the database query.") from e
 
 
 @tracer.capture_method(capture_response=False)
