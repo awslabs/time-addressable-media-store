@@ -22,6 +22,7 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from cymple import QueryBuilder
 from mediatimestamp.immutable import TimeRange
@@ -33,7 +34,9 @@ tracer = Tracer()
 
 events = boto3.client("events")
 sqs = boto3.client("sqs")
-s3 = boto3.client("s3")
+s3 = boto3.client(
+    "s3", config=Config(s3={"addressing_style": "virtual"})
+)  # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 neptune = boto3.client(
     "neptunedata",
     region_name=os.environ["AWS_REGION"],
