@@ -1,4 +1,5 @@
 # pylint: disable=too-many-lines
+import boto3
 import pytest
 import requests
 
@@ -151,8 +152,26 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
         assert 200 == put_file.status_code
 
 
+@pytest.mark.storage
+def test_S3_PUT_bulk_objects(region, stack):
+    # Arrange
+    bucket_name = stack["outputs"]["MediaStorageBucket"]
+    s3 = boto3.resource("s3", region_name=region)
+    bucket = s3.Bucket(bucket_name)
+    # Act
+    for n in range(5, 100):
+        bucket.put_object(
+            Key=f"20000000-0000-1000-8000-0000000{n:05}",
+            Body="test file content",
+        )
+    # Assert
+    assert True
+
+
 @pytest.mark.segments
-def test_Create_Flow_Segment_POST_201_VIDEO(api_client_cognito, media_objects):
+def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
+    api_client_cognito, media_objects
+):
     # Arrange
     path = f'/flows/{VIDEO_FLOW["id"]}/segments'
     # Act
@@ -164,7 +183,12 @@ def test_Create_Flow_Segment_POST_201_VIDEO(api_client_cognito, media_objects):
         )
         # Assert
         assert 201 == response.status_code
-    # Bulk load 100 records to ensure pagination is testable
+
+
+@pytest.mark.segments
+def test_Create_Flow_Segment_POST_201_VIDEO_bulk(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
     # Act
     for n in range(5, 100):
         response = api_client_cognito.request(
@@ -205,7 +229,7 @@ def test_Create_Flow_Segment_POST_201_negative(api_client_cognito):
         "POST",
         path,
         json={
-            "object_id": "negative-timerange",
+            "object_id": "20000000-0000-1000-8000-000000000005",
             "timerange": "[-60:0_-30:0)",
         },
     )
@@ -1038,7 +1062,10 @@ def test_Create_Flow_Segment_POST_400_container(api_client_cognito):
     response = api_client_cognito.request(
         "POST",
         path,
-        json={"object_id": "dummy_id", "timerange": "[0:0_1:0)"},
+        json={
+            "object_id": "20000000-0000-1000-8000-000000000005",
+            "timerange": "[0:0_1:0)",
+        },
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1061,7 +1088,7 @@ def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito):
         "POST",
         path,
         json={
-            "object_id": "dummy",
+            "object_id": "20000000-0000-1000-8000-000000000005",
             "timerange": "[0:100_1:0)",
         },
     )
@@ -1072,6 +1099,31 @@ def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito):
     assert "application/json" == response_headers_lower["content-type"]
     assert (
         "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow."
+        == response.json()["message"]
+    )
+
+
+@pytest.mark.segments
+def test_Create_Flow_Segment_POST_400_missing_object(api_client_cognito):
+    """Object must already exist in S3"""
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": "dummy_id",
+            "timerange": "[0:100_1:0)",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert (
+        "Bad request. The object id provided for a segment MUST exist."
         == response.json()["message"]
     )
 

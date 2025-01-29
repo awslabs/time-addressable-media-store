@@ -80,6 +80,16 @@ def check_delete_source(source_id: str) -> None:
 
 
 @tracer.capture_method(capture_response=False)
+def check_object_exists(bucket, object_id: str) -> bool:
+    """Checks whether the specified object_id (as key) currently exists in the specified S3 Bucket"""
+    try:
+        s3.head_object(Bucket=bucket, Key=object_id)
+        return True
+    except ClientError:
+        return False
+
+
+@tracer.capture_method(capture_response=False)
 def delete_flow_segments(
     segments_table: "boto3.resources.factory.dynamodb.Table",
     flow_id: str,

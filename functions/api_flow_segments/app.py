@@ -24,6 +24,7 @@ from pydantic import ValidationError
 from schema import Deletionrequest, Flow, Flowsegment, Uuid
 from utils import (
     base_delete_request_dict,
+    check_object_exists,
     delete_flow_segments,
     generate_link_url,
     generate_presigned_url,
@@ -160,6 +161,10 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
     if flow.root.container is None:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
+        )  # 400
+    if not check_object_exists(bucket, flow_segment.object_id):
+        raise BadRequestError(
+            "Bad request. The object id provided for a segment MUST exist."
         )  # 400
     item_dict = model_dump(flow_segment)
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
