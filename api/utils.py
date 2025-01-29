@@ -4,7 +4,6 @@ import math
 import os
 import urllib.parse
 import uuid
-from copy import deepcopy
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -68,7 +67,7 @@ def base_delete_request_dict(
 
 @tracer.capture_method(capture_response=False)
 def check_delete_source(source_id: str) -> None:
-    """Checks to see if the specified Source is not without representations and if so it deletes it from the Neptune Database"""
+    """Performs a conditional delete on the specified Source. It is only deleted if it is not referenced by any flow representations"""
     query = (
         qb.match()
         .node(ref_name="source", labels="source", properties={"id": source_id})
@@ -515,26 +514,27 @@ def validate_query_string(
 @tracer.capture_method(capture_response=False)
 def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
     """Return a new dict with properties of type dict/list serialised into string"""
-    return {
-        f"{key_prefix}{constants.SERIALISE_PREFIX if isinstance(v, (list, dict)) else ''}{k}": (
-            json.dumps(v) if isinstance(v, (list, dict)) else v
-        )
-        for k, v in obj.items()
-    }
+    serialised = {}
+    for k, v in obj.items():
+        if isinstance(v, (list, dict)):
+            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{k}"] = json.dumps(v)
+        else:
+            serialised[f"{key_prefix}{k}"] = v
+    return serialised
 
 
 @tracer.capture_method(capture_response=False)
 def deserialise_neptune_obj(obj: dict) -> dict:
-    """Modifies Neptune JSON response back to hierachical JSON structure required by API"""
-    _obj = deepcopy(obj)  # Work on a copy to avoid mutation
-    for prop_name, prop_value in list(_obj.items()):
+    deserialised = {}
+    for prop_name, prop_value in obj.items():
         if prop_name.startswith(constants.SERIALISE_PREFIX):
             actual_name = prop_name[len(constants.SERIALISE_PREFIX) :]
-            _obj[actual_name] = json.loads(prop_value)
-            del _obj[prop_name]
+            deserialised[actual_name] = json.loads(prop_value)
         elif isinstance(prop_value, dict):
-            _obj[prop_name] = deserialise_neptune_obj(prop_value)
-    return _obj
+            deserialised[prop_name] = deserialise_neptune_obj(prop_value)
+        else:
+            deserialised[prop_name] = prop_value
+    return deserialised
 
 
 @tracer.capture_method(capture_response=False)
@@ -853,9 +853,9 @@ def query_delete_requests() -> list:
 
 
 @tracer.capture_method(capture_response=False)
-def filter_dict(obj: dict, keys: list) -> dict:
+def filter_dict(obj: dict, keys: set) -> dict:
     """Returns a dictionary with specific keys removed"""
-    return {k: v for k, v in obj.items() if v not in keys}
+    return {k: v for k, v in obj.items() if k not in keys}
 
 
 @tracer.capture_method(capture_response=False)
@@ -869,7 +869,7 @@ def merge_source(source_dict: dict) -> None:
             labels="source",
             properties={"id": source_dict["id"]},
         )
-        .set(serialise_neptune_obj(filter_dict(source_dict, ["id", "tags"]), "s."))
+        .set(serialise_neptune_obj(filter_dict(source_dict, {"id", "tags"}), "s."))
         .merge()
         .node(labels="tags", ref_name="t")
         .merge()
@@ -897,13 +897,13 @@ def merge_flow(flow_dict: dict) -> None:
             serialise_neptune_obj(
                 filter_dict(
                     flow_dict,
-                    [
+                    {
                         "id",
                         "source_id",
                         "tags",
                         "essence_parameters",
                         "flow_collection",
-                    ],
+                    },
                 ),
                 "f.",
             )
@@ -962,7 +962,7 @@ def merge_delete_request(delete_request_dict: dict) -> None:
         )
         .set(
             serialise_neptune_obj(
-                filter_dict(delete_request_dict, ["id", "error"]), "d."
+                filter_dict(delete_request_dict, {"id", "error"}), "d."
             )
         )
         .merge()
