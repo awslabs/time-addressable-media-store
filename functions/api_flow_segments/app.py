@@ -21,19 +21,23 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from mediatimestamp.immutable import TimeRange
 from pydantic import ValidationError
-from schema import Deletionrequest, Flow, Flowsegment, Uuid
+from schema import Deletionrequest, Flowsegment, Uuid
 from utils import (
+    TimeRangeBoundary,
     base_delete_request_dict,
+    check_node_exists,
     check_object_exists,
     delete_flow_segments,
     generate_link_url,
     generate_presigned_url,
     get_flow_timerange,
     get_key_and_args,
+    get_timerange_expression,
     model_dump,
     model_dump_json,
     publish_event,
     put_deletion_request,
+    query_node,
     update_flow_segments_updated,
     validate_query_string,
 )
@@ -46,7 +50,6 @@ metrics = Metrics(namespace="Powertools")
 
 dynamodb = boto3.resource("dynamodb")
 segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
-table = dynamodb.Table(os.environ["TABLE"])
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
@@ -64,24 +67,14 @@ def get_flow_segments_by_id(flowId: str):
         Uuid(root=flowId)
     except ValidationError as ex:
         raise NotFoundError("The flow ID in the path is invalid.") from ex  # 404
-    item = table.get_item(
-        Key={"record_type": "flow", "id": flowId},
-        ProjectionExpression="id",
-    )
-    if "Item" not in item:
+    if not check_node_exists("flow", flowId):
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
             content_type=content_types.APPLICATION_JSON,
             body=json.dumps([]),
         )
-    valid_parameters = [
-        "limit",
-        # "object_id",  # Handled as a special case
-        "page",
-        # "reverse_order",  # Handled as a special case
-        "timerange",
-    ]
-    args, reverse_order = get_key_and_args(flowId, parameters, valid_parameters)
+    args = get_key_and_args(flowId, parameters)
+    reverse_order = not args["ScanIndexForward"]
     query = segments_table.query(**args)
     items = query["Items"]
     custom_headers = {}
@@ -149,16 +142,16 @@ def get_flow_segments_by_id(flowId: str):
 @app.post("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
-    item = table.get_item(Key={"record_type": "flow", "id": flowId})
-    if "Item" not in item:
-        raise NotFoundError("The flow does not exist.")  # 404
-    flow: Flow = Flow(**item["Item"])
-    if flow.root.read_only:
+    try:
+        item = query_node("flow", flowId)
+    except ValueError as e:
+        raise NotFoundError("The flow does not exist.") from e  # 404
+    if "read_only" in item and item["read_only"]:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    if flow.root.container is None:
+    if "container" not in item:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
         )  # 400
@@ -181,7 +174,7 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
     put_item = segments_table.put_item(
         Item={**item_dict, "flow_id": flowId}, ReturnValues="ALL_OLD"
     )
-    update_flow_segments_updated(flowId, table)
+    update_flow_segments_updated(flowId)
     # Determine return code
     if "Attributes" in put_item:
         return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -199,11 +192,13 @@ def delete_flow_segments_by_id(flowId: str):
     parameters = app.current_event.query_string_parameters
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400
-    item = table.get_item(Key={"record_type": "flow", "id": flowId})
-    if "Item" not in item:
-        raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
-    flow: Flow = Flow(**item["Item"])
-    if flow.root.read_only:
+    try:
+        item = query_node("flow", flowId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if "read_only" in item and item["read_only"]:
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -213,17 +208,11 @@ def delete_flow_segments_by_id(flowId: str):
         timerange_to_delete = TimeRange.from_str(parameters["timerange"])
     deletion_request_dict = None
     if parameters and "object_id" in parameters:
-        valid_parameters = [
-            # "object_id",  # Handled as a special case
-            "timerange"
-        ]
         # Not able to handle return of Delete Request as delete requests do not support "object_id" query parameter
         delete_flow_segments(
-            table,
             segments_table,
             flowId,
             parameters,
-            valid_parameters,
             timerange_to_delete,
             app.lambda_context,
             s3_queue,
@@ -237,7 +226,7 @@ def delete_flow_segments_by_id(flowId: str):
         "timerange_to_delete": str(timerange_to_delete),
         "timerange_remaining": str(timerange_to_delete),
     }
-    put_deletion_request(del_queue, table, deletion_request_dict)
+    put_deletion_request(del_queue, deletion_request_dict)
     if deletion_request_dict is not None:
         return Response(
             status_code=HTTPStatus.ACCEPTED.value,  # 202
@@ -264,16 +253,10 @@ def check_overlapping_segments(flow_id, segment_timerange):
     args = {
         "KeyConditionExpression": And(
             Key("flow_id").eq(flow_id),
-            (
-                Key("timerange_end").gte(segment_timerange.start.to_nanosec())
-                if segment_timerange.includes_start()
-                else Key("timerange_end").gt(segment_timerange.start.to_nanosec())
-            ),
+            get_timerange_expression(Key, TimeRangeBoundary.END, segment_timerange),
         ),
-        "FilterExpression": (
-            Attr("timerange_start").lte(segment_timerange.end.to_nanosec())
-            if segment_timerange.includes_end()
-            else Attr("timerange_start").lt(segment_timerange.end.to_nanosec())
+        "FilterExpression": get_timerange_expression(
+            Attr, TimeRangeBoundary.START, segment_timerange
         ),
     }
     query = segments_table.query(**args)

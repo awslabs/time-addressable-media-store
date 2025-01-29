@@ -1,4 +1,3 @@
-import os
 from http import HTTPStatus
 
 import boto3
@@ -7,9 +6,8 @@ from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConf
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
 from schema import Deletionrequest
-from utils import model_dump_json
+from utils import model_dump_json, query_delete_requests, query_node
 
 tracer = Tracer()
 logger = Logger()
@@ -18,16 +16,18 @@ metrics = Metrics(namespace="Powertools")
 
 
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["TABLE"])
-record_type = "delete-request"
+record_type = "delete_request"
 
 
 @app.get("/flow-delete-requests")
 @tracer.capture_method(capture_response=False)
 def get_flow_delete_requests():
-    query = table.query(KeyConditionExpression=Key("record_type").eq(record_type))
+    items = query_delete_requests()
+    for item in items:
+        if item["error"] == {}:
+            del item["error"]
     return (
-        model_dump_json([Deletionrequest(**item) for item in query["Items"]]),
+        model_dump_json([Deletionrequest(**item) for item in items]),
         HTTPStatus.OK.value,
     )  # 200
 
@@ -36,17 +36,20 @@ def get_flow_delete_requests():
 @app.get("/flow-delete-requests/<requestId>")
 @tracer.capture_method(capture_response=False)
 def get_flow_delete_requests_by_id(requestId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": requestId},
-    )
-    if "Item" not in item:
-        raise NotFoundError("The requested flow delete request does not exist.")  # 404
+    try:
+        item = query_node(record_type, requestId)
+        if item["error"] == {}:
+            del item["error"]
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow delete request does not exist."
+        ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return (
             None,
             HTTPStatus.OK.value,
         )  # 200
-    deletion_request: Deletionrequest = Deletionrequest(**item["Item"])
+    deletion_request: Deletionrequest = Deletionrequest(**item)
     return model_dump_json(deletion_request), HTTPStatus.OK.value  # 200
 
 
