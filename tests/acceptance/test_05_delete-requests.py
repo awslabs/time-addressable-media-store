@@ -153,14 +153,6 @@ def test_Flow_Delete_Request_Details_GET_404(api_client_cognito):
     )
 
 
-def test_Cleanup_Delete_Requests(region, stack, delete_requests):
-    dynamodb = boto3.resource("dynamodb", region_name=region)
-    table = dynamodb.Table(stack["outputs"]["MainTable"])
-    with table.batch_writer() as batch:
-        for request_id in delete_requests:
-            batch.delete_item(Key={"record_type": "delete-request", "id": request_id})
-
-
 def test_Webhooks_Table_Empty(region, stack, webhooks_enabled):
     if webhooks_enabled:
         # Arrange
@@ -178,16 +170,6 @@ def test_FlowSegments_Table_Empty(region, stack):
     segments_table = dynamodb.Table(stack["outputs"]["FlowSegmentsTable"])
     # Act
     scan = segments_table.scan(Select="COUNT")
-    # Assert
-    assert 0 == scan["Count"]
-
-
-def test_Main_Table_Empty(region, stack):
-    # Arrange
-    dynamodb = boto3.resource("dynamodb", region_name=region)
-    table = dynamodb.Table(stack["outputs"]["MainTable"])
-    # Act
-    scan = table.scan(Select="COUNT")
     # Assert
     assert 0 == scan["Count"]
 

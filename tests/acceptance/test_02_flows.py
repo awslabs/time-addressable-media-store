@@ -316,9 +316,7 @@ def test_List_Flows_HEAD_200_page(api_client_cognito):
     # Arrange
     path = "/flows"
     # Act
-    response = api_client_cognito.request(
-        "HEAD", path, params={"page": VIDEO_FLOW["id"]}
-    )
+    response = api_client_cognito.request("HEAD", path, params={"page": "1"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 200 == response.status_code
@@ -497,7 +495,7 @@ def test_List_Flows_HEAD_400_page(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"page": VIDEO_FLOW["id"], "bad": "query"}
+        "HEAD", path, params={"page": "1", "bad": "query"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -726,9 +724,7 @@ def test_List_Flows_GET_200_page(api_client_cognito):
     # Arrange
     path = "/flows"
     # Act
-    response = api_client_cognito.request(
-        "GET", path, params={"page": VIDEO_FLOW["id"]}
-    )
+    response = api_client_cognito.request("GET", path, params={"page": "1"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 200 == response.status_code
@@ -929,7 +925,7 @@ def test_List_Flows_GET_400_page(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"page": VIDEO_FLOW["id"], "bad": "query"}
+        "GET", path, params={"page": "1", "bad": "query"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
