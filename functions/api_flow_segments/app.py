@@ -147,12 +147,12 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
         item = query_node("flow", flowId)
     except ValueError as e:
         raise NotFoundError("The flow does not exist.") from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    if "container" not in item:
+    if not item.get("container"):
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
         )  # 400
@@ -199,7 +199,7 @@ def delete_flow_segments_by_id(flowId: str):
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",

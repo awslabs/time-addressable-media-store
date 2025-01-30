@@ -145,7 +145,7 @@ def put_flow_by_id(flow: Flow, flowId: str):
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
     try:
         existing_item = query_node(record_type, flowId)
-        if "read_only" in existing_item and existing_item["read_only"]:
+        if existing_item("read_only"):
             raise ServiceError(
                 403,
                 "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -203,7 +203,7 @@ def delete_flow_by_id(flowId: str):
         raise NotFoundError(
             "The requested Flow ID in the path is invalid."
         ) from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -275,7 +275,7 @@ def put_flow_tag_value(flowId: str, name: str):
         item = query_node(record_type, flowId)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -301,7 +301,7 @@ def delete_flow_tag_value(flowId: str, name: str):
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -324,8 +324,6 @@ def get_flow_description(flowId: str):
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    if description is None:
-        return None, HTTPStatus.OK.value  # 200
     return description, HTTPStatus.OK.value  # 200
 
 
@@ -336,7 +334,7 @@ def put_flow_description(flowId: str):
         item = query_node(record_type, flowId)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -364,7 +362,7 @@ def delete_flow_description(flowId: str):
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -389,8 +387,6 @@ def get_flow_label(flowId: str):
         ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    if label is None:
-        return None, HTTPStatus.OK.value  # 200
     return label, HTTPStatus.OK.value  # 200
 
 
@@ -401,7 +397,7 @@ def put_flow_label(flowId: str):
         item = query_node(record_type, flowId)
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -427,7 +423,7 @@ def delete_flow_label(flowId: str):
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item.get("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
@@ -481,7 +477,7 @@ def post_flow_storage_by_id(flow_storage_post: Flowstoragepost, flowId: str):
         item = query_node(record_type, flowId)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
-    if "read_only" in item and item["read_only"]:
+    if item("read_only"):
         raise ServiceError(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",

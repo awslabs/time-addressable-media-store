@@ -160,8 +160,6 @@ def get_source_description(sourceId: str):
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    if description is None:
-        return None, HTTPStatus.OK.value  # 200
     return description, HTTPStatus.OK.value  # 200
 
 
@@ -208,8 +206,6 @@ def get_source_label(sourceId: str):
             "The requested Source does not exist, or does not have a label set."
         ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
-        return None, HTTPStatus.OK.value  # 200
-    if label is None:
         return None, HTTPStatus.OK.value  # 200
     return label, HTTPStatus.OK.value  # 200
 
