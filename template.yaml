@@ -121,42 +121,6 @@ Resources:
           Parameters:
             Location: api/openapi.yaml
 
-  MainTable:
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Type: AWS::DynamoDB::Table
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W74
-            reason: Encryption not required
-          - id: W78
-            reason: Backup not required
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: record_type
-          AttributeType: S
-        - AttributeName: id
-          AttributeType: S
-        - AttributeName: source_id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: record_type
-          KeyType: HASH
-        - AttributeName: id
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: source-id-index
-          KeySchema:
-            - AttributeName: source_id
-              KeyType: HASH
-          Projection:
-            ProjectionType: INCLUDE
-            NonKeyAttributes:
-              - flow_collection
-              - collected_by
-
   FlowSegmentsTable:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
@@ -411,7 +375,6 @@ Resources:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-sources
           EVENT_BUS: !Ref EventBus
-          TABLE: !Ref MainTable
           USER_POOL_ID: !Ref UserPool
       Policies:
         - Version: "2012-10-17"
@@ -426,14 +389,6 @@ Resources:
                 - cognito-idp:AdminGetUser
                 - cognito-idp:DescribeUserPoolClient
               Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-              Resource:
-                - !GetAtt MainTable.Arn
-                - !Sub ${MainTable.Arn}/index/source-id-index
       Events:
         headSources:
           Type: Api
@@ -563,7 +518,6 @@ Resources:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-flows
           EVENT_BUS: !Ref EventBus
-          TABLE: !Ref MainTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           USER_POOL_ID: !Ref UserPool
           BUCKET: !Ref MediaStorageBucket
@@ -581,15 +535,6 @@ Resources:
                 - cognito-idp:AdminGetUser
                 - cognito-idp:DescribeUserPoolClient
               Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:DeleteItem
-              Resource:
-                - !GetAtt MainTable.Arn
-                - !Sub ${MainTable.Arn}/index/source-id-index
             - Effect: Allow
               Action:
                 - dynamodb:Query
@@ -765,7 +710,6 @@ Resources:
           POWERTOOLS_SERVICE_NAME: tams-segments
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
-          TABLE: !Ref MainTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
           S3_QUEUE_URL: !Ref CleanupS3Queue
@@ -784,12 +728,6 @@ Resources:
                 - cognito-idp:AdminGetUser
                 - cognito-idp:DescribeUserPoolClient
               Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
-            - Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-              Resource:
-                - !GetAtt MainTable.Arn
             - Effect: Allow
               Action:
                 - dynamodb:Query
@@ -852,16 +790,6 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-deletion
-          TABLE: !Ref MainTable
-      Policies:
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-                - dynamodb:GetItem
-              Resource:
-                - !GetAtt MainTable.Arn
       Events:
         getFlowDeleteRequests:
           Type: Api
@@ -939,7 +867,6 @@ Resources:
           POWERTOOLS_SERVICE_NAME: tams-sqs-delete-requests
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
-          TABLE: !Ref MainTable
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
       Policies:
@@ -949,16 +876,6 @@ Resources:
               Action:
                 - events:PutEvents
               Resource: !GetAtt EventBus.Arn
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:UpdateItem
-                - dynamodb:DeleteItem
-              Resource:
-                - !GetAtt MainTable.Arn
-                - !Sub ${MainTable.Arn}/index/source-id-index
             - Effect: Allow
               Action:
                 - dynamodb:Query
@@ -1191,9 +1108,6 @@ Outputs:
 
   MediaStorageBucket:
     Value: !Ref MediaStorageBucket
-
-  MainTable:
-    Value: !Ref MainTable
 
   FlowSegmentsTable:
     Value: !Ref FlowSegmentsTable
