@@ -23,9 +23,6 @@ record_type = "delete_request"
 @tracer.capture_method(capture_response=False)
 def get_flow_delete_requests():
     items = query_delete_requests()
-    for item in items:
-        if item["error"] == {}:
-            del item["error"]
     return (
         model_dump_json([Deletionrequest(**item) for item in items]),
         HTTPStatus.OK.value,
@@ -38,8 +35,6 @@ def get_flow_delete_requests():
 def get_flow_delete_requests_by_id(requestId: str):
     try:
         item = query_node(record_type, requestId)
-        if item["error"] == {}:
-            del item["error"]
     except ValueError as e:
         raise NotFoundError(
             "The requested flow delete request does not exist."
