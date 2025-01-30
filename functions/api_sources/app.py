@@ -2,6 +2,7 @@ import json
 import os
 from http import HTTPStatus
 
+import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
@@ -13,9 +14,11 @@ from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     NotFoundError,
 )
+from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from schema import Source, Tags
+from typing_extensions import Annotated
 from utils import (
     check_node_exists,
     generate_link_url,
@@ -71,7 +74,9 @@ def list_sources():
 @app.route("/sources/<sourceId>", method=["HEAD"])
 @app.get("/sources/<sourceId>")
 @tracer.capture_method(capture_response=False)
-def get_source_details(sourceId: str):
+def get_source_details(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     try:
         item = query_node(record_type, sourceId)
     except ValueError as e:
@@ -84,7 +89,9 @@ def get_source_details(sourceId: str):
 @app.route("/sources/<sourceId>/tags", method=["HEAD"])
 @app.get("/sources/<sourceId>/tags")
 @tracer.capture_method(capture_response=False)
-def get_source_tags(sourceId: str):
+def get_source_tags(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     try:
         tags = query_node_tags(record_type, sourceId)
     except ValueError as e:
@@ -100,7 +107,9 @@ def get_source_tags(sourceId: str):
 @app.route("/sources/<sourceId>/tags/<name>", method=["HEAD"])
 @app.get("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def get_source_tag_value(sourceId: str, name: str):
+def get_source_tag_value(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)], name: str
+):
     try:
         tags = query_node_tags(record_type, sourceId)
     except ValueError as e:
@@ -114,7 +123,9 @@ def get_source_tag_value(sourceId: str, name: str):
 
 @app.put("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def put_source_tag_value(sourceId: str, name: str):
+def put_source_tag_value(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)], name: str
+):
     if not check_node_exists(record_type, sourceId):
         raise NotFoundError(
             "The requested Source does not exist, or the tag name in the path is invalid."
@@ -133,7 +144,9 @@ def put_source_tag_value(sourceId: str, name: str):
 
 @app.delete("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def delete_source_tag(sourceId: str, name: str):
+def delete_source_tag(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)], name: str
+):
     try:
         item = query_node(record_type, sourceId)
     except ValueError as e:
@@ -153,7 +166,9 @@ def delete_source_tag(sourceId: str, name: str):
 @app.route("/sources/<sourceId>/description", method=["HEAD"])
 @app.get("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def get_source_description(sourceId: str):
+def get_source_description(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     try:
         description = query_node_property(record_type, sourceId, "description")
     except ValueError as e:
@@ -165,7 +180,9 @@ def get_source_description(sourceId: str):
 
 @app.put("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def put_source_description(sourceId: str):
+def put_source_description(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The requested Source does not exist.")  # 404
     try:
@@ -184,7 +201,9 @@ def put_source_description(sourceId: str):
 
 @app.delete("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def delete_source_description(sourceId: str):
+def delete_source_description(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The Source ID in the path is invalid.")  # 404
     username = get_username(app.current_event.request_context)
@@ -198,7 +217,9 @@ def delete_source_description(sourceId: str):
 @app.route("/sources/<sourceId>/label", method=["HEAD"])
 @app.get("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def get_source_label(sourceId: str):
+def get_source_label(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     try:
         label = query_node_property(record_type, sourceId, "label")
     except ValueError as e:
@@ -212,7 +233,9 @@ def get_source_label(sourceId: str):
 
 @app.put("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def put_source_label(sourceId: str):
+def put_source_label(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The requested Source does not exist.")  # 404
     try:
@@ -231,7 +254,9 @@ def put_source_label(sourceId: str):
 
 @app.delete("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def delete_source_label(sourceId: str):
+def delete_source_label(
+    sourceId: Annotated[str, Path(pattern=constants.SOURCE_ID_PATTERN)]
+):
     if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The requested Source ID in the path is invalid.")  # 404
     username = get_username(app.current_event.request_context)

@@ -4,6 +4,7 @@ import os
 from http import HTTPStatus
 
 import boto3
+import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
@@ -16,12 +17,14 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
     ServiceError,
 )
+from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from mediatimestamp.immutable import TimeRange
 from pydantic import ValidationError
 from schema import Deletionrequest, Flowsegment, Uuid
+from typing_extensions import Annotated
 from utils import (
     TimeRangeBoundary,
     base_delete_request_dict,
@@ -59,7 +62,9 @@ del_queue = os.environ["DELETE_QUEUE_URL"]
 @app.route("/flows/<flowId>/segments", method=["HEAD"])
 @app.get("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
-def get_flow_segments_by_id(flowId: str):
+def get_flow_segments_by_id(
+    flowId: str,
+):  # There is a special case here where 404 is defined for an invalid (bad format) flowId
     parameters = app.current_event.query_string_parameters
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400
@@ -142,7 +147,10 @@ def get_flow_segments_by_id(flowId: str):
 
 @app.post("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
-def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
+def post_flow_segments_by_id(
+    flow_segment: Flowsegment,
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)],
+):
     try:
         item = query_node("flow", flowId)
     except ValueError as e:
@@ -189,7 +197,9 @@ def post_flow_segments_by_id(flow_segment: Flowsegment, flowId: str):
 
 @app.delete("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
-def delete_flow_segments_by_id(flowId: str):
+def delete_flow_segments_by_id(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
     parameters = app.current_event.query_string_parameters
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400

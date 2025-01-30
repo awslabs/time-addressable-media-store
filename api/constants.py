@@ -1,3 +1,5 @@
+from schema import Deletionrequest, Flowcore, Source
+
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 DEFAULT_PAGE_LIMIT = 30
 MAX_PAGE_LIMIT = 300
@@ -11,3 +13,6 @@ RETURN_LITERAL = {
     "flow": "flow {.*, source_id: s.id, essence_parameters: e {.*}, tags: t {.*}, flow_collection: collect(c {.*, id: fc.id}), collected_by: collect(cb.id)}",
     "delete_request": "delete_request {.*, error: CASE WHEN e.type IS NULL THEN NULL ELSE e {.*} END}",
 }
+SOURCE_ID_PATTERN = Source.model_fields["id"].metadata[0].pattern
+FLOW_ID_PATTERN = Flowcore.model_fields["id"].metadata[0].pattern
+DELETE_REQUEST_ID_PATTERN = Deletionrequest.model_fields["id"].metadata[0].pattern
