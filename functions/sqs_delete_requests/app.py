@@ -38,7 +38,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
             source_id = delete_flow(body["flow_id"])
             if source_id:
                 publish_event(
-                    "flowss/deleted", {"flow_id": body["flow_id"]}, [body["flow_id"]]
+                    "flows/deleted", {"flow_id": body["flow_id"]}, [body["flow_id"]]
                 )
             # Delete source if no longer referenced by any other flows
             check_delete_source(source_id)
