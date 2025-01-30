@@ -90,17 +90,18 @@ def get_flow_segments_by_id(flowId: str):
             **args, ExclusiveStartKey=query["LastEvaluatedKey"]
         )
         items.extend(query["Items"])
-    if "LastEvaluatedKey" in query:
-        if len(items) == 0:
+    match len(items):
+        case 0:
             custom_headers["X-Paging-Timerange"] = "()"
-        elif len(items) == 1:
+        case 1:
             custom_headers["X-Paging-Timerange"] = items[0]["timerange"]
-        else:
+        case _:
             custom_headers["X-Paging-Timerange"] = str(
                 TimeRange.from_str(items[0]["timerange"]).extend_to_encompass_timerange(
                     TimeRange.from_str(items[-1]["timerange"])
                 )
             )
+    if "LastEvaluatedKey" in query:
         custom_headers["X-Paging-NextKey"] = str(
             query["LastEvaluatedKey"]["timerange_end"]
         )
