@@ -45,7 +45,7 @@ def lambda_handler(event: dict, context: LambdaContext):
         s = Session()
         for item in items:
             headers = {"Content-Type": "application/json"}
-            if "api_key_name" in item and "api_key_value" in item:
+            if item.get("api_key_name") and item.get("api_key_value"):
                 headers[item["api_key_name"]] = item["api_key_value"]
             s.mount(item["url"], HTTPAdapter(max_retries=retries))
             response = s.post(

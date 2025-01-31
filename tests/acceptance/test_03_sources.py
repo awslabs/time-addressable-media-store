@@ -120,7 +120,7 @@ def test_List_Sources_HEAD_200_page(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"page": VIDEO_SOURCE["id"]},
+        params={"page": "1"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -222,7 +222,7 @@ def test_List_Sources_HEAD_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"page": VIDEO_SOURCE["id"], "bad": "query"},
+        params={"page": "1", "bad": "query"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -378,7 +378,7 @@ def test_List_Sources_GET_200_page(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"page": VIDEO_SOURCE["id"]},
+        params={"page": "1"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -514,7 +514,7 @@ def test_List_Sources_GET_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"page": VIDEO_SOURCE["id"], "bad": "query"},
+        params={"page": "1", "bad": "query"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
