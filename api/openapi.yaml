@@ -75,6 +75,55 @@ paths:
                   "flow-delete-requests"
                 ]
         passthroughBehavior: when_no_templates
+    x-amazon-apigateway-any-method:
+      responses:
+        '404':
+          description: The specified path or method does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: '{"statusCode": 404}'
+        responses:
+          default:
+            statusCode: '404'
+            responseTemplates:
+              application/json: {}
+        passthroughBehavior: when_no_templates
+  /{proxy+}:
+    x-amazon-apigateway-any-method:
+      parameters:
+      - name: proxy
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The specified path or method does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: '{"statusCode": 404}'
+        responses:
+          default:
+            statusCode: '404'
+            responseTemplates:
+              application/json: {}
+        passthroughBehavior: when_no_templates
   /service:
     head:
       summary: Service Information
