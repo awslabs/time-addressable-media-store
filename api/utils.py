@@ -942,6 +942,7 @@ def merge_flow(flow_dict: dict) -> None:
         collection_properties = {
             k: json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
             for k, v in collection.items()
+            if k != "id"
         }
         query = (
             qb.match().node(
