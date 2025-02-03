@@ -1763,6 +1763,122 @@ paths:
         uri:
           Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
         passthroughBehavior: when_no_templates
+  /flows/{flowId}/flow_collection:
+    parameters:
+    - name: flowId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuid'
+      description: The flow identifier.
+    head:
+      summary: Flow Collection
+      description: Returns the flow collection path headers
+      operationId: HEAD_flows-flowId-flow-collection
+      tags:
+      - Flows
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_info_head_200'
+        '404':
+          $ref: '#/components/responses/trait_resource_info_head_404'
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    get:
+      summary: Flow Collection
+      description: Returns the flow collection property.
+      operationId: GET_flows-flowId-flow-collection
+      tags:
+      - Flows
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/flowcollection'
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    put:
+      summary: Create or Update Flow Collection
+      description: Create or update the flow collection property.
+      operationId: PUT_flows-flowId-flow-collection
+      tags:
+      - Flows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/flowcollection'
+        required: true
+      responses:
+        '204':
+          description: No content. The flow collection has been created or updated.
+        '400':
+          description: Bad request. Invalid flow collection.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/write
+      x-amazon-apigateway-request-validator: parameters-and-body
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    delete:
+      summary: Delete Flow Collection
+      description: Delete the flow collection property.
+      operationId: DELETE_flows-flowId-flow-collection
+      tags:
+      - Flows
+      responses:
+        '204':
+          description: No content. The flow collection property has been deleted.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow ID in the path is invalid.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/delete
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
   /flows/{flowId}/max_bit_rate:
     parameters:
     - name: flowId

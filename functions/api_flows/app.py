@@ -23,13 +23,14 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from mediatimestamp.immutable import TimeRange
 from schema import (
+    Collectionitem,
     Deletionrequest,
     Flow,
+    Flowcollection,
     Flowstorage,
     Flowstoragepost,
     Httprequest,
     MediaObject,
-    Source,
     Tags,
 )
 from typing_extensions import Annotated
@@ -43,15 +44,16 @@ from utils import (
     get_flow_timerange,
     get_username,
     merge_flow,
-    merge_source,
     model_dump,
     model_dump_json,
     publish_event,
     put_deletion_request,
+    query_flow_collection,
     query_flows,
     query_node,
     query_node_property,
     query_node_tags,
+    set_flow_collection,
     set_node_property,
     validate_flow_collection,
     validate_query_string,
@@ -179,10 +181,6 @@ def put_flow_by_id(
         merged_item.root.created_by = username
     if not merged_item.root.updated_by and existing_item:
         merged_item.root.updated_by = username
-    if not check_node_exists("source", merged_item.root.source_id):
-        source: Source = Source(**model_dump(flow))
-        source.id = flow.root.source_id
-        merge_source(model_dump(source))
     item_dict = model_dump(merged_item)
     merge_flow(item_dict)
     publish_event(
@@ -443,6 +441,71 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": None})
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.route("/flows/<flowId>/flow_collection", method=["HEAD"])
+@app.get("/flows/<flowId>/flow_collection")
+@tracer.capture_method(capture_response=False)
+def get_flow_flow_collection(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        flow_collection = query_flow_collection(flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return (
+        model_dump_json(
+            Flowcollection([Collectionitem(**item) for item in flow_collection])
+        ),
+        HTTPStatus.OK.value,
+    )  # 200
+
+
+@app.put("/flows/<flowId>/flow_collection")
+@tracer.capture_method(capture_response=False)
+def put_flow_flow_collection(
+    flow_collection: Flowcollection,
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)],
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    if not validate_flow_collection(flowId, flow_collection):
+        raise BadRequestError("Bad request. Invalid flow collection.")  # 400
+    username = get_username(app.current_event.request_context)
+    item_dict = set_flow_collection(flowId, username, model_dump(flow_collection))
+    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.delete("/flows/<flowId>/flow_collection")
+@tracer.capture_method(capture_response=False)
+def delete_flow_flow_collection(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_flow_collection(flowId, username, [])
     publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
 

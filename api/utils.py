@@ -27,7 +27,7 @@ from cymple import QueryBuilder
 from mediatimestamp.immutable import TimeRange
 from params import essence_params, query_params
 from pydantic import BaseModel
-from schema import Flowcollection
+from schema import Flowcollection, Source
 
 tracer = Tracer()
 
@@ -734,6 +734,26 @@ def query_node_property(record_type: str, record_id: str, prop_name: str) -> any
 
 
 @tracer.capture_method(capture_response=False)
+def query_flow_collection(flow_id: str) -> list:
+    """Returns the flow_collection of the specified Flow"""
+    try:
+        query = (
+            qb.match()
+            .node(ref_name="f", labels="flow", properties={"id": flow_id})
+            .match_optional()
+            .node(ref_name="f")
+            .related_from(ref_name="c", label="collected_by")
+            .node(ref_name="fc", labels="flow")
+            .return_literal("f.id as id, collect(c {.*, id: fc.id}) AS flow_collection")
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        return results["results"][0]["flow_collection"]
+    except IndexError as e:
+        raise ValueError("No results returned from the database query.") from e
+
+
+@tracer.capture_method(capture_response=False)
 def query_node(record_type: str, record_id: str) -> dict:
     """Returns the specified Node from the Neptune Database"""
     try:
@@ -891,30 +911,44 @@ def merge_source(source_dict: dict) -> None:
             labels="source",
             properties={"id": source_dict["id"]},
         )
+        .related_to(ref_name="t", label="has_tags")
+        .node(labels="tags")
         .set(serialise_neptune_obj(filter_dict(source_dict, {"id", "tags"}), "s."))
-        .merge()
-        .node(labels="tags", ref_name="t")
-        .merge()
-        .node(ref_name="s")
-        .related_to(label="has_tags", properties=tags)
-        .node(ref_name="t")
-        .get()
     )
-    neptune.execute_open_cypher_query(openCypherQuery=query)
+    # Add Set for Source Tags
+    if tags:
+        query = query.set(serialise_neptune_obj(tags, "t."))
+    neptune.execute_open_cypher_query(openCypherQuery=query.get())
 
 
 @tracer.capture_method(capture_response=False)
 def merge_flow(flow_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Flow record"""
+    # Check if supplied source already exists, create if not
+    if not check_node_exists("source", flow_dict["source_id"]):
+        source: Source = Source(**flow_dict)
+        source.id = flow_dict["source_id"]
+        merge_source(model_dump(source))
+    # Extract properties required for other node types
     tags = flow_dict.get("tags", {})
     essence_parameters = flow_dict.get("essence_parameters", {})
     flow_collection = flow_dict.get("flow_collection", [])
-    essence_parameters_properties = serialise_neptune_obj(essence_parameters)
+    # Build Merge queries
     query = (
         qb.match()
         .node(ref_name="s", labels="source", properties={"id": flow_dict["source_id"]})
         .merge()
         .node(ref_name="f", labels="flow", properties={"id": flow_dict["id"]})
+        .related_to(label="represents")
+        .node(ref_name="s")
+        .merge()
+        .node(ref_name="f")
+        .related_to(ref_name="t", label="has_tags")
+        .node(labels="tags")
+        .merge()
+        .node(ref_name="f")
+        .related_to(ref_name="ep", label="has_essence_parameters")
+        .node(labels="essence_parameters")
         .set(
             serialise_neptune_obj(
                 filter_dict(
@@ -930,44 +964,17 @@ def merge_flow(flow_dict: dict) -> None:
                 "f.",
             )
         )
-        .merge()
-        .node(labels="tags", ref_name="t")
-        .merge()
-        .node(ref_name="f")
-        .related_to(label="has_tags", properties=tags)
-        .node(ref_name="t")
-        .merge()
-        .node(labels="essence_parameters", ref_name="ep")
-        .merge()
-        .node(ref_name="f")
-        .related_to(
-            label="has_essence_parameters", properties=essence_parameters_properties
-        )
-        .node(ref_name="ep")
-        .merge()
-        .node(ref_name="f")
-        .related_to(label="represents")
-        .node(ref_name="s")
     )
-    for n, collection in enumerate(flow_collection):
-        node_ref = f"f{n}"
-        collection_properties = {
-            k: json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
-            for k, v in collection.items()
-            if k != "id"
-        }
-        query = (
-            qb.match().node(
-                labels="flow",
-                ref_name=node_ref,
-                properties={"id": collection["id"]},
-            )
-            + query
-            + qb.merge()
-            .node(ref_name=node_ref)
-            .related_to(label="collected_by", properties=collection_properties)
-            .node(ref_name="f")
-        )
+    # Add Set for Flow Tags
+    if tags:
+        query = query.set(serialise_neptune_obj(tags, "t."))
+    # Add Set for Flow Essence Parameters
+    if essence_parameters:
+        query = query.set(serialise_neptune_obj(essence_parameters, "ep."))
+    # Add flow collection queries as needed
+    query_collection = generate_flow_collection_query(flow_collection)
+    if query_collection:
+        query = query + query_collection
     neptune.execute_open_cypher_query(openCypherQuery=query.get())
 
 
@@ -975,7 +982,6 @@ def merge_flow(flow_dict: dict) -> None:
 def merge_delete_request(delete_request_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Delete Request record"""
     error = delete_request_dict.get("error", {})
-    error_properties = serialise_neptune_obj(error)
     query = (
         qb.merge()
         .node(
@@ -983,20 +989,18 @@ def merge_delete_request(delete_request_dict: dict) -> None:
             labels="delete_request",
             properties={"id": delete_request_dict["id"]},
         )
+        .related_to(ref_name="e", label="has_error")
+        .node(labels="error")
         .set(
             serialise_neptune_obj(
                 filter_dict(delete_request_dict, {"id", "error"}), "d."
             )
         )
-        .merge()
-        .node(labels="error", ref_name="e")
-        .merge()
-        .node(ref_name="d")
-        .related_to(label="has_error", properties=error_properties)
-        .node(ref_name="e")
-        .get()
     )
-    neptune.execute_open_cypher_query(openCypherQuery=query)
+    # Add Set for Error
+    if error:
+        query = query.set(serialise_neptune_obj(error, "e."))
+    neptune.execute_open_cypher_query(openCypherQuery=query.get())
 
 
 @tracer.capture_method(capture_response=False)
@@ -1054,3 +1058,71 @@ def set_node_property(
         f"{record_type}.updated_by": username,
     }
     return set_node_property_base(record_type, record_id, meta_props)
+
+
+@tracer.capture_method(capture_response=False)
+# pylint: disable=W0102:dangerous-default-value
+def generate_flow_collection_query(
+    flow_collection: list, set_dict: dict = {}
+) -> cymple.builder.SetAvailable | None:
+    """Returns a QueryBuilder that creates the specfied flow collection."""
+    if not flow_collection:
+        return None
+    query = qb.with_("f")
+    # process the supplied flow_collection into numbered records
+    ref_names = []
+    for n, collection in enumerate(flow_collection):
+        collection_properties = {
+            k: json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
+            for k, v in collection.items()
+            if k != "id"
+        }
+        ref_names.append((f"f{n}", f"c{n}", collection["id"], collection_properties))
+    # Add the match queries for each flow_collection record
+    for f_ref, _, f_id, _ in ref_names:
+        query = query.match().node(
+            ref_name=f_ref, labels="flow", properties={"id": f_id}
+        )
+    # Add the merge queries to create the collected_by edges for each flow_collection record
+    for f_ref, c_ref, _, _ in ref_names:
+        query = (
+            query.merge()
+            .node(ref_name="f")
+            .related_from(ref_name=c_ref, label="collected_by")
+            .node(ref_name=f_ref)
+        )
+    # Build the dict of set operations to carry out
+    for _, c_ref, _, props in ref_names:
+        for k, v in props.items():
+            set_dict[f"{c_ref}.{k}"] = v
+    return query.set(set_dict)
+
+
+@tracer.capture_method(capture_response=False)
+def set_flow_collection(flow_id: str, username: str, flow_collection: list) -> dict:
+    """Set the specfified flow to have the specified flow_collection and set flow metadata_updated and updated_by properties"""
+    # Create initial query that deletes all collect_by edges for this flow
+    query = (
+        qb.match()
+        .node(ref_name="f", labels="flow", properties={"id": flow_id})
+        .match_optional()
+        .node(ref_name="f")
+        .related_from(ref_name="c", label="collected_by")
+        .node(labels="flow")
+        .delete(ref_name="c")
+    )
+    # Create the base set query
+    query_collection = generate_flow_collection_query(
+        flow_collection,
+        {
+            "f.metadata_updated": datetime.now()
+            .astimezone(timezone.utc)
+            .strftime(constants.DATETIME_FORMAT),
+            "f.updated_by": username,
+        },
+    )
+    if query_collection:
+        query = query + query_collection
+    neptune.execute_open_cypher_query(openCypherQuery=query.get())
+    # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
+    return query_node("flow", flow_id)

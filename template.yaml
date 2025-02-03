@@ -665,6 +665,30 @@ Resources:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
             Method: delete
+        headFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: head
+        getFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: get
+        putFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: put
+        deleteFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: delete
         headFlowsFlowidMaxBitRate:
           Type: Api
           Properties:
