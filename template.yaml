@@ -39,7 +39,7 @@ Mappings:
   Solution:
     Constants:
       ApiVersion: "5.1"
-      ServiceVersion: "2.1"
+      ServiceVersion: "3.0"
 
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
@@ -664,6 +664,54 @@ Resources:
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
+            Method: delete
+        headFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: head
+        getFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: get
+        putFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: put
+        deleteFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: delete
+        headFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: head
+        getFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: get
+        putFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: put
+        deleteFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
             Method: delete
         headFlowsFlowidReadonly:
           Type: Api

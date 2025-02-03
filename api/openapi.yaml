@@ -1763,6 +1763,242 @@ paths:
         uri:
           Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
         passthroughBehavior: when_no_templates
+  /flows/{flowId}/max_bit_rate:
+    parameters:
+    - name: flowId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuid'
+      description: The flow identifier.
+    head:
+      summary: Flow Maximum Bit Rate
+      description: Returns the flow max bit rate path headers
+      operationId: HEAD_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_info_head_200'
+        '404':
+          $ref: '#/components/responses/trait_resource_info_head_404'
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    get:
+      summary: Flow Maximum Bit Rate
+      description: Returns the flow max bit rate property.
+      operationId: GET_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: integer
+                minimum: 0
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    put:
+      summary: Create or Update Flow Maximum Bit Rate
+      description: Create or update the max bit rate property.
+      operationId: PUT_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              minimum: 0
+        required: true
+      responses:
+        '204':
+          description: No content. The max bit rate has been created or updated.
+        '400':
+          description: Bad request. Invalid flow max bit rate.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/write
+      x-amazon-apigateway-request-validator: parameters-and-body
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    delete:
+      summary: Delete Flow Maximum Bit Rate
+      description: Delete the flow max bit rate property.
+      operationId: DELETE_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      responses:
+        '204':
+          description: No content. The flow max bit rate property has been deleted.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow ID in the path is invalid.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/delete
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+  /flows/{flowId}/avg_bit_rate:
+    parameters:
+    - name: flowId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuid'
+      description: The flow identifier.
+    head:
+      summary: Flow Average Bit Rate
+      description: Returns the flow average bit rate path headers
+      operationId: HEAD_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_info_head_200'
+        '404':
+          $ref: '#/components/responses/trait_resource_info_head_404'
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    get:
+      summary: Flow Average Bit Rate
+      description: Returns the flow average bit rate property.
+      operationId: GET_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: integer
+                minimum: 0
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    put:
+      summary: Create or Update Flow Average Bit Rate
+      description: Create or update the average bit rate property.
+      operationId: PUT_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              minimum: 0
+        required: true
+      responses:
+        '204':
+          description: No content. The average bit rate has been created or updated.
+        '400':
+          description: Bad request. Invalid flow avg bit rate.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/write
+      x-amazon-apigateway-request-validator: parameters-and-body
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    delete:
+      summary: Delete Flow Average Bit Rate
+      description: Delete the flow average bit rate property.
+      operationId: DELETE_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      responses:
+        '204':
+          description: No content. The flow average bit rate property has been deleted.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow ID in the path is invalid.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/delete
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
   /flows/{flowId}/segments:
     parameters:
     - name: flowId

@@ -450,6 +450,140 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
+@app.route("/flows/<flowId>/max_bit_rate", method=["HEAD"])
+@app.get("/flows/<flowId>/max_bit_rate")
+@tracer.capture_method(capture_response=False)
+def get_flow_max_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        max_bit_rate = query_node_property(record_type, flowId, "max_bit_rate")
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return max_bit_rate, HTTPStatus.OK.value  # 200
+
+
+@app.put("/flows/<flowId>/max_bit_rate")
+@tracer.capture_method(capture_response=False)
+def put_flow_max_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    try:
+        body = json.loads(app.current_event.body)
+    except json.decoder.JSONDecodeError:
+        body = None
+    if not isinstance(body, int):
+        raise BadRequestError("Bad request. Invalid flow max bit rate.")  # 400
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.max_bit_rate": body}
+    )
+    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.delete("/flows/<flowId>/max_bit_rate")
+@tracer.capture_method(capture_response=False)
+def delete_flow_max_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.max_bit_rate": None}
+    )
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.route("/flows/<flowId>/avg_bit_rate", method=["HEAD"])
+@app.get("/flows/<flowId>/avg_bit_rate")
+@tracer.capture_method(capture_response=False)
+def get_flow_avg_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        avg_bit_rate = query_node_property(record_type, flowId, "avg_bit_rate")
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return avg_bit_rate, HTTPStatus.OK.value  # 200
+
+
+@app.put("/flows/<flowId>/avg_bit_rate")
+@tracer.capture_method(capture_response=False)
+def put_flow_avg_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    try:
+        body = json.loads(app.current_event.body)
+    except json.decoder.JSONDecodeError:
+        body = None
+    if not isinstance(body, int):
+        raise BadRequestError("Bad request. Invalid flow avg bit rate.")  # 400
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.avg_bit_rate": body}
+    )
+    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.delete("/flows/<flowId>/avg_bit_rate")
+@tracer.capture_method(capture_response=False)
+def delete_flow_avg_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.avg_bit_rate": None}
+    )
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
 @app.route("/flows/<flowId>/read_only", method=["HEAD"])
 @app.get("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
