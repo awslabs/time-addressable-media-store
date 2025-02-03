@@ -27,6 +27,7 @@ from cymple import QueryBuilder
 from mediatimestamp.immutable import TimeRange
 from params import essence_params, query_params
 from pydantic import BaseModel
+from schema import Flowcollection
 
 tracer = Tracer()
 
@@ -866,6 +867,17 @@ def query_delete_requests() -> list:
 def filter_dict(obj: dict, keys: set) -> dict:
     """Returns a dictionary with specific keys removed"""
     return {k: v for k, v in obj.items() if k not in keys}
+
+
+@tracer.capture_method(capture_response=False)
+def validate_flow_collection(flow_id: str, flow_collection: Flowcollection):
+    """Checks whether the supplied Flow Collection is valid"""
+    if not flow_collection:
+        return True
+    for collection in flow_collection.root:
+        if flow_id == collection.id or not check_node_exists("flow", collection.id):
+            return False
+    return True
 
 
 @tracer.capture_method(capture_response=False)

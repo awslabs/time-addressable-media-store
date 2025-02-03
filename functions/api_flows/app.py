@@ -53,6 +53,7 @@ from utils import (
     query_node_property,
     query_node_tags,
     set_node_property,
+    validate_flow_collection,
     validate_query_string,
 )
 
@@ -156,12 +157,8 @@ def put_flow_by_id(
             )  # 403
     except ValueError:
         existing_item = None
-    if flow.root.flow_collection:
-        for collection in flow.root.flow_collection:
-            if not check_node_exists(record_type, collection.id):
-                raise BadRequestError(
-                    "The supplied value for flow_collection references flowId(s) that do not exist"
-                )  # 400
+    if not validate_flow_collection(flowId, flow.root.flow_collection):
+        raise BadRequestError("Bad request. Invalid flow collection.")  # 400
     request_item = model_dump(flow)
     # API spec states these fields should be ignored if given in a PUT request.
     for field in ["created", "metadata_updated", "collected_by"]:
