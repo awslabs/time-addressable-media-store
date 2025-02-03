@@ -1,5 +1,4 @@
 # pylint: disable=too-many-lines
-import boto3
 import pytest
 import requests
 
@@ -153,10 +152,10 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
 
 
 @pytest.mark.storage
-def test_S3_PUT_bulk_objects(region, stack):
+def test_S3_PUT_bulk_objects(session, region, stack):
     # Arrange
     bucket_name = stack["outputs"]["MediaStorageBucket"]
-    s3 = boto3.resource("s3", region_name=region)
+    s3 = session.resource("s3", region_name=region)
     bucket = s3.Bucket(bucket_name)
     # Act
     for n in range(5, 100):
@@ -620,6 +619,8 @@ def test_Flow_Details_GET_200_timerange(api_client_cognito):
         "description": "pytest",
         "collected_by": [MULTI_FLOW["id"]],
         "timerange": "[1:0_3:0)",
+        "avg_bit_rate": 6000000,
+        "max_bit_rate": 6000000,
     } == response_json
 
 
