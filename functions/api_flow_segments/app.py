@@ -4,6 +4,8 @@ import os
 from http import HTTPStatus
 
 import boto3
+
+# pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -23,7 +25,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from mediatimestamp.immutable import TimeRange
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, Uuid
+from schema import Deletionrequest, Flowsegment, GetUrl, Uuid
 from typing_extensions import Annotated
 from utils import (
     TimeRangeBoundary,
@@ -123,20 +125,8 @@ def get_flow_segments_by_id(
             headers=custom_headers,
         )
     schema_items = [Flowsegment(**item) for item in items]
-    presigned_urls = generate_urls_parallel(
-        set(item.object_id for item in schema_items)
-    )
-    # Add url to items
-    stage_variables = app.current_event.stage_variables
-    for item in schema_items:
-        get_url = {
-            "label": f'aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}',
-            "url": presigned_urls[item.object_id],
-        }
-        if item.get_urls:
-            item.get_urls.append(get_url)
-        else:
-            item.get_urls = [get_url]
+    accept_get_urls = parameters.get("accept_get_urls", None)
+    filter_object_urls(schema_items, accept_get_urls)
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
@@ -299,3 +289,39 @@ def generate_urls_parallel(keys):
         key, url = future.result()
         urls[key] = url
     return urls
+
+
+def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
+    """Filter the object urls in the schema items based on the accept_get_urls parameter."""
+    presigned_urls = {}
+    # Get presigned URLs only if required
+    if accept_get_urls is None or ":s3.presigned:" in accept_get_urls:
+        presigned_urls = generate_urls_parallel(
+            set(item.object_id for item in schema_items)
+        )
+    # Add url to items
+    stage_variables = app.current_event.stage_variables
+    for item in schema_items:
+        if accept_get_urls == "":
+            item.get_urls = None
+        else:
+            get_url = GetUrl(
+                label=f'aws.{bucket_region}:s3:{stage_variables.get("name", "example-store-name")}',
+                url=f"https://{bucket}.s3.{bucket_region}.amazonaws.com/{item.object_id}",
+            )
+            item.get_urls = (
+                item.get_urls.append(get_url) if item.get_urls else [get_url]
+            )
+            if item.object_id in presigned_urls:
+                presigned_get_url = GetUrl(
+                    label=f'aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}',
+                    url=presigned_urls[item.object_id],
+                )
+                item.get_urls.append(presigned_get_url)
+        if accept_get_urls:
+            get_url_labels = [
+                label for label in accept_get_urls.split(",") if label.strip()
+            ]
+            item.get_urls = [
+                get_url for get_url in item.get_urls if get_url.label in get_url_labels
+            ]
