@@ -2,6 +2,7 @@ import json
 import os
 from http import HTTPStatus
 
+# pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -248,7 +249,7 @@ def put_source_label(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.label": body}
     )
-    publish_event("sources/updated", {"source": item_dict}, [sourceId])
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 

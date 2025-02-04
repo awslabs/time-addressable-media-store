@@ -5,6 +5,8 @@ from datetime import datetime
 from http import HTTPStatus
 
 import boto3
+
+# pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -216,7 +218,8 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
                 f"{record_type}s/deleted", {f"{record_type}_id": flowId}, [flowId]
             )
         # Delete source if no longer referenced by any other flows
-        check_delete_source(source_id)
+        if check_delete_source(source_id):
+            publish_event("sources/deleted", {"source_id": source_id}, [source_id])
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request
     item_dict = {
@@ -421,7 +424,7 @@ def put_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
         raise BadRequestError("Bad request. Invalid flow label.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": body})
-    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -484,7 +487,7 @@ def put_flow_flow_collection(
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_flow_collection(flowId, username, model_dump(flow_collection))
-    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -549,7 +552,7 @@ def put_flow_max_bit_rate(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.max_bit_rate": body}
     )
-    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -616,7 +619,7 @@ def put_flow_avg_bit_rate(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.avg_bit_rate": body}
     )
-    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 

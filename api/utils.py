@@ -12,6 +12,8 @@ from itertools import batched
 from typing import Type
 
 import boto3
+
+# pylint: disable=no-member
 import constants
 import cymple
 from aws_lambda_powertools import Tracer
@@ -67,8 +69,8 @@ def base_delete_request_dict(
 
 
 @tracer.capture_method(capture_response=False)
-def check_delete_source(source_id: str) -> None:
-    """Performs a conditional delete on the specified Source. It is only deleted if it is not referenced by any flow representations"""
+def check_delete_source(source_id: str) -> bool:
+    """Performs a conditional delete on the specified Source. It is only deleted if it is not referenced by any flow representations. Returns True if delete occurred."""
     query = (
         qb.match()
         .node(ref_name="source", labels="source", properties={"id": source_id})
@@ -77,7 +79,8 @@ def check_delete_source(source_id: str) -> None:
         .return_literal("source.id AS source_id")
         .get()
     )
-    neptune.execute_open_cypher_query(openCypherQuery=query)
+    results = neptune.execute_open_cypher_query(openCypherQuery=query)
+    return len(results["results"]) > 0
 
 
 @tracer.capture_method(capture_response=False)
@@ -928,7 +931,9 @@ def merge_flow(flow_dict: dict) -> None:
     if not check_node_exists("source", flow_dict["source_id"]):
         source: Source = Source(**flow_dict)
         source.id = flow_dict["source_id"]
-        merge_source(model_dump(source))
+        source_dict = model_dump(source)
+        merge_source(source_dict)
+        publish_event("sources/created", {"source": source_dict}, [source_dict["id"]])
     # Extract properties required for other node types
     tags = flow_dict.get("tags", {})
     essence_parameters = flow_dict.get("essence_parameters", {})
@@ -1040,7 +1045,7 @@ def set_node_property_base(record_type: str, record_id: str, props: dict) -> dic
             deserialise_neptune_obj(result[record_type])
             for result in results["results"]
         ]
-        return deserialised_results
+        return deserialised_results[0]
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
 

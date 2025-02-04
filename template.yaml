@@ -895,6 +895,7 @@ Resources:
       CodeUri: functions/webhooks/
       Layers:
         - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
+        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
