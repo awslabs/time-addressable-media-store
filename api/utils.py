@@ -182,7 +182,7 @@ def delete_segment_items(
     segments_table: "boto3.resources.factory.dynamodb.Table",
     items: list[dict],
     object_ids: set[str],
-) -> tuple[dict, None]:
+) -> dict | None:
     """Loop supplied items and delete, early return on error, append to object_ids supplied on success"""
     delete_error = None
     for item in items:
@@ -315,7 +315,7 @@ def get_timerange_expression(
 
 
 @tracer.capture_method(capture_response=False)
-def get_key_and_args(flow_id: str, parameters: None | dict) -> tuple[dict, bool]:
+def get_key_and_args(flow_id: str, parameters: None | dict) -> dict | bool:
     """Generate key expression and args for a dynamodb query operation"""
     args = {
         "KeyConditionExpression": Key("flow_id").eq(flow_id),
@@ -406,22 +406,17 @@ def get_username(request_context: APIGatewayEventRequestContext) -> str:
 
 
 @tracer.capture_method(capture_response=False)
-def model_dump(model: BaseModel, **kwargs: None | dict) -> dict:
+def model_dump(
+    model: BaseModel | list[BaseModel], **kwargs: None | dict
+) -> dict | list:
     """Dumps a pydantic model to a dict, removing null and other "empty" keys"""
-    args = {"by_alias": True, "exclude_unset": True, "exclude_none": True, **kwargs}
-    model_dict = model.model_dump(mode="json", **args)
-    remove_null(model_dict)
-    return model_dict
-
-
-@tracer.capture_method(capture_response=False)
-def model_dump_json(model: BaseModel | list[BaseModel], **kwargs: None | dict):
-    """Dumps a pydantic model to a json string, removing null and other "empty" keys"""
     if isinstance(model, list):
         model_dict = [model_dump(m, **kwargs) for m in model]
     else:
-        model_dict = model_dump(model, **kwargs)
-    return json.dumps(model_dict)
+        args = {"by_alias": True, "exclude_unset": True, "exclude_none": True, **kwargs}
+        model_dict = model.model_dump(mode="json", **args)
+        remove_null(model_dict)
+    return model_dict
 
 
 @tracer.capture_method(capture_response=False)

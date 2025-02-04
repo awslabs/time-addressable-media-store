@@ -39,7 +39,6 @@ from utils import (
     get_key_and_args,
     get_timerange_expression,
     model_dump,
-    model_dump_json,
     publish_event,
     put_deletion_request,
     query_node,
@@ -130,7 +129,7 @@ def get_flow_segments_by_id(
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump_json(schema_items),
+        body=model_dump(schema_items),
         headers=custom_headers,
     )
 
@@ -182,7 +181,7 @@ def post_flow_segments_by_id(
         {"flow_id": flowId, "timerange": item_dict["timerange"]},
         [flowId],
     )
-    return model_dump_json(flow_segment), HTTPStatus.CREATED.value  # 201
+    return model_dump(flow_segment), HTTPStatus.CREATED.value  # 201
 
 
 @app.delete("/flows/<flowId>/segments")
@@ -232,7 +231,7 @@ def delete_flow_segments_by_id(
         return Response(
             status_code=HTTPStatus.ACCEPTED.value,  # 202
             content_type=content_types.APPLICATION_JSON,
-            body=model_dump_json(Deletionrequest(**deletion_request_dict)),
+            body=model_dump(Deletionrequest(**deletion_request_dict)),
             headers={
                 "Location": f'https://{app.current_event.request_context.domain_name}{app.current_event.request_context.path.split("/flows/")[0]}/flow-delete-requests/{deletion_request_dict["id"]}'
             },

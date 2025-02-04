@@ -16,7 +16,7 @@ from schema import (
     Webhook,
     Webhookpost,
 )
-from utils import model_dump_json
+from utils import model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -53,10 +53,7 @@ def get_service():
                 )
             else:
                 service.event_stream_mechanisms = [Eventstreamcommon(name="webhooks")]
-        return (
-            service.model_dump_json(by_alias=True, exclude_unset=True),
-            HTTPStatus.OK.value,
-        )  # 200
+        return model_dump(service), HTTPStatus.OK.value  # 200
     except Exception as e:
         raise NotFoundError from e  # 404
 
@@ -113,7 +110,7 @@ def get_webhooks():
         else:
             schema_dict[item["url"]] = {**item, "events": [event]}
     return (
-        model_dump_json([Webhook(**v) for v in schema_dict.values()]),
+        model_dump([Webhook(**v) for v in schema_dict.values()]),
         HTTPStatus.OK.value,
     )  # 200
 
@@ -150,10 +147,7 @@ def post_webhooks(webhook: Webhookpost):
             batch.delete_item(Key=item)
     if len(webhook.events) == 0:
         return None, HTTPStatus.NO_CONTENT.value  # 204
-    return (
-        webhook.model_dump_json(by_alias=True, exclude_unset=True),
-        HTTPStatus.CREATED.value,
-    )  # 201
+    return model_dump(webhook), HTTPStatus.CREATED.value  # 201
 
 
 @logger.inject_lambda_context(

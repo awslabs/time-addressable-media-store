@@ -1,6 +1,8 @@
 from http import HTTPStatus
 
 import boto3
+
+# pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
@@ -10,7 +12,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from schema import Deletionrequest
 from typing_extensions import Annotated
-from utils import model_dump_json, query_delete_requests, query_node
+from utils import model_dump, query_delete_requests, query_node
 
 tracer = Tracer()
 logger = Logger()
@@ -27,7 +29,7 @@ record_type = "delete_request"
 def get_flow_delete_requests():
     items = query_delete_requests()
     return (
-        model_dump_json([Deletionrequest(**item) for item in items]),
+        model_dump([Deletionrequest(**item) for item in items]),
         HTTPStatus.OK.value,
     )  # 200
 
@@ -50,7 +52,7 @@ def get_flow_delete_requests_by_id(
             HTTPStatus.OK.value,
         )  # 200
     deletion_request: Deletionrequest = Deletionrequest(**item)
-    return model_dump_json(deletion_request), HTTPStatus.OK.value  # 200
+    return model_dump(deletion_request), HTTPStatus.OK.value  # 200
 
 
 @logger.inject_lambda_context(

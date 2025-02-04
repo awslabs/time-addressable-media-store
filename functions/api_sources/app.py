@@ -24,7 +24,7 @@ from utils import (
     check_node_exists,
     generate_link_url,
     get_username,
-    model_dump_json,
+    model_dump,
     publish_event,
     query_node,
     query_node_property,
@@ -67,7 +67,7 @@ def list_sources():
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump_json([Source(**item) for item in items]),
+        body=model_dump([Source(**item) for item in items]),
         headers=custom_headers,
     )
 
@@ -84,7 +84,7 @@ def get_source_details(
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump_json(Source(**item)), HTTPStatus.OK.value  # 200
+    return model_dump(Source(**item)), HTTPStatus.OK.value  # 200
 
 
 @app.route("/sources/<sourceId>/tags", method=["HEAD"])
@@ -99,10 +99,7 @@ def get_source_tags(
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return (
-        model_dump_json(Tags(**tags)),
-        HTTPStatus.OK.value,
-    )  # 200
+    return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
 
 
 @app.route("/sources/<sourceId>/tags/<name>", method=["HEAD"])
