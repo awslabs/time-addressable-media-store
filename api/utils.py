@@ -521,12 +521,23 @@ def validate_query_string(
 
 
 @tracer.capture_method(capture_response=False)
+def json_number(x: any) -> float | int:
+    """Returns a numeric value as the int of float based upon whether it contains a decimal point"""
+    f = float(x)
+    if f.is_integer():
+        return int(f)
+    return f
+
+
+@tracer.capture_method(capture_response=False)
 def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
     """Return a new dict with properties of type dict/list serialised into string"""
     serialised = {}
     for k, v in obj.items():
         if isinstance(v, (list, dict)):
-            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{k}"] = json.dumps(v)
+            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{k}"] = json.dumps(
+                v, default=json_number
+            )
         else:
             serialised[f"{key_prefix}{k}"] = v
     return serialised
@@ -1068,11 +1079,12 @@ def set_node_property(
 
 
 @tracer.capture_method(capture_response=False)
-# pylint: disable=W0102:dangerous-default-value
 def generate_flow_collection_query(
-    flow_collection: list, set_dict: dict = {}
+    flow_collection: list, set_dict: dict | None = None
 ) -> cymple.builder.SetAvailable | None:
     """Returns a QueryBuilder that creates the specfied flow collection."""
+    if not set_dict:
+        set_dict = {}
     if not flow_collection:
         return None
     query = qb.with_("f")
