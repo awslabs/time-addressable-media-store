@@ -45,7 +45,7 @@ from utils import (
     generate_presigned_url,
     get_flow_timerange,
     get_username,
-    merge_flow,
+    merge_source_flow,
     model_dump,
     publish_event,
     put_deletion_request,
@@ -183,7 +183,7 @@ def put_flow_by_id(
     if not merged_item.root.updated_by and existing_item:
         merged_item.root.updated_by = username
     item_dict = model_dump(merged_item)
-    merge_flow(item_dict)
+    merge_source_flow(item_dict)
     publish_event(
         (f"{record_type}s/updated" if existing_item else f"{record_type}s/created"),
         {record_type: item_dict},

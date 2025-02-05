@@ -922,13 +922,6 @@ def merge_source(source_dict: dict) -> None:
 @tracer.capture_method(capture_response=False)
 def merge_flow(flow_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Flow record"""
-    # Check if supplied source already exists, create if not
-    if not check_node_exists("source", flow_dict["source_id"]):
-        source: Source = Source(**flow_dict)
-        source.id = flow_dict["source_id"]
-        source_dict = model_dump(source)
-        merge_source(source_dict)
-        publish_event("sources/created", {"source": source_dict}, [source_dict["id"]])
     # Extract properties required for other node types
     tags = flow_dict.get("tags", {})
     essence_parameters = flow_dict.get("essence_parameters", {})
@@ -976,6 +969,20 @@ def merge_flow(flow_dict: dict) -> None:
     if query_collection:
         query = query + query_collection
     neptune.execute_open_cypher_query(openCypherQuery=query.get())
+
+
+@tracer.capture_method(capture_response=False)
+def merge_source_flow(flow_dict: dict) -> None:
+    """Perform an OpenCypher Merge operation on the supplied TAMS Source/Flow record"""
+    # Check if supplied source already exists, create if not
+    if not check_node_exists("source", flow_dict["source_id"]):
+        source: Source = Source(**flow_dict)
+        source.id = flow_dict["source_id"]
+        source_dict = model_dump(source)
+        merge_source(source_dict)
+        publish_event("sources/created", {"source": source_dict}, [source_dict["id"]])
+    # Create Flow
+    merge_flow(flow_dict)
 
 
 @tracer.capture_method(capture_response=False)
