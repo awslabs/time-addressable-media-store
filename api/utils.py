@@ -201,7 +201,7 @@ def delete_segment_items(
                 publish_event(
                     "flows/segments_deleted",
                     {"flow_id": item["flow_id"], "timerange": item["timerange"]},
-                    [item["flow_id"]],
+                    [f'tams:flow:{item["flow_id"]}'],
                 )
         except ClientError as e:
             delete_error = {
@@ -433,9 +433,96 @@ def pop_outliers(timerange: TimeRange, items: list) -> list:
 
 
 @tracer.capture_method(capture_response=False)
+def get_flow_source_id(flow_id: str) -> str | None:
+    """Get the source_id for the specified Flow"""
+    try:
+        query = (
+            qb.match()
+            .node(labels="flow", properties={"id": flow_id})
+            .related_to(label="represents")
+            .node(ref_name="s", labels="source")
+            .return_literal("s.id as source_id")
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        return results["results"][0]["source_id"]
+    except IndexError:
+        return None
+
+
+@tracer.capture_method(capture_response=False)
+def get_source_collected_by(source_id: str) -> list:
+    """Get the collect_by source ids for the specified Source"""
+    try:
+        query = (
+            qb.match()
+            .node(labels="source", properties={"id": source_id})
+            .related_from(label="represents")
+            .node(labels="flow")
+            .related_to(label="collected_by")
+            .node(labels="flow")
+            .related_to(label="represents")
+            .node(ref_name="s", labels="source")
+            .return_literal("collect(s.id) as source_collected_by")
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        return results["results"][0]["source_collected_by"]
+    except IndexError:
+        return []
+
+
+@tracer.capture_method(capture_response=False)
+def get_flow_collected_by(flow_id: str) -> list:
+    """Get the collect_by flow ids for the specified Flow"""
+    try:
+        query = (
+            qb.match()
+            .node(labels="flow", properties={"id": flow_id})
+            .related_to(label="collected_by")
+            .node(ref_name="f", labels="flow")
+            .return_literal("collect(f.id) as flow_collected_by")
+            .get()
+        )
+        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        return results["results"][0]["flow_collected_by"]
+    except IndexError:
+        return []
+
+
+@tracer.capture_method(capture_response=False)
 # pylint: disable=dangerous-default-value
 def publish_event(detail_type: str, details: dict, resources: list = []) -> None:
     """Publishes the supplied events to an EventBridge EventBus"""
+
+    if all(not r.startswith("tams:source:") for r in resources) and any(
+        r.startswith("tams:flow:") for r in resources
+    ):
+        flow_id = next(
+            r[len("tams:flow:") :] for r in resources if r.startswith("tams:flow:")
+        )
+        source_id = get_flow_source_id(flow_id)
+        if source_id:
+            resources.append(f"tams:source:{source_id}")
+    if all(not r.startswith("tams:source-collected-by:") for r in resources) and any(
+        r.startswith("tams:source:") for r in resources
+    ):
+        source_id = next(
+            r[len("tams:source:") :] for r in resources if r.startswith("tams:source:")
+        )
+        resources.extend(
+            f"tams:source-collected-by:{s_id}"
+            for s_id in get_source_collected_by(source_id)
+        )
+    if all(not r.startswith("tams:flow-collected-by:") for r in resources) and any(
+        r.startswith("tams:flow:") for r in resources
+    ):
+        flow_id = next(
+            r[len("tams:flow:") :] for r in resources if r.startswith("tams:flow:")
+        )
+        resources.extend(
+            f"tams:flow-collected-by:{s_id}" for s_id in get_flow_collected_by(flow_id)
+        )
     events.put_events(
         Entries=[
             {
@@ -496,7 +583,18 @@ def update_flow_segments_updated(flow_id: str) -> None:
                 .strftime(constants.DATETIME_FORMAT)
             },
         )
-        publish_event("flows/updated", {"flow": item_dict}, [flow_id])
+        publish_event(
+            "flows/updated",
+            {"flow": item_dict},
+            [
+                f'tams:flow:{item_dict["id"]}',
+                f'tams:source:{item_dict["source_id"]}',
+                *[
+                    f"tams:flow-collected-by:{c_id}"
+                    for c_id in item_dict.get("collected_by", [])
+                ],
+            ],
+        )
     except ValueError:
         # The set_node_property_base function will throw an exception
         # if specified flow does not exist. When setting the segments_updated
@@ -1017,7 +1115,11 @@ def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
         source.id = flow_dict["source_id"]
         source_dict = model_dump(source)
         merge_source(source_dict)
-        publish_event("sources/created", {"source": source_dict}, [source_dict["id"]])
+        publish_event(
+            "sources/created",
+            {"source": source_dict},
+            [f'tams:source:{source_dict["id"]}'],
+        )
     # Create Flow
     return merge_flow(flow_dict, existing_dict)
 

@@ -178,8 +178,15 @@ def post_flow_segments_by_id(
         return None, HTTPStatus.NO_CONTENT.value  # 204
     publish_event(
         "flows/segments_added",
-        {"flow_id": flowId, "timerange": item_dict["timerange"]},
-        [flowId],
+        {"flow_id": flowId, "segments": [model_dump(Flowsegment(**item_dict))]},
+        [
+            f"tams:flow:{flowId}",
+            f'tams:source:{item["source_id"]}',
+            *[
+                f"tams:flow-collected-by:{c_id}"
+                for c_id in item.get("collected_by", [])
+            ],
+        ],
     )
     return model_dump(flow_segment), HTTPStatus.CREATED.value  # 201
 

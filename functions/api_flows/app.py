@@ -181,7 +181,7 @@ def put_flow_by_id(
     publish_event(
         (f"{record_type}s/updated" if existing_item else f"{record_type}s/created"),
         {record_type: item_dict},
-        [flowId],
+        get_event_resources(item_dict),
     )
     if existing_item:
         return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -208,11 +208,17 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
         source_id = delete_flow(flowId)
         if source_id:
             publish_event(
-                f"{record_type}s/deleted", {f"{record_type}_id": flowId}, [flowId]
+                f"{record_type}s/deleted",
+                {f"{record_type}_id": flowId},
+                get_event_resources(item),
             )
         # Delete source if no longer referenced by any other flows
         if check_delete_source(source_id):
-            publish_event("sources/deleted", {"source_id": source_id}, [source_id])
+            publish_event(
+                "sources/deleted",
+                {"source_id": source_id},
+                [f"tams:source:{source_id}"],
+            )
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request
     item_dict = {
@@ -284,7 +290,11 @@ def put_flow_tag_value(
         raise BadRequestError("Bad request. Invalid flow tag value.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": body})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -308,7 +318,11 @@ def delete_flow_tag_value(
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": None})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -351,7 +365,11 @@ def put_flow_description(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.description": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -375,7 +393,11 @@ def delete_flow_description(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.description": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -414,7 +436,11 @@ def put_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
         raise BadRequestError("Bad request. Invalid flow label.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": body})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -434,7 +460,11 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": None})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -477,7 +507,11 @@ def put_flow_flow_collection(
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_flow_collection(flowId, username, model_dump(flow_collection))
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -499,7 +533,11 @@ def delete_flow_flow_collection(
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_flow_collection(flowId, username, [])
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -542,7 +580,11 @@ def put_flow_max_bit_rate(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.max_bit_rate": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -566,7 +608,11 @@ def delete_flow_max_bit_rate(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.max_bit_rate": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -609,7 +655,11 @@ def put_flow_avg_bit_rate(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.avg_bit_rate": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -633,7 +683,11 @@ def delete_flow_avg_bit_rate(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.avg_bit_rate": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -667,7 +721,11 @@ def put_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PAT
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.read_only": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -724,3 +782,13 @@ def get_presigned_put(content_type):
         object_id=object_id,
         put_url=Httprequest.model_validate({"url": url, "content-type": content_type}),
     )
+
+
+@tracer.capture_method(capture_response=False)
+def get_event_resources(obj: dict) -> list:
+    """Generate a list of event resources for the given flow object."""
+    return [
+        f'tams:flow:{obj["id"]}',
+        f'tams:source:{obj["source_id"]}',
+        *[f"tams:flow-collected-by:{c_id}" for c_id in obj.get("collected_by", [])],
+    ]

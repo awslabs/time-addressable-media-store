@@ -136,7 +136,11 @@ def put_source_tag_value(
         raise BadRequestError("Bad request. Invalid Source tag value.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": body})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -157,7 +161,11 @@ def delete_source_tag(
         )  # 404
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": None})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -193,7 +201,11 @@ def put_source_description(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.description": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -208,7 +220,11 @@ def delete_source_description(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.description": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -246,7 +262,11 @@ def put_source_label(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.label": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -261,7 +281,11 @@ def delete_source_label(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.label": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -272,3 +296,12 @@ def delete_source_label(
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@tracer.capture_method(capture_response=False)
+def get_event_resources(obj: dict) -> list:
+    """Generate a list of event resources for the given source object."""
+    return [
+        f'tams:source:{obj["id"]}',
+        *[f"tams:source-collected-by:{c_id}" for c_id in obj.get("collected_by", [])],
+    ]
