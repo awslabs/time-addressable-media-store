@@ -159,31 +159,25 @@ def put_flow_by_id(
                 "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
             )  # 403
     except ValueError:
-        existing_item = None
+        existing_item = {}
     if not validate_flow_collection(flowId, flow.root.flow_collection):
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
-    request_item = model_dump(flow)
     # API spec states these fields should be ignored if given in a PUT request.
-    for field in ["created", "metadata_updated", "collected_by"]:
-        request_item.pop(field, None)
-    merged_item = (
-        Flow(**{**existing_item, **request_item})
-        if existing_item
-        else Flow(**request_item)
-    )
+    for field in constants.FLOW_PUT_IGNORE_FIELDS:
+        setattr(flow.root, field, None)
+        existing_item.pop(field, None)
     now = datetime.now()
-    if merged_item.root.created:
-        merged_item.root.metadata_updated = now
+    if existing_item:
+        flow.root.metadata_updated = now
     else:
-        merged_item.root.created = now
+        flow.root.created = now
     # Set these if not supplied
     username = get_username(app.current_event.request_context)
-    if not merged_item.root.created_by:
-        merged_item.root.created_by = username
-    if not merged_item.root.updated_by and existing_item:
-        merged_item.root.updated_by = username
-    item_dict = model_dump(merged_item)
-    merge_source_flow(item_dict)
+    if not flow.root.created_by and not existing_item:
+        flow.root.created_by = username
+    if not flow.root.updated_by and existing_item:
+        flow.root.updated_by = username
+    item_dict = model_dump(Flow(**merge_source_flow(model_dump(flow), existing_item)))
     publish_event(
         (f"{record_type}s/updated" if existing_item else f"{record_type}s/created"),
         {record_type: item_dict},
@@ -191,7 +185,7 @@ def put_flow_by_id(
     )
     if existing_item:
         return None, HTTPStatus.NO_CONTENT.value  # 204
-    return model_dump(merged_item), HTTPStatus.CREATED.value  # 201
+    return item_dict, HTTPStatus.CREATED.value  # 201
 
 
 @app.delete("/flows/<flowId>")

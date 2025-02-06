@@ -26,6 +26,7 @@ from boto3.dynamodb.conditions import And, Attr, Key
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from cymple import QueryBuilder
+from deepdiff import DeepDiff
 from mediatimestamp.immutable import TimeRange
 from params import essence_params, query_params
 from pydantic import BaseModel
@@ -931,12 +932,49 @@ def merge_source(source_dict: dict) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def merge_flow(flow_dict: dict) -> None:
+def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
     """Perform an OpenCypher Merge operation on the supplied TAMS Flow record"""
     # Extract properties required for other node types
     tags = flow_dict.get("tags", {})
     essence_parameters = flow_dict.get("essence_parameters", {})
     flow_collection = flow_dict.get("flow_collection", [])
+    flow_properties = filter_dict(
+        flow_dict, {"id", "source_id", "tags", "essence_parameters", "flow_collection"}
+    )
+    if existing_dict:
+        existing_flow_collection = existing_dict.get("flow_collection", [])
+        # If there is an flow collection and it has changed delete it so that it is set correctly with the merge
+        if existing_flow_collection and DeepDiff(
+            flow_collection, existing_flow_collection, ignore_order=True
+        ):
+            set_flow_collection(flow_dict["id"], "temp", [])
+        null_tags = {
+            k: None for k in existing_dict.get("tags", {}).keys() - tags.keys()
+        }
+        null_essence_parameters = {
+            k: None
+            for k in existing_dict.get("essence_parameters", {}).keys()
+            - essence_parameters.keys()
+        }
+        null_properties = {
+            k: None
+            for k in (
+                existing_dict.keys()
+                - {
+                    "id",
+                    "source_id",
+                    "tags",
+                    "essence_parameters",
+                    "flow_collection",
+                    "created_by",
+                    "updated_by",
+                }
+            )
+            - flow_properties.keys()
+        }
+        tags = tags | null_tags
+        essence_parameters = essence_parameters | null_essence_parameters
+        flow_properties = flow_properties | null_properties
     # Build Merge queries
     query = (
         qb.match()
@@ -953,21 +991,7 @@ def merge_flow(flow_dict: dict) -> None:
         .node(ref_name="f")
         .related_to(ref_name="ep", label="has_essence_parameters")
         .node(labels="essence_parameters")
-        .set(
-            serialise_neptune_obj(
-                filter_dict(
-                    flow_dict,
-                    {
-                        "id",
-                        "source_id",
-                        "tags",
-                        "essence_parameters",
-                        "flow_collection",
-                    },
-                ),
-                "f.",
-            )
-        )
+        .set(serialise_neptune_obj(flow_properties, "f."))
     )
     # Add Set for Flow Tags
     if tags:
@@ -980,10 +1004,12 @@ def merge_flow(flow_dict: dict) -> None:
     if query_collection:
         query = query + query_collection
     neptune.execute_open_cypher_query(openCypherQuery=query.get())
+    # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
+    return query_node("flow", flow_dict["id"])
 
 
 @tracer.capture_method(capture_response=False)
-def merge_source_flow(flow_dict: dict) -> None:
+def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
     """Perform an OpenCypher Merge operation on the supplied TAMS Source/Flow record"""
     # Check if supplied source already exists, create if not
     if not check_node_exists("source", flow_dict["source_id"]):
@@ -993,7 +1019,7 @@ def merge_source_flow(flow_dict: dict) -> None:
         merge_source(source_dict)
         publish_event("sources/created", {"source": source_dict}, [source_dict["id"]])
     # Create Flow
-    merge_flow(flow_dict)
+    return merge_flow(flow_dict, existing_dict)
 
 
 @tracer.capture_method(capture_response=False)
