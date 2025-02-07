@@ -60,7 +60,7 @@ s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
 
-@app.route("/flows/<flowId>/segments", method=["HEAD"])
+@app.head("/flows/<flowId>/segments")
 @app.get("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def get_flow_segments_by_id(

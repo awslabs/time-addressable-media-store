@@ -43,7 +43,7 @@ record_type = "source"
 event_bus = os.environ["EVENT_BUS"]
 
 
-@app.route("/sources", method=["HEAD"])
+@app.head("/sources")
 @app.get("/sources")
 @tracer.capture_method(capture_response=False)
 def list_sources():
@@ -72,7 +72,7 @@ def list_sources():
     )
 
 
-@app.route("/sources/<sourceId>", method=["HEAD"])
+@app.head("/sources/<sourceId>")
 @app.get("/sources/<sourceId>")
 @tracer.capture_method(capture_response=False)
 def get_source_details(
@@ -87,7 +87,7 @@ def get_source_details(
     return model_dump(Source(**item)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/sources/<sourceId>/tags", method=["HEAD"])
+@app.head("/sources/<sourceId>/tags")
 @app.get("/sources/<sourceId>/tags")
 @tracer.capture_method(capture_response=False)
 def get_source_tags(
@@ -102,7 +102,7 @@ def get_source_tags(
     return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/sources/<sourceId>/tags/<name>", method=["HEAD"])
+@app.head("/sources/<sourceId>/tags/<name>")
 @app.get("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def get_source_tag_value(
@@ -169,7 +169,7 @@ def delete_source_tag(
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/sources/<sourceId>/description", method=["HEAD"])
+@app.head("/sources/<sourceId>/description")
 @app.get("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
 def get_source_description(
@@ -228,7 +228,7 @@ def delete_source_description(
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/sources/<sourceId>/label", method=["HEAD"])
+@app.head("/sources/<sourceId>/label")
 @app.get("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
 def get_source_label(

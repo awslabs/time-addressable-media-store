@@ -87,7 +87,7 @@ def post_service(service_post: Servicepost):
     return None, HTTPStatus.OK.value  # 200
 
 
-@app.route("/service/webhooks", method=["HEAD"])
+@app.head("/service/webhooks")
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def get_webhooks():

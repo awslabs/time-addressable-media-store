@@ -72,7 +72,7 @@ bucket = os.environ["BUCKET"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
 
-@app.route("/flows", method=["HEAD"])
+@app.head("/flows")
 @app.get("/flows")
 @tracer.capture_method(capture_response=False)
 def get_flows():
@@ -120,7 +120,7 @@ def get_flows():
     )
 
 
-@app.route("/flows/<flowId>", method=["HEAD"])
+@app.head("/flows/<flowId>")
 @app.get("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
 def get_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
@@ -238,7 +238,7 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
     )
 
 
-@app.route("/flows/<flowId>/tags", method=["HEAD"])
+@app.head("/flows/<flowId>/tags")
 @app.get("/flows/<flowId>/tags")
 @tracer.capture_method(capture_response=False)
 def get_flow_tags(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
@@ -251,7 +251,7 @@ def get_flow_tags(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)
     return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/flows/<flowId>/tags/<name>", method=["HEAD"])
+@app.head("/flows/<flowId>/tags/<name>")
 @app.get("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def get_flow_tag_value(
@@ -326,7 +326,7 @@ def delete_flow_tag_value(
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/description", method=["HEAD"])
+@app.head("/flows/<flowId>/description")
 @app.get("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
 def get_flow_description(
@@ -401,7 +401,7 @@ def delete_flow_description(
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/label", method=["HEAD"])
+@app.head("/flows/<flowId>/label")
 @app.get("/flows/<flowId>/label")
 @tracer.capture_method(capture_response=False)
 def get_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
@@ -468,7 +468,7 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/flow_collection", method=["HEAD"])
+@app.head("/flows/<flowId>/flow_collection")
 @app.get("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
 def get_flow_flow_collection(
@@ -541,7 +541,7 @@ def delete_flow_flow_collection(
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/max_bit_rate", method=["HEAD"])
+@app.head("/flows/<flowId>/max_bit_rate")
 @app.get("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
 def get_flow_max_bit_rate(
@@ -616,7 +616,7 @@ def delete_flow_max_bit_rate(
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/avg_bit_rate", method=["HEAD"])
+@app.head("/flows/<flowId>/avg_bit_rate")
 @app.get("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
 def get_flow_avg_bit_rate(
@@ -691,7 +691,7 @@ def delete_flow_avg_bit_rate(
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/read_only", method=["HEAD"])
+@app.head("/flows/<flowId>/read_only")
 @app.get("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
 def get_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):

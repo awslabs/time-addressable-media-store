@@ -34,7 +34,7 @@ def get_flow_delete_requests():
     )  # 200
 
 
-@app.route("/flow-delete-requests/<requestId>", method=["HEAD"])
+@app.head("/flow-delete-requests/<requestId>")
 @app.get("/flow-delete-requests/<requestId>")
 @tracer.capture_method(capture_response=False)
 def get_flow_delete_requests_by_id(
