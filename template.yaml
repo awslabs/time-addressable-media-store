@@ -901,6 +901,10 @@ Resources:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-webhooks
           WEBHOOKS_TABLE: !Ref WebhooksTable
+          API_ID: !Ref Api
+          STAGE_NAME: !Ref Api.Stage
+          BUCKET: !Ref MediaStorageBucket
+          BUCKET_REGION: !Ref AWS::Region
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -909,6 +913,16 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !GetAtt WebhooksTable.Arn
+            - Effect: Allow
+              Action:
+                - apigateway:GET
+              Resource:
+                - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}/stages/${Api.Stage}
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
       Events:
         EventBridge:
           Type: EventBridgeRule
