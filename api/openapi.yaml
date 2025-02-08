@@ -75,6 +75,55 @@ paths:
                   "flow-delete-requests"
                 ]
         passthroughBehavior: when_no_templates
+    x-amazon-apigateway-any-method:
+      responses:
+        '404':
+          description: The specified path or method does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: '{"statusCode": 404}'
+        responses:
+          default:
+            statusCode: '404'
+            responseTemplates:
+              application/json: {}
+        passthroughBehavior: when_no_templates
+  /{proxy+}:
+    x-amazon-apigateway-any-method:
+      parameters:
+      - name: proxy
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The specified path or method does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: '{"statusCode": 404}'
+        responses:
+          default:
+            statusCode: '404'
+            responseTemplates:
+              application/json: {}
+        passthroughBehavior: when_no_templates
   /service:
     head:
       summary: Service Information
@@ -964,7 +1013,7 @@ paths:
           $ref: '#/components/schemas/uuid'
       - name: timerange
         in: query
-        description: Filter on flows that overlap the given timerange.
+        description: Filter on flows that overlap the given timerange. An empty timerange returns flows with no content.
         schema:
           default: _
           $ref: '#/components/schemas/timerange'
@@ -1436,7 +1485,9 @@ paths:
         '200':
           description: ''
           content:
-            application/json: {}
+            application/json:
+              schema:
+                type: string
         '404':
           description: The requested flow does not exist.
       security:
@@ -1584,6 +1635,8 @@ paths:
           description: No content. The label has been created or updated.
         '400':
           description: Bad request. Invalid Flow label.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested Flow does not exist.
       security:
@@ -1662,7 +1715,9 @@ paths:
         '200':
           description: ''
           content:
-            application/json: {}
+            application/json:
+              schema:
+                type: boolean
         '404':
           description: The requested flow does not exist.
       security:
@@ -1708,6 +1763,358 @@ paths:
         uri:
           Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
         passthroughBehavior: when_no_templates
+  /flows/{flowId}/flow_collection:
+    parameters:
+    - name: flowId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuid'
+      description: The flow identifier.
+    head:
+      summary: Flow Collection
+      description: Returns the flow collection path headers
+      operationId: HEAD_flows-flowId-flow-collection
+      tags:
+      - Flows
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_info_head_200'
+        '404':
+          $ref: '#/components/responses/trait_resource_info_head_404'
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    get:
+      summary: Flow Collection
+      description: Returns the flow collection property.
+      operationId: GET_flows-flowId-flow-collection
+      tags:
+      - Flows
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/flowcollection'
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    put:
+      summary: Create or Update Flow Collection
+      description: Create or update the flow collection property.
+      operationId: PUT_flows-flowId-flow-collection
+      tags:
+      - Flows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/flowcollection'
+        required: true
+      responses:
+        '204':
+          description: No content. The flow collection has been created or updated.
+        '400':
+          description: Bad request. Invalid flow collection.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/write
+      x-amazon-apigateway-request-validator: parameters-and-body
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    delete:
+      summary: Delete Flow Collection
+      description: Delete the flow collection property.
+      operationId: DELETE_flows-flowId-flow-collection
+      tags:
+      - Flows
+      responses:
+        '204':
+          description: No content. The flow collection property has been deleted.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow ID in the path is invalid.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/delete
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+  /flows/{flowId}/max_bit_rate:
+    parameters:
+    - name: flowId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuid'
+      description: The flow identifier.
+    head:
+      summary: Flow Maximum Bit Rate
+      description: Returns the flow max bit rate path headers
+      operationId: HEAD_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_info_head_200'
+        '404':
+          $ref: '#/components/responses/trait_resource_info_head_404'
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    get:
+      summary: Flow Maximum Bit Rate
+      description: Returns the flow max bit rate property.
+      operationId: GET_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: integer
+                minimum: 0
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    put:
+      summary: Create or Update Flow Maximum Bit Rate
+      description: Create or update the max bit rate property.
+      operationId: PUT_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              minimum: 0
+        required: true
+      responses:
+        '204':
+          description: No content. The max bit rate has been created or updated.
+        '400':
+          description: Bad request. Invalid flow max bit rate.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/write
+      x-amazon-apigateway-request-validator: parameters-and-body
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    delete:
+      summary: Delete Flow Maximum Bit Rate
+      description: Delete the flow max bit rate property.
+      operationId: DELETE_flows-flowId-max-bit-rate
+      tags:
+      - Flows
+      responses:
+        '204':
+          description: No content. The flow max bit rate property has been deleted.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow ID in the path is invalid.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/delete
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+  /flows/{flowId}/avg_bit_rate:
+    parameters:
+    - name: flowId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuid'
+      description: The flow identifier.
+    head:
+      summary: Flow Average Bit Rate
+      description: Returns the flow average bit rate path headers
+      operationId: HEAD_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_info_head_200'
+        '404':
+          $ref: '#/components/responses/trait_resource_info_head_404'
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    get:
+      summary: Flow Average Bit Rate
+      description: Returns the flow average bit rate property.
+      operationId: GET_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: integer
+                minimum: 0
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/read
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    put:
+      summary: Create or Update Flow Average Bit Rate
+      description: Create or update the average bit rate property.
+      operationId: PUT_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              minimum: 0
+        required: true
+      responses:
+        '204':
+          description: No content. The average bit rate has been created or updated.
+        '400':
+          description: Bad request. Invalid flow avg bit rate.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow does not exist.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/write
+      x-amazon-apigateway-request-validator: parameters-and-body
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
+    delete:
+      summary: Delete Flow Average Bit Rate
+      description: Delete the flow average bit rate property.
+      operationId: DELETE_flows-flowId-avg-bit-rate
+      tags:
+      - Flows
+      responses:
+        '204':
+          description: No content. The flow average bit rate property has been deleted.
+        '403':
+          description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
+        '404':
+          description: The requested flow ID in the path is invalid.
+      security:
+      - Cognito:
+        - openid
+        - aws.cognito.signin.user.admin
+        - tams-api/delete
+      x-amazon-apigateway-request-validator: parameters-only
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
+        passthroughBehavior: when_no_templates
   /flows/{flowId}/segments:
     parameters:
     - name: flowId
@@ -1739,6 +2146,18 @@ paths:
         schema:
           default: false
           type: boolean
+      - name: accept_get_urls
+        in: query
+        description: |
+          A comma separated list of labels of flow segment `get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in all `get_urls` returned.
+          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
+          Flow segment `get_urls` with no label cannot be filtered for; they will only be returned if `accept_get_urls` is omitted.
+          Without `get_urls`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs for example.
+        schema:
+          type: string
+          pattern: ^([^,]+(,[^,]+)*)?$
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1841,6 +2260,18 @@ paths:
         schema:
           default: false
           type: boolean
+      - name: accept_get_urls
+        in: query
+        description: |
+          A comma separated list of labels of flow segment `get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in all `get_urls` returned.
+          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
+          Flow segment `get_urls` with no label cannot be filtered for; they will only be returned if `accept_get_urls` is omitted.
+          Without `get_urls`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs for example.
+        schema:
+          type: string
+          pattern: ^([^,]+(,[^,]+)*)?$
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -2285,6 +2716,11 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/deletionrequest'
+    flowcollection:
+      title: Flow Collection
+      type: array
+      items:
+        $ref: '#/components/schemas/collectionitem'
     flowsegment:
       type: object
       description: Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
@@ -2300,13 +2736,13 @@ components:
           description: The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative
           $ref: '#/components/schemas/timestamp'
         timerange:
-          description: The timerange from the first sample in the segment to the last, with an inclusive start and inclusive or exclusive end, as described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, this refers to the presentation timeline.
+          description: The timerange for the samples contained in the segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.
           $ref: '#/components/schemas/timerange'
         last_duration:
-          description: The duration of the last sample in the segment (which may differ from that of the object). Defaults to 1/rate if a fixed media rate is set. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative
+          description: The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative
           $ref: '#/components/schemas/timestamp'
         sample_offset:
-          description: The start of the segment represented as a count of samples from the start of the object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples
+          description: The start of the segment represented as a count of samples from the start of the object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set.
           type: integer
         sample_count:
           description: The count of samples in the segment (which may be fewer than in the object). The count could be less than expected given the segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples
@@ -2320,7 +2756,7 @@ components:
             - url
             properties:
               label:
-                description: Label identifying this URL
+                description: Label identifying this URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.
                 type: string
               url:
                 description: A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint
@@ -2507,16 +2943,19 @@ components:
     timerange:
       title: TimeRange
       description: |
-        A timerange of timestamps. It is represented using a pair ot timestamps with inclusivity and exclusivity markers.
+        A timerange of timestamps. It is represented using one or two timestamps with inclusivity and exclusivity markers.
 
         E.g.
-        * "[0:0_10:0)" represents 10 seconds of media starting at timestamp "0:0" and ending before "10:0".
-        * "(5:0_" represents a timerange starting after "5:0" and to eternity.
-        * "[1694429247:0_1694429248:0)" is a 1 second TAI timerange starting at 2023-09-11T10:46:50.0Z UTC.
-        * A "[" or "]" indicates that bound is inclusive, and a "(" or ")" indicates that bound is exclusive.
+        * `[0:0_10:0)` represents 10 seconds of media starting at timestamp `0:0` and ending before `10:0`.
+        * `(5:0_` represents a timerange starting after `5:0` and to eternity.
+        * `[1694429247:0_1694429248:0)` is a 1 second TAI timerange starting at 2023-09-11T10:46:50.0Z UTC.
+        * `[1694429247:0]` is an instantaneous TAI timerange at 2023-09-11T10:46:50.0Z UTC.
+          This is equivalent to `[1694429247:0_1694429247:0]`.
+          The short syntax is preferred due to ease of identification as instantaneous.
+          Instantaneous TimeRanges cannot use exclusive markers (i.e. `(` or `)`).
+        * A `[` or `]` indicates that bound is inclusive, and a `(` or `)` indicates that bound is exclusive.
 
-        Details of the format can be found in the TimeRange class provided in the Python
-        [mediatimestamp](https://github.com/bbc/rd-apmm-python-lib-mediatimestamp) library.
+        Details of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.
       type: string
       pattern: ^(\[|\()?(-?\d+:\d+)?(_(-?\d+:\d+)?)?(\]|\))?$
     webhookpost:
@@ -2538,6 +2977,38 @@ components:
           type: string
         events:
           description: List of event types to receive
+          type: array
+          items:
+            type: string
+        flow_ids:
+          description: Limit Flow and Flow Segment events to Flows in the given list of Flow IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        source_ids:
+          description: Limit Flow, Flow Segment and Source events to Sources in the given list of Source IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        flow_collected_by_ids:
+          description: Limit Flow and Flow Segment events to those with Flow that is collected by a Flow Collection in the given list of Flow Collection IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        source_collected_by_ids:
+          description: Limit Flow, Flow Segment and Source events to those with Source that is collected by a Source Collection in the given list of Source Collection IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        accept_get_urls:
+          description: >-
+            List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the
+            `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather
+            than a (comma separated list) string.
           type: array
           items:
             type: string
@@ -2563,6 +3034,38 @@ components:
           type: array
           items:
             type: string
+        flow_ids:
+          description: Limit Flow and Flow Segment events to Flows in the given list of Flow IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        source_ids:
+          description: Limit Flow, Flow Segment and Source events to Sources in the given list of Source IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        flow_collected_by_ids:
+          description: Limit Flow and Flow Segment events to those with Flow that is collected by a Flow Collection in the given list of Flow Collection IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        source_collected_by_ids:
+          description: Limit Flow, Flow Segment and Source events to those with Source that is collected by a Source Collection in the given list of Source Collection IDs
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        accept_get_urls:
+          description: >-
+            List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the
+            `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather
+            than a (comma separated list) string.
+          type: array
+          items:
+            type: string
     collectionitem:
       type: object
       description: Describes how an object (Source or Flow) is collected into another object of the same type
@@ -2572,7 +3075,7 @@ components:
       - role
       properties:
         id:
-          description: Source or Flow Identifier of the member of this collection.  Must already be registered in TAMS
+          description: Source or Flow Identifier of the member of this collection. Sources must only collect Sources, and Flows must only collect Flows. Must already be registered in TAMS
           type: string
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         role:
@@ -2888,15 +3391,14 @@ components:
     timestamp:
       title: Timestamp
       description: |
-        A signed nanosecond resolution timestamp represented as <sign><seconds>:<nanoseconds>. The intended
+        A signed nanosecond resolution timestamp represented as "{sign?}{seconds}:{nanoseconds}". The intended
         interpretation of the value is assumed to be defined elsewhere.
 
         E.g.
         * "1:40000000" is the timestamp of the 27th video frame for 25 Hz video with origin at "0:0".
         * "1694429247:40000000" is the TAI timestamp for a video frame at 2023-09-11T10:46:50.04Z UTC.
 
-        Details of the format can be found in the Timestamp class provided in the Python
-        [mediatimestamp](https://github.com/bbc/rd-apmm-python-lib-mediatimestamp) library.
+        Details of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.
       type: string
       pattern: ^-?\d+:\d+$
     containermapping:
@@ -3013,21 +3515,34 @@ components:
           type: string
           pattern: ^[^\s/]+/[^\s/]+$
         avg_bit_rate:
-          description: The average bit rate of the flow content in 1000 bits/second. A precise definition of how the bit rate is calculated is not provided here.
+          description: The average bit rate of the flow segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
           type: integer
           minimum: 0
         max_bit_rate:
-          description: The maximum bit rate of the flow content in 1000 bits/second. A precise definition of how the bit rate is calculated is not provided here.
+          description: The maximum bit rate of the flow segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
           type: integer
           minimum: 0
+        segment_duration:
+          description: The target flow segment duration in seconds. The duration for each segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
+          type: object
+          required:
+          - numerator
+          properties:
+            numerator:
+              description: numerator
+              type: integer
+              exclusiveMinimum: 0
+            denominator:
+              description: denominator
+              type: integer
+              default: 1
+              exclusiveMinimum: 0
         timerange:
           description: The timerange of samples available in the flow, as described by the [TimeRange](../schemas/timerange#top) type
           $ref: '#/components/schemas/timerange'
         flow_collection:
-          type: array
           description: List of Flows that are collected together by this Flow.
-          items:
-            $ref: '#/components/schemas/collectionitem'
+          $ref: '#/components/schemas/flowcollection'
         collected_by:
           type: array
           description: Flows that reference this Flow to include it in a collection. This attribute is intended to be read-only. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally

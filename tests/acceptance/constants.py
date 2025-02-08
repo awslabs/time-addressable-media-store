@@ -20,6 +20,8 @@ VIDEO_FLOW = {
     "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
     "codec": "video/h264",
     "container": "video/mp2t",
+    "avg_bit_rate": 5000000,
+    "max_bit_rate": 5000000,
     "essence_parameters": {
         "frame_rate": {"numerator": 50, "denominator": 1},
         "frame_width": 1920,

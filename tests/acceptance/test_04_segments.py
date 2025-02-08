@@ -1,5 +1,4 @@
 # pylint: disable=too-many-lines
-import boto3
 import pytest
 import requests
 
@@ -153,10 +152,10 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
 
 
 @pytest.mark.storage
-def test_S3_PUT_bulk_objects(region, stack):
+def test_S3_PUT_bulk_objects(session, region, stack):
     # Arrange
     bucket_name = stack["outputs"]["MediaStorageBucket"]
-    s3 = boto3.resource("s3", region_name=region)
+    s3 = session.resource("s3", region_name=region)
     bucket = s3.Bucket(bucket_name)
     # Act
     for n in range(5, 100):
@@ -251,6 +250,30 @@ def test_List_Flow_Segments_HEAD_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+@pytest.mark.segments
+def test_List_Flow_Segments_HEAD_200_accept_get_urls(api_client_cognito):
+    """List segments with accept_get_urls query specified"""
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"accept_get_urls": ""},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "link" in response_headers_lower
+    assert "x-paging-count" in response_headers_lower
+    assert "x-paging-nextkey" in response_headers_lower
+    assert "x-paging-reverse-order" in response_headers_lower
+    assert "x-paging-timerange" in response_headers_lower
     assert "" == response.content.decode("utf-8")
 
 
@@ -363,6 +386,25 @@ def test_List_Flow_Segments_HEAD_400(api_client_cognito):
         "HEAD",
         path,
         params={"bad": "query"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+@pytest.mark.segments
+def test_List_Flow_Segments_HEAD_400_accept_get_urls(api_client_cognito):
+    """List segments with accept_get_urls query specified"""
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"accept_get_urls": "", "bad": "query"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -504,6 +546,25 @@ def test_List_Flow_Segments_HEAD_404_limit(api_client_cognito):
 
 
 @pytest.mark.segments
+def test_List_Flow_Segments_HEAD_404_accept_get_urls(api_client_cognito):
+    """List segments with accept_get_urls query specified"""
+    # Arrange
+    path = "/flows/invalid-id/segments"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"accept_get_urls": ""},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito):
     """List segments with object_id query specified"""
     # Arrange
@@ -620,6 +681,8 @@ def test_Flow_Details_GET_200_timerange(api_client_cognito):
         "description": "pytest",
         "collected_by": [MULTI_FLOW["id"]],
         "timerange": "[1:0_3:0)",
+        "avg_bit_rate": 6000000,
+        "max_bit_rate": 6000000,
     } == response_json
 
 
@@ -679,7 +742,7 @@ def test_List_Flow_Segments_GET_200(api_client_cognito):
         assert "object_id" in record
         assert "timerange" in record
         assert "get_urls" in record
-        assert 1 == len(record["get_urls"])
+        assert 2 == len(record["get_urls"])
 
 
 @pytest.mark.segments
@@ -698,6 +761,78 @@ def test_List_Flow_Segments_GET_200_non_existant(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 0 == len(response.json())
+
+
+@pytest.mark.segments
+def test_List_Flow_Segments_GET_200_accept_get_urls_empty(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"accept_get_urls": ""},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 30 == len(response.json())
+    for record in response.json():
+        assert "object_id" in record
+        assert "timerange" in record
+        assert "get_urls" not in record
+
+
+@pytest.mark.segments
+def test_List_Flow_Segments_GET_200_accept_get_urls_single(api_client_cognito, region):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"accept_get_urls": f"aws.{region}:s3:Example TAMS"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 30 == len(response.json())
+    for record in response.json():
+        assert "object_id" in record
+        assert "timerange" in record
+        assert "get_urls" in record
+        assert 1 == len(record["get_urls"])
+
+
+@pytest.mark.segments
+def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
+    api_client_cognito, region
+):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "accept_get_urls": f"aws.{region}:s3:Example TAMS,aws.{region}:s3.presigned:Example TAMS"
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 30 == len(response.json())
+    for record in response.json():
+        assert "object_id" in record
+        assert "timerange" in record
+        assert "get_urls" in record
+        assert 2 == len(record["get_urls"])
 
 
 @pytest.mark.segments

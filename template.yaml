@@ -39,7 +39,7 @@ Mappings:
   Solution:
     Constants:
       ApiVersion: "5.1"
-      ServiceVersion: "2.1"
+      ServiceVersion: "3.0"
 
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
@@ -243,11 +243,11 @@ Resources:
   UtilsLayer:
     Type: AWS::Serverless::LayerVersion
     Metadata:
-      BuildMethod: makefile
+      BuildMethod: python3.13
       BuildArchitecture: arm64
     Properties:
       RetentionPolicy: Delete
-      ContentUri: api/
+      ContentUri: layers/utils/
       CompatibleRuntimes:
         - python3.13
       CompatibleArchitectures:
@@ -665,6 +665,78 @@ Resources:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
             Method: delete
+        headFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: head
+        getFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: get
+        putFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: put
+        deleteFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: delete
+        headFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: head
+        getFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: get
+        putFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: put
+        deleteFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: delete
+        headFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: head
+        getFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: get
+        putFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: put
+        deleteFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: delete
         headFlowsFlowidReadonly:
           Type: Api
           Properties:
@@ -823,11 +895,16 @@ Resources:
       CodeUri: functions/webhooks/
       Layers:
         - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
+        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-webhooks
           WEBHOOKS_TABLE: !Ref WebhooksTable
+          API_ID: !Ref Api
+          STAGE_NAME: !Ref Api.Stage
+          BUCKET: !Ref MediaStorageBucket
+          BUCKET_REGION: !Ref AWS::Region
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -836,6 +913,16 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !GetAtt WebhooksTable.Arn
+            - Effect: Allow
+              Action:
+                - apigateway:GET
+              Resource:
+                - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}/stages/${Api.Stage}
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
       Events:
         EventBridge:
           Type: EventBridgeRule

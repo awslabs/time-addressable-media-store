@@ -35,6 +35,18 @@ pytestmark = [
         ("/flows/{flowId}/label", "GET"),
         ("/flows/{flowId}/label", "HEAD"),
         ("/flows/{flowId}/label", "PUT"),
+        ("/flows/{flowId}/flow_collection", "DELETE"),
+        ("/flows/{flowId}/flow_collection", "GET"),
+        ("/flows/{flowId}/flow_collection", "HEAD"),
+        ("/flows/{flowId}/flow_collection", "PUT"),
+        ("/flows/{flowId}/max_bit_rate", "DELETE"),
+        ("/flows/{flowId}/max_bit_rate", "GET"),
+        ("/flows/{flowId}/max_bit_rate", "HEAD"),
+        ("/flows/{flowId}/max_bit_rate", "PUT"),
+        ("/flows/{flowId}/avg_bit_rate", "DELETE"),
+        ("/flows/{flowId}/avg_bit_rate", "GET"),
+        ("/flows/{flowId}/avg_bit_rate", "HEAD"),
+        ("/flows/{flowId}/avg_bit_rate", "PUT"),
         ("/flows/{flowId}/read_only", "GET"),
         ("/flows/{flowId}/read_only", "HEAD"),
         ("/flows/{flowId}/read_only", "PUT"),
@@ -1897,6 +1909,500 @@ def test_Delete_Flow_Label_DELETE_204(api_client_cognito):
 def test_Delete_Flow_Label_DELETE_404(api_client_cognito):
     # Arrange
     path = f"/flows/{ID_404}/label"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+
+
+def test_Flow_Flow_Collection_HEAD_200(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Flow_Flow_Collection_HEAD_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/flow_collection"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Flow_Flow_Collection_GET_200(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    response_json = sorted(response_json, key=lambda fc: fc["id"])
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert MULTI_FLOW["flow_collection"] == response_json
+
+
+def test_Flow_Flow_Collection_GET_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/flow_collection"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested Flow does not exist." == response.json()["message"]
+
+
+def test_Delete_Flow_Flow_Collection_DELETE_204(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/flow_collection"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+
+
+def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=MULTI_FLOW["flow_collection"][0:1],
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=MULTI_FLOW["flow_collection"],
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Create_or_Update_Flow_Flow_Collection_PUT_400(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/flow_collection'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        data="test",
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "Invalid request body" == response.json()["message"]
+
+
+def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/flow_collection"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=[],
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested Flow does not exist." == response.json()["message"]
+
+
+def test_Flow_Max_Bit_Rate_HEAD_200(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Flow_Max_Bit_Rate_HEAD_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/max_bit_rate"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Flow_Max_Bit_Rate_GET_200(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert VIDEO_FLOW["max_bit_rate"] == int(response.content.decode("utf-8"))
+
+
+def test_Flow_Max_Bit_Rate_GET_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/max_bit_rate"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested Flow does not exist." == response.json()["message"]
+
+
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}/max_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=6000000,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=6000000,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        data="test",
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "Bad request. Invalid flow max bit rate." == response.json()["message"]
+
+
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/max_bit_rate"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json="test",
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested Flow does not exist." == response.json()["message"]
+
+
+def test_Delete_Flow_Max_Bit_Rate_DELETE_204(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}/max_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/max_bit_rate"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+
+
+def test_Flow_Avg_Bit_Rate_HEAD_200(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Flow_Avg_Bit_Rate_HEAD_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/avg_bit_rate"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Flow_Avg_Bit_Rate_GET_200(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert VIDEO_FLOW["avg_bit_rate"] == int(response.content.decode("utf-8"))
+
+
+def test_Flow_Avg_Bit_Rate_GET_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/avg_bit_rate"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested Flow does not exist." == response.json()["message"]
+
+
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}/avg_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=6000000,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=6000000,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        data="test",
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "Bad request. Invalid flow avg bit rate." == response.json()["message"]
+
+
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/avg_bit_rate"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json="test",
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested Flow does not exist." == response.json()["message"]
+
+
+def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}/avg_bit_rate'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "DELETE",

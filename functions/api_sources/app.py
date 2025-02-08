@@ -2,6 +2,7 @@ import json
 import os
 from http import HTTPStatus
 
+# pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -23,7 +24,7 @@ from utils import (
     check_node_exists,
     generate_link_url,
     get_username,
-    model_dump_json,
+    model_dump,
     publish_event,
     query_node,
     query_node_property,
@@ -42,7 +43,7 @@ record_type = "source"
 event_bus = os.environ["EVENT_BUS"]
 
 
-@app.route("/sources", method=["HEAD"])
+@app.head("/sources")
 @app.get("/sources")
 @tracer.capture_method(capture_response=False)
 def list_sources():
@@ -66,12 +67,12 @@ def list_sources():
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump_json([Source(**item) for item in items]),
+        body=model_dump([Source(**item) for item in items]),
         headers=custom_headers,
     )
 
 
-@app.route("/sources/<sourceId>", method=["HEAD"])
+@app.head("/sources/<sourceId>")
 @app.get("/sources/<sourceId>")
 @tracer.capture_method(capture_response=False)
 def get_source_details(
@@ -83,10 +84,10 @@ def get_source_details(
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump_json(Source(**item)), HTTPStatus.OK.value  # 200
+    return model_dump(Source(**item)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/sources/<sourceId>/tags", method=["HEAD"])
+@app.head("/sources/<sourceId>/tags")
 @app.get("/sources/<sourceId>/tags")
 @tracer.capture_method(capture_response=False)
 def get_source_tags(
@@ -98,13 +99,10 @@ def get_source_tags(
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return (
-        model_dump_json(Tags(**tags)),
-        HTTPStatus.OK.value,
-    )  # 200
+    return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/sources/<sourceId>/tags/<name>", method=["HEAD"])
+@app.head("/sources/<sourceId>/tags/<name>")
 @app.get("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def get_source_tag_value(
@@ -138,7 +136,11 @@ def put_source_tag_value(
         raise BadRequestError("Bad request. Invalid Source tag value.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": body})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -159,11 +161,15 @@ def delete_source_tag(
         )  # 404
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": None})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/sources/<sourceId>/description", method=["HEAD"])
+@app.head("/sources/<sourceId>/description")
 @app.get("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
 def get_source_description(
@@ -195,7 +201,11 @@ def put_source_description(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.description": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -210,11 +220,15 @@ def delete_source_description(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.description": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/sources/<sourceId>/label", method=["HEAD"])
+@app.head("/sources/<sourceId>/label")
 @app.get("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
 def get_source_label(
@@ -248,7 +262,11 @@ def put_source_label(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.label": body}
     )
-    publish_event("sources/updated", {"source": item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -263,7 +281,11 @@ def delete_source_label(
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.label": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -274,3 +296,12 @@ def delete_source_label(
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@tracer.capture_method(capture_response=False)
+def get_event_resources(obj: dict) -> list:
+    """Generate a list of event resources for the given source object."""
+    return [
+        f'tams:source:{obj["id"]}',
+        *[f"tams:source-collected-by:{c_id}" for c_id in obj.get("collected_by", [])],
+    ]

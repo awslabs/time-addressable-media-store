@@ -5,6 +5,8 @@ from datetime import datetime
 from http import HTTPStatus
 
 import boto3
+
+# pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -23,13 +25,14 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from mediatimestamp.immutable import TimeRange
 from schema import (
+    Collectionitem,
     Deletionrequest,
     Flow,
+    Flowcollection,
     Flowstorage,
     Flowstoragepost,
     Httprequest,
     MediaObject,
-    Source,
     Tags,
 )
 from typing_extensions import Annotated
@@ -42,17 +45,18 @@ from utils import (
     generate_presigned_url,
     get_flow_timerange,
     get_username,
-    merge_flow,
-    merge_source,
+    merge_source_flow,
     model_dump,
-    model_dump_json,
     publish_event,
     put_deletion_request,
+    query_flow_collection,
     query_flows,
     query_node,
     query_node_property,
     query_node_tags,
+    set_flow_collection,
     set_node_property,
+    validate_flow_collection,
     validate_query_string,
 )
 
@@ -68,7 +72,7 @@ bucket = os.environ["BUCKET"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
 
-@app.route("/flows", method=["HEAD"])
+@app.head("/flows")
 @app.get("/flows")
 @tracer.capture_method(capture_response=False)
 def get_flows():
@@ -111,12 +115,12 @@ def get_flows():
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump_json([Flow(**item) for item in items]),
+        body=model_dump([Flow(**item) for item in items]),
         headers=custom_headers,
     )
 
 
-@app.route("/flows/<flowId>", method=["HEAD"])
+@app.head("/flows/<flowId>")
 @app.get("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
 def get_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
@@ -137,7 +141,7 @@ def get_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
         )
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump_json(Flow(**item)), HTTPStatus.OK.value  # 200
+    return model_dump(Flow(**item)), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>")
@@ -155,47 +159,33 @@ def put_flow_by_id(
                 "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
             )  # 403
     except ValueError:
-        existing_item = None
-    if flow.root.flow_collection:
-        for collection in flow.root.flow_collection:
-            if not check_node_exists(record_type, collection.id):
-                raise BadRequestError(
-                    "The supplied value for flow_collection references flowId(s) that do not exist"
-                )  # 400
-    request_item = model_dump(flow)
+        existing_item = {}
+    if not validate_flow_collection(flowId, flow.root.flow_collection):
+        raise BadRequestError("Bad request. Invalid flow collection.")  # 400
     # API spec states these fields should be ignored if given in a PUT request.
-    for field in ["created", "metadata_updated", "collected_by"]:
-        request_item.pop(field, None)
-    merged_item = (
-        Flow(**{**existing_item, **request_item})
-        if existing_item
-        else Flow(**request_item)
-    )
+    for field in constants.FLOW_PUT_IGNORE_FIELDS:
+        setattr(flow.root, field, None)
+        existing_item.pop(field, None)
     now = datetime.now()
-    if merged_item.root.created:
-        merged_item.root.metadata_updated = now
+    if existing_item:
+        flow.root.metadata_updated = now
     else:
-        merged_item.root.created = now
+        flow.root.created = now
     # Set these if not supplied
     username = get_username(app.current_event.request_context)
-    if not merged_item.root.created_by:
-        merged_item.root.created_by = username
-    if not merged_item.root.updated_by and existing_item:
-        merged_item.root.updated_by = username
-    if not check_node_exists("source", merged_item.root.source_id):
-        source: Source = Source(**model_dump(flow))
-        source.id = flow.root.source_id
-        merge_source(model_dump(source))
-    item_dict = model_dump(merged_item)
-    merge_flow(item_dict)
+    if not flow.root.created_by and not existing_item:
+        flow.root.created_by = username
+    if not flow.root.updated_by and existing_item:
+        flow.root.updated_by = username
+    item_dict = model_dump(Flow(**merge_source_flow(model_dump(flow), existing_item)))
     publish_event(
         (f"{record_type}s/updated" if existing_item else f"{record_type}s/created"),
         {record_type: item_dict},
-        [flowId],
+        get_event_resources(item_dict),
     )
     if existing_item:
         return None, HTTPStatus.NO_CONTENT.value  # 204
-    return model_dump_json(merged_item), HTTPStatus.CREATED.value  # 201
+    return item_dict, HTTPStatus.CREATED.value  # 201
 
 
 @app.delete("/flows/<flowId>")
@@ -218,10 +208,17 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
         source_id = delete_flow(flowId)
         if source_id:
             publish_event(
-                f"{record_type}s/deleted", {f"{record_type}_id": flowId}, [flowId]
+                f"{record_type}s/deleted",
+                {f"{record_type}_id": flowId},
+                get_event_resources(item),
             )
         # Delete source if no longer referenced by any other flows
-        check_delete_source(source_id)
+        if check_delete_source(source_id):
+            publish_event(
+                "sources/deleted",
+                {"source_id": source_id},
+                [f"tams:source:{source_id}"],
+            )
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request
     item_dict = {
@@ -234,14 +231,14 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
     return Response(
         status_code=HTTPStatus.ACCEPTED.value,  # 202
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump_json(Deletionrequest(**item_dict)),
+        body=model_dump(Deletionrequest(**item_dict)),
         headers={
             "Location": f'https://{app.current_event.request_context.domain_name}{app.current_event.request_context.path.split("/flows/")[0]}/flow-delete-requests/{item_dict["id"]}'
         },
     )
 
 
-@app.route("/flows/<flowId>/tags", method=["HEAD"])
+@app.head("/flows/<flowId>/tags")
 @app.get("/flows/<flowId>/tags")
 @tracer.capture_method(capture_response=False)
 def get_flow_tags(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
@@ -251,13 +248,10 @@ def get_flow_tags(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return (
-        model_dump_json(Tags(**tags)),
-        HTTPStatus.OK.value,
-    )  # 200
+    return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/flows/<flowId>/tags/<name>", method=["HEAD"])
+@app.head("/flows/<flowId>/tags/<name>")
 @app.get("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def get_flow_tag_value(
@@ -296,7 +290,11 @@ def put_flow_tag_value(
         raise BadRequestError("Bad request. Invalid flow tag value.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": body})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -320,11 +318,15 @@ def delete_flow_tag_value(
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": None})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/description", method=["HEAD"])
+@app.head("/flows/<flowId>/description")
 @app.get("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
 def get_flow_description(
@@ -363,7 +365,11 @@ def put_flow_description(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.description": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -387,11 +393,15 @@ def delete_flow_description(
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.description": None}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/label", method=["HEAD"])
+@app.head("/flows/<flowId>/label")
 @app.get("/flows/<flowId>/label")
 @tracer.capture_method(capture_response=False)
 def get_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
@@ -426,7 +436,11 @@ def put_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
         raise BadRequestError("Bad request. Invalid flow label.")  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": body})
-    publish_event("sources/updated", {"source": item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -446,11 +460,238 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": None})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/flows/<flowId>/read_only", method=["HEAD"])
+@app.head("/flows/<flowId>/flow_collection")
+@app.get("/flows/<flowId>/flow_collection")
+@tracer.capture_method(capture_response=False)
+def get_flow_flow_collection(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        flow_collection = query_flow_collection(flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return (
+        model_dump(
+            Flowcollection([Collectionitem(**item) for item in flow_collection])
+        ),
+        HTTPStatus.OK.value,
+    )  # 200
+
+
+@app.put("/flows/<flowId>/flow_collection")
+@tracer.capture_method(capture_response=False)
+def put_flow_flow_collection(
+    flow_collection: Flowcollection,
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)],
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    if not validate_flow_collection(flowId, flow_collection):
+        raise BadRequestError("Bad request. Invalid flow collection.")  # 400
+    username = get_username(app.current_event.request_context)
+    item_dict = set_flow_collection(flowId, username, model_dump(flow_collection))
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.delete("/flows/<flowId>/flow_collection")
+@tracer.capture_method(capture_response=False)
+def delete_flow_flow_collection(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_flow_collection(flowId, username, [])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.head("/flows/<flowId>/max_bit_rate")
+@app.get("/flows/<flowId>/max_bit_rate")
+@tracer.capture_method(capture_response=False)
+def get_flow_max_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        max_bit_rate = query_node_property(record_type, flowId, "max_bit_rate")
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return max_bit_rate, HTTPStatus.OK.value  # 200
+
+
+@app.put("/flows/<flowId>/max_bit_rate")
+@tracer.capture_method(capture_response=False)
+def put_flow_max_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    try:
+        body = json.loads(app.current_event.body)
+    except json.decoder.JSONDecodeError:
+        body = None
+    if not isinstance(body, int):
+        raise BadRequestError("Bad request. Invalid flow max bit rate.")  # 400
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.max_bit_rate": body}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.delete("/flows/<flowId>/max_bit_rate")
+@tracer.capture_method(capture_response=False)
+def delete_flow_max_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.max_bit_rate": None}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.head("/flows/<flowId>/avg_bit_rate")
+@app.get("/flows/<flowId>/avg_bit_rate")
+@tracer.capture_method(capture_response=False)
+def get_flow_avg_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        avg_bit_rate = query_node_property(record_type, flowId, "avg_bit_rate")
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return avg_bit_rate, HTTPStatus.OK.value  # 200
+
+
+@app.put("/flows/<flowId>/avg_bit_rate")
+@tracer.capture_method(capture_response=False)
+def put_flow_avg_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    try:
+        body = json.loads(app.current_event.body)
+    except json.decoder.JSONDecodeError:
+        body = None
+    if not isinstance(body, int):
+        raise BadRequestError("Bad request. Invalid flow avg bit rate.")  # 400
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.avg_bit_rate": body}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.delete("/flows/<flowId>/avg_bit_rate")
+@tracer.capture_method(capture_response=False)
+def delete_flow_avg_bit_rate(
+    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
+):
+    try:
+        item = query_node(record_type, flowId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if item.get("read_only"):
+        raise ServiceError(
+            403,
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flowId, username, {"flow.avg_bit_rate": None}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.head("/flows/<flowId>/read_only")
 @app.get("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
 def get_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
@@ -480,7 +721,11 @@ def put_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PAT
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.read_only": body}
     )
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [flowId])
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -512,10 +757,7 @@ def post_flow_storage_by_id(
             for _ in range(flow_storage_post.limit)
         ]
     )
-    return (
-        flow_storage.model_dump_json(by_alias=True, exclude_unset=True),
-        HTTPStatus.CREATED.value,
-    )  # 201
+    return model_dump(flow_storage), HTTPStatus.CREATED.value  # 201
 
 
 @logger.inject_lambda_context(
@@ -540,3 +782,13 @@ def get_presigned_put(content_type):
         object_id=object_id,
         put_url=Httprequest.model_validate({"url": url, "content-type": content_type}),
     )
+
+
+@tracer.capture_method(capture_response=False)
+def get_event_resources(obj: dict) -> list:
+    """Generate a list of event resources for the given flow object."""
+    return [
+        f'tams:flow:{obj["id"]}',
+        f'tams:source:{obj["source_id"]}',
+        *[f"tams:flow-collected-by:{c_id}" for c_id in obj.get("collected_by", [])],
+    ]

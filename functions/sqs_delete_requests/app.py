@@ -38,10 +38,17 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
             source_id = delete_flow(body["flow_id"])
             if source_id:
                 publish_event(
-                    "flows/deleted", {"flow_id": body["flow_id"]}, [body["flow_id"]]
+                    "flows/deleted",
+                    {"flow_id": body["flow_id"]},
+                    [f'tams:flow:{body["flow_id"]}'],
                 )
             # Delete source if no longer referenced by any other flows
-            check_delete_source(source_id)
+            if check_delete_source(source_id):
+                publish_event(
+                    "sources/deleted",
+                    {"source_id": source_id},
+                    [f"tams:source:{source_id}"],
+                )
         # Now proceed with deleting the flow segments
         body["status"] = "started"
         set_node_property_base(
