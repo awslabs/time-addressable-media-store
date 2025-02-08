@@ -245,5 +245,4 @@ $RECYCLE.BIN/
 .vscode/settings.json
 .aws-sam
 Flashpost-tests
-utils
 samconfig.toml
