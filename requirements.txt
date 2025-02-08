@@ -3,3 +3,4 @@ pytest
 boto3
 mediatimestamp
 cymple
+pyaml

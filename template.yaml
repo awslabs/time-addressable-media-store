@@ -243,11 +243,11 @@ Resources:
   UtilsLayer:
     Type: AWS::Serverless::LayerVersion
     Metadata:
-      BuildMethod: makefile
+      BuildMethod: python3.13
       BuildArchitecture: arm64
     Properties:
       RetentionPolicy: Delete
-      ContentUri: api/
+      ContentUri: layers/utils/
       CompatibleRuntimes:
         - python3.13
       CompatibleArchitectures:
