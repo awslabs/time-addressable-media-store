@@ -76,10 +76,17 @@ def check_delete_source(source_id: str) -> bool:
         qb.match()
         .node(ref_name="source", labels="source", properties={"id": source_id})
         .where_literal("NOT exists((source)<-[:represents]-(:flow))")
+        .match()
+        .node(ref_name="source")
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags")
         .detach_delete(ref_name="source")
         .return_literal("source.id AS source_id")
         .get()
     )
+    query = query.replace(
+        "DETACH DELETE source", "DETACH DELETE source DELETE t"
+    )  # Limitation in Cymple library, unable to stack DELETE
     results = neptune.execute_open_cypher_query(openCypherQuery=query)
     return len(results["results"]) > 0
 
@@ -1158,10 +1165,21 @@ def delete_flow(flow_id: str) -> str | None:
             .node(ref_name="flow", labels="flow", properties={"id": flow_id})
             .related_to(label="represents")
             .node(ref_name="s", labels="source")
+            .match()
+            .node(ref_name="flow")
+            .related_to(label="has_tags")
+            .node(ref_name="t", labels="tags")
+            .match()
+            .node(ref_name="flow")
+            .related_to(label="has_essence_parameters")
+            .node(ref_name="e", labels="essence_parameters")
             .detach_delete(ref_name="flow")
             .return_literal("s.id AS source_id")
             .get()
         )
+        query = query.replace(
+            "DETACH DELETE flow", "DETACH DELETE flow DELETE t DELETE e"
+        )  # Limitation in Cymple library, unable to stack DELETE
         results = neptune.execute_open_cypher_query(openCypherQuery=query)
         return results["results"][0]["source_id"]
     except IndexError:
