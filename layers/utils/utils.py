@@ -678,12 +678,8 @@ def generate_source_query(
             labels="source",
             properties=properties.get("source", {}),
         )
-        .related_to(
-            ref_name="t",
-            label="has_tags",
-            properties=properties.get("tags", {}),
-        )
-        .node(labels="tags")
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags", properties=properties.get("tags", {}))
     )
     if set_dict:
         query = query.set(set_dict).with_("*")
@@ -727,20 +723,16 @@ def generate_flow_query(
         )
         .match()
         .node(ref_name="flow")
-        .related_to(
+        .related_to(label="has_essence_parameters")
+        .node(
             ref_name="e",
-            label="has_essence_parameters",
+            labels="essence_parameters",
             properties=properties.get("essence_parameters", {}),
         )
-        .node(labels="essence_parameters")
         .match()
         .node(ref_name="flow")
-        .related_to(
-            ref_name="t",
-            label="has_tags",
-            properties=properties.get("tags", {}),
-        )
-        .node(labels="tags")
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags", properties=properties.get("tags", {}))
     )
     if set_dict:
         query = query.set(set_dict).with_("*")
@@ -772,12 +764,8 @@ def generate_delete_request_query(
             labels="delete_request",
             properties=properties.get("delete_request", {}),
         )
-        .related_to(
-            ref_name="e",
-            label="has_error",
-            properties=properties.get("error", {}),
-        )
-        .node(labels="error")
+        .related_to(label="has_error")
+        .node(ref_name="e", labels="error", properties=properties.get("error", {}))
     )
     if set_dict:
         query = query.set(set_dict).with_("*")
@@ -821,8 +809,8 @@ def query_node_tags(record_type: str, record_id: str) -> dict:
         query = (
             qb.match()
             .node(labels=record_type, properties={"id": record_id})
-            .related_to(ref_name="t", label="has_tags")
-            .node(labels="tags")
+            .related_to(label="has_tags")
+            .node(ref_name="t", labels="tags")
             .return_literal("t {.*} AS tags")
             .get()
         )
@@ -1026,8 +1014,8 @@ def merge_source(source_dict: dict) -> None:
             labels="source",
             properties={"id": source_dict["id"]},
         )
-        .related_to(ref_name="t", label="has_tags")
-        .node(labels="tags")
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags")
         .set(serialise_neptune_obj(filter_dict(source_dict, {"id", "tags"}), "s."))
     )
     # Add Set for Source Tags
@@ -1090,12 +1078,12 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
         .node(ref_name="s")
         .merge()
         .node(ref_name="f")
-        .related_to(ref_name="t", label="has_tags")
-        .node(labels="tags")
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags")
         .merge()
         .node(ref_name="f")
-        .related_to(ref_name="ep", label="has_essence_parameters")
-        .node(labels="essence_parameters")
+        .related_to(label="has_essence_parameters")
+        .node(ref_name="ep", labels="essence_parameters")
         .set(serialise_neptune_obj(flow_properties, "f."))
     )
     # Add Set for Flow Tags
@@ -1142,8 +1130,8 @@ def merge_delete_request(delete_request_dict: dict) -> None:
             labels="delete_request",
             properties={"id": delete_request_dict["id"]},
         )
-        .related_to(ref_name="e", label="has_error")
-        .node(labels="error")
+        .related_to(label="has_error")
+        .node(ref_name="e", labels="error")
         .set(
             serialise_neptune_obj(
                 filter_dict(delete_request_dict, {"id", "error"}), "d."
