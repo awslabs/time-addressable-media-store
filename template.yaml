@@ -122,7 +122,7 @@ Resources:
             Location: api/openapi.yaml
 
   FlowSegmentsTable:
-    DeletionPolicy: Retain
+    DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Metadata:
@@ -157,6 +157,8 @@ Resources:
             ProjectionType: ALL
 
   WebhooksTable:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Metadata:
       cfn_nag:
@@ -191,7 +193,7 @@ Resources:
     Condition: SupportWebhooks
 
   MediaStorageBucket:
-    DeletionPolicy: Retain
+    DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
     Type: AWS::S3::Bucket
     Metadata:
@@ -389,6 +391,15 @@ Resources:
                 - cognito-idp:AdminGetUser
                 - cognito-idp:DescribeUserPoolClient
               Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headSources:
           Type: Api
@@ -550,6 +561,15 @@ Resources:
                 - sqs:SendMessage
               Resource:
                 - !GetAtt DeleteRequestQueue.Arn
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headFlows:
           Type: Api
@@ -819,6 +839,15 @@ Resources:
                 - s3:GetObject
               Resource:
                 - !Sub ${MediaStorageBucket.Arn}/*
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headFlowsFlowidSegments:
           Type: Api
@@ -862,6 +891,18 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-deletion
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         getFlowDeleteRequests:
           Type: Api
@@ -974,6 +1015,15 @@ Resources:
                 - sqs:SendMessage
               Resource:
                 - !GetAtt CleanupS3Queue.Arn
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         SQSEvent:
           Type: SQS

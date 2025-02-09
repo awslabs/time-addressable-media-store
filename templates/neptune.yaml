@@ -54,16 +54,15 @@ Resources:
           ToPort: 443
 
   TAMSNeptuneCluster:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
     Type: AWS::Neptune::DBCluster
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: F30
-            reason: Storage Encryption not required
     Properties:
       AvailabilityZones: !Ref VpcAZs
       DBSubnetGroupName: !Ref DBSubnetGroup
       EngineVersion: 1.3.4.0
+      IamAuthEnabled: True
+      StorageEncrypted: True
       VpcSecurityGroupIds:
         - !Ref NeptuneSecurityGroup
       ServerlessScalingConfiguration:
@@ -71,6 +70,8 @@ Resources:
         MaxCapacity: !Select [1, !Split [",", !Ref ServerlessScalingConfiguration]]
 
   TAMSNeptuneInstance:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
     Type: AWS::Neptune::DBInstance
     Properties:
       DBInstanceClass: db.serverless
