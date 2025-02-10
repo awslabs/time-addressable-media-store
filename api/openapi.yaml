@@ -7,6 +7,12 @@ info:
     a database index of the flow segments. This document is a specification of the service API.
 
     See the [bbc/tams](https://github.com/bbc/tams) repository for more background on TAMS.
+
+    **Note**: the examples provided in this specification are for a system which uses a media
+    store that provides HTTP URLs for uploading and downloading media objects in buckets. This
+    could for example be implemented using an AWS S3 compatible store using presigned URLs or by
+    a simple file system storage with an HTTP frontend. Clients should parse the /service endpoint
+    and handle the media store type in use appropriately.
   version: '5.1'
 paths:
   /:
@@ -271,6 +277,9 @@ paths:
 
         HTTP requests from the service SHOULD include a `api_key_name` header with the 'api_key_value' value. Clients SHOULD verify this against the value they provided when registering the webhook.
 
+        API implementations MAY partially support event filtering and transformations.
+        API implementations SHALL return a 400 response code if the filtering or transformation specified in the request is not supported.
+
         API implementations SHOULD consider the security implementations of providing webhooks, and include appropriate
         mitigations against Server Side Request Forgery (SSRF) attacks and similar.
       operationId: POST_webhooks
@@ -288,7 +297,7 @@ paths:
         '204':
           description: Success. The webhook has been removed
         '400':
-          description: Bad request. Invalid parameters.
+          description: Bad request. Invalid parameters or unsupported event filtering or transformation.
         '404':
           description: Webhooks are not supported by this API implementation
       security:
@@ -3005,10 +3014,7 @@ components:
             type: string
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         accept_get_urls:
-          description: >-
-            List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the
-            `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather
-            than a (comma separated list) string.
+          description: List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.
           type: array
           items:
             type: string
@@ -3059,10 +3065,7 @@ components:
             type: string
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         accept_get_urls:
-          description: >-
-            List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the
-            `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather
-            than a (comma separated list) string.
+          description: List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.
           type: array
           items:
             type: string

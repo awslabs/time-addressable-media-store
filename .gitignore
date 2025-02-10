@@ -236,12 +236,9 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# Build folder
-
-*/build/*
-
 # End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode
 .vscode/settings.json
 .aws-sam
 Flashpost-tests
 samconfig.toml
+api/build/tams
