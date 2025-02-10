@@ -63,7 +63,6 @@ Globals:
         NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
     Layers:
       - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-      - !Ref ApiLayer
       - !Ref UtilsLayer
     VpcConfig:
       SubnetIds: !If [CreateVpc, !Split [',', !GetAtt VpcStack.Outputs.PrivateSubnetIds], !Ref PrivateSubnetIds]
@@ -254,19 +253,6 @@ Resources:
     Properties:
       RetentionPolicy: Delete
       ContentUri: layers/utils/
-      CompatibleRuntimes:
-        - python3.13
-      CompatibleArchitectures:
-        - arm64
-
-  ApiLayer:
-    Type: AWS::Serverless::LayerVersion
-    Metadata:
-      BuildMethod: python3.13
-      BuildArchitecture: arm64
-    Properties:
-      RetentionPolicy: Delete
-      ContentUri: layers/api/
       CompatibleRuntimes:
         - python3.13
       CompatibleArchitectures:

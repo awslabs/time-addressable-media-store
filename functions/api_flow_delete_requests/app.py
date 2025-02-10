@@ -1,18 +1,16 @@
 from http import HTTPStatus
 
 import boto3
-
-# pylint: disable=no-member
-import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from neptune import query_delete_requests, query_node
 from schema import Deletionrequest
 from typing_extensions import Annotated
-from utils import model_dump, query_delete_requests, query_node
+from utils import model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -38,7 +36,9 @@ def get_flow_delete_requests():
 @app.get("/flow-delete-requests/<requestId>")
 @tracer.capture_method(capture_response=False)
 def get_flow_delete_requests_by_id(
-    requestId: Annotated[str, Path(pattern=constants.DELETE_REQUEST_ID_PATTERN)]
+    requestId: Annotated[
+        str, Path(pattern=Deletionrequest.model_fields["id"].metadata[0].pattern)
+    ]
 ):
     try:
         item = query_node(record_type, requestId)

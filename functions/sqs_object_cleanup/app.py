@@ -1,7 +1,5 @@
 import json
 import os
-
-# pylint: disable=no-name-in-module
 from itertools import batched
 
 import boto3
@@ -9,13 +7,12 @@ from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.data_classes.sqs_event import SQSEvent
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
+from dynamodb import segments_table
 
 tracer = Tracer()
 logger = Logger()
 metrics = Metrics(namespace="Powertools")
 
-dynamodb = boto3.resource("dynamodb")
-segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
 s3 = boto3.client("s3")
 bucket = os.environ["BUCKET"]
 

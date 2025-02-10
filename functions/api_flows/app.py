@@ -4,8 +4,6 @@ import uuid
 from datetime import datetime
 from http import HTTPStatus
 
-import boto3
-
 # pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -23,12 +21,30 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from dynamodb import get_flow_timerange
 from mediatimestamp.immutable import TimeRange
+from neptune import (
+    check_delete_source,
+    check_node_exists,
+    delete_flow,
+    enhance_resources,
+    merge_delete_request,
+    merge_source_flow,
+    query_flow_collection,
+    query_flows,
+    query_node,
+    query_node_property,
+    query_node_tags,
+    set_flow_collection,
+    set_node_property,
+    validate_flow_collection,
+)
 from schema import (
     Collectionitem,
     Deletionrequest,
     Flow,
     Flowcollection,
+    Flowcore,
     Flowstorage,
     Flowstoragepost,
     Httprequest,
@@ -38,25 +54,12 @@ from schema import (
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
-    check_delete_source,
-    check_node_exists,
-    delete_flow,
     generate_link_url,
     generate_presigned_url,
-    get_flow_timerange,
     get_username,
-    merge_source_flow,
     model_dump,
     publish_event,
-    put_deletion_request,
-    query_flow_collection,
-    query_flows,
-    query_node,
-    query_node_property,
-    query_node_tags,
-    set_flow_collection,
-    set_node_property,
-    validate_flow_collection,
+    put_message,
     validate_query_string,
 )
 
@@ -65,11 +68,11 @@ logger = Logger()
 app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
 metrics = Metrics(namespace="Powertools")
 
-dynamodb = boto3.resource("dynamodb")
-segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
 record_type = "flow"
 bucket = os.environ["BUCKET"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
+
+FLOW_ID_PATTERN = Flowcore.model_fields["id"].metadata[0].pattern
 
 
 @app.head("/flows")
@@ -89,17 +92,13 @@ def get_flows():
             items = [
                 item
                 for item in items
-                if TimeRange.from_str(
-                    get_flow_timerange(segments_table, item["id"])
-                ).is_empty()
+                if TimeRange.from_str(get_flow_timerange(item["id"])).is_empty()
             ]
         else:
             items = [
                 item
                 for item in items
-                if not TimeRange.from_str(
-                    get_flow_timerange(segments_table, item["id"])
-                )
+                if not TimeRange.from_str(get_flow_timerange(item["id"]))
                 .intersect_with(timerange_filter)
                 .is_empty()
             ]
@@ -123,7 +122,7 @@ def get_flows():
 @app.head("/flows/<flowId>")
 @app.get("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
-def get_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def get_flow_by_id(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     parameters = app.current_event.query_string_parameters
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400
@@ -132,7 +131,7 @@ def get_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if parameters and "include_timerange" in parameters:
-        item["timerange"] = get_flow_timerange(segments_table, flowId)
+        item["timerange"] = get_flow_timerange(flowId)
     # Update timerange if timerange parameter supplied
     if parameters and "timerange" in parameters and "include_timerange" in parameters:
         timerange_filter = TimeRange.from_str(parameters["timerange"])
@@ -146,9 +145,7 @@ def get_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
 
 @app.put("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
-def put_flow_by_id(
-    flow: Flow, flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def put_flow_by_id(flow: Flow, flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     if flow.root.id != flowId:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
     try:
@@ -190,7 +187,7 @@ def put_flow_by_id(
 
 @app.delete("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
-def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def delete_flow_by_id(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -203,7 +200,7 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
     # Get flow timerange, if timerange is empty delete flow sync, otherwise return a delete request
-    flow_timerange = TimeRange.from_str(get_flow_timerange(segments_table, flowId))
+    flow_timerange = TimeRange.from_str(get_flow_timerange(flowId))
     if flow_timerange.is_empty():
         source_id = delete_flow(flowId)
         if source_id:
@@ -217,7 +214,7 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
             publish_event(
                 "sources/deleted",
                 {"source_id": source_id},
-                [f"tams:source:{source_id}"],
+                enhance_resources([f"tams:source:{source_id}"]),
             )
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request
@@ -227,7 +224,8 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
         "timerange_to_delete": str(flow_timerange),
         "timerange_remaining": str(flow_timerange),
     }
-    put_deletion_request(del_queue, item_dict)
+    put_message(del_queue, item_dict)
+    merge_delete_request(item_dict)
     return Response(
         status_code=HTTPStatus.ACCEPTED.value,  # 202
         content_type=content_types.APPLICATION_JSON,
@@ -241,7 +239,7 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
 @app.head("/flows/<flowId>/tags")
 @app.get("/flows/<flowId>/tags")
 @tracer.capture_method(capture_response=False)
-def get_flow_tags(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def get_flow_tags(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         tags = query_node_tags(record_type, flowId)
     except ValueError as e:
@@ -255,7 +253,7 @@ def get_flow_tags(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)
 @app.get("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def get_flow_tag_value(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)], name: str
+    flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)], name: str
 ):
     try:
         tags = query_node_tags(record_type, flowId)
@@ -271,7 +269,7 @@ def get_flow_tag_value(
 @app.put("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def put_flow_tag_value(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)], name: str
+    flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)], name: str
 ):
     try:
         item = query_node(record_type, flowId)
@@ -301,7 +299,7 @@ def put_flow_tag_value(
 @app.delete("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def delete_flow_tag_value(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)], name: str
+    flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)], name: str
 ):
     try:
         item = query_node(record_type, flowId)
@@ -329,9 +327,7 @@ def delete_flow_tag_value(
 @app.head("/flows/<flowId>/description")
 @app.get("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
-def get_flow_description(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def get_flow_description(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         description = query_node_property(record_type, flowId, "description")
     except ValueError as e:
@@ -343,9 +339,7 @@ def get_flow_description(
 
 @app.put("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
-def put_flow_description(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def put_flow_description(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -375,9 +369,7 @@ def put_flow_description(
 
 @app.delete("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
-def delete_flow_description(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def delete_flow_description(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -404,7 +396,7 @@ def delete_flow_description(
 @app.head("/flows/<flowId>/label")
 @app.get("/flows/<flowId>/label")
 @tracer.capture_method(capture_response=False)
-def get_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def get_flow_label(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         label = query_node_property(record_type, flowId, "label")
     except ValueError as e:
@@ -418,7 +410,7 @@ def get_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
 
 @app.put("/flows/<flowId>/label")
 @tracer.capture_method(capture_response=False)
-def put_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def put_flow_label(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -446,7 +438,7 @@ def put_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN
 
 @app.delete("/flows/<flowId>/label")
 @tracer.capture_method(capture_response=False)
-def delete_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def delete_flow_label(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -471,9 +463,7 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATT
 @app.head("/flows/<flowId>/flow_collection")
 @app.get("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
-def get_flow_flow_collection(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def get_flow_flow_collection(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         flow_collection = query_flow_collection(flowId)
     except ValueError as e:
@@ -492,7 +482,7 @@ def get_flow_flow_collection(
 @tracer.capture_method(capture_response=False)
 def put_flow_flow_collection(
     flow_collection: Flowcollection,
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)],
+    flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)],
 ):
     try:
         item = query_node(record_type, flowId)
@@ -517,9 +507,7 @@ def put_flow_flow_collection(
 
 @app.delete("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
-def delete_flow_flow_collection(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def delete_flow_flow_collection(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -544,9 +532,7 @@ def delete_flow_flow_collection(
 @app.head("/flows/<flowId>/max_bit_rate")
 @app.get("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
-def get_flow_max_bit_rate(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def get_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         max_bit_rate = query_node_property(record_type, flowId, "max_bit_rate")
     except ValueError as e:
@@ -558,9 +544,7 @@ def get_flow_max_bit_rate(
 
 @app.put("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
-def put_flow_max_bit_rate(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def put_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -590,9 +574,7 @@ def put_flow_max_bit_rate(
 
 @app.delete("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
-def delete_flow_max_bit_rate(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def delete_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -619,9 +601,7 @@ def delete_flow_max_bit_rate(
 @app.head("/flows/<flowId>/avg_bit_rate")
 @app.get("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
-def get_flow_avg_bit_rate(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def get_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         avg_bit_rate = query_node_property(record_type, flowId, "avg_bit_rate")
     except ValueError as e:
@@ -633,9 +613,7 @@ def get_flow_avg_bit_rate(
 
 @app.put("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
-def put_flow_avg_bit_rate(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def put_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -665,9 +643,7 @@ def put_flow_avg_bit_rate(
 
 @app.delete("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
-def delete_flow_avg_bit_rate(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def delete_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:
@@ -694,7 +670,7 @@ def delete_flow_avg_bit_rate(
 @app.head("/flows/<flowId>/read_only")
 @app.get("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
-def get_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def get_flow_read_only(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     try:
         read_only = query_node_property(record_type, flowId, "read_only")
     except ValueError as e:
@@ -706,7 +682,7 @@ def get_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PAT
 
 @app.put("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
-def put_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]):
+def put_flow_read_only(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     if not check_node_exists(record_type, flowId):
         raise NotFoundError("The requested flow does not exist.")  # 404
     try:
@@ -733,7 +709,7 @@ def put_flow_read_only(flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PAT
 @tracer.capture_method(capture_response=False)
 def post_flow_storage_by_id(
     flow_storage_post: Flowstoragepost,
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)],
+    flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)],
 ):
     if flow_storage_post.limit is None:
         flow_storage_post.limit = constants.DEFAULT_PUT_LIMIT
@@ -776,7 +752,7 @@ def get_presigned_put(content_type):
         "put_object",
         bucket,
         object_id,
-        {"ContentType": content_type},
+        ContentType=content_type,
     )
     return MediaObject(
         object_id=object_id,
@@ -787,8 +763,10 @@ def get_presigned_put(content_type):
 @tracer.capture_method(capture_response=False)
 def get_event_resources(obj: dict) -> list:
     """Generate a list of event resources for the given flow object."""
-    return [
-        f'tams:flow:{obj["id"]}',
-        f'tams:source:{obj["source_id"]}',
-        *[f"tams:flow-collected-by:{c_id}" for c_id in obj.get("collected_by", [])],
-    ]
+    return enhance_resources(
+        [
+            f'tams:flow:{obj["id"]}',
+            f'tams:source:{obj["source_id"]}',
+            *[f"tams:flow-collected-by:{c_id}" for c_id in obj.get("collected_by", [])],
+        ]
+    )
