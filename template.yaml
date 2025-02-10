@@ -61,6 +61,9 @@ Globals:
       Variables:
         POWERTOOLS_LOG_LEVEL: INFO
         NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+    Layers:
+      - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+      - !Ref UtilsLayer
     VpcConfig:
       SubnetIds: !If [CreateVpc, !Split [',', !GetAtt VpcStack.Outputs.PrivateSubnetIds], !Ref PrivateSubnetIds]
       SecurityGroupIds:
@@ -288,9 +291,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_service/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-service
@@ -370,9 +370,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_sources/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-sources
@@ -522,9 +519,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flows/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-flows
@@ -794,9 +788,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flow_segments/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-segments
@@ -885,9 +876,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flow_delete_requests/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-deletion
@@ -934,9 +922,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/webhooks/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
@@ -986,9 +971,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/sqs_delete_requests/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
@@ -1043,8 +1025,6 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/sqs_object_cleanup/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
       Timeout: 900
       Environment:
         Variables:

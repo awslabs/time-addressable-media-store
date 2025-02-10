@@ -3,10 +3,6 @@ import json
 import os
 from http import HTTPStatus
 
-import boto3
-
-# pylint: disable=no-member
-import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
@@ -23,26 +19,33 @@ from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
-from mediatimestamp.immutable import TimeRange
-from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, GetUrl, Uuid
-from typing_extensions import Annotated
-from utils import (
+from dynamodb import (
     TimeRangeBoundary,
-    base_delete_request_dict,
-    check_node_exists,
-    check_object_exists,
     delete_flow_segments,
-    generate_link_url,
-    generate_presigned_url,
     get_flow_timerange,
     get_key_and_args,
     get_timerange_expression,
-    model_dump,
-    publish_event,
-    put_deletion_request,
+    segments_table,
+)
+from mediatimestamp.immutable import TimeRange
+from neptune import (
+    check_node_exists,
+    enhance_resources,
+    merge_delete_request,
     query_node,
     update_flow_segments_updated,
+)
+from pydantic import ValidationError
+from schema import Deletionrequest, Flowcore, Flowsegment, GetUrl, Uuid
+from typing_extensions import Annotated
+from utils import (
+    base_delete_request_dict,
+    check_object_exists,
+    generate_link_url,
+    generate_presigned_url,
+    model_dump,
+    publish_event,
+    put_message,
     validate_query_string,
 )
 
@@ -52,12 +55,12 @@ app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
 metrics = Metrics(namespace="Powertools")
 
 
-dynamodb = boto3.resource("dynamodb")
-segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
+
+FLOW_ID_PATTERN = Flowcore.model_fields["id"].metadata[0].pattern
 
 
 @app.head("/flows/<flowId>/segments")
@@ -138,7 +141,7 @@ def get_flow_segments_by_id(
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(
     flow_segment: Flowsegment,
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)],
+    flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)],
 ):
     try:
         item = query_node("flow", flowId)
@@ -179,23 +182,23 @@ def post_flow_segments_by_id(
     publish_event(
         "flows/segments_added",
         {"flow_id": flowId, "segments": [model_dump(Flowsegment(**item_dict))]},
-        [
-            f"tams:flow:{flowId}",
-            f'tams:source:{item["source_id"]}',
-            *[
-                f"tams:flow-collected-by:{c_id}"
-                for c_id in item.get("collected_by", [])
-            ],
-        ],
+        enhance_resources(
+            [
+                f"tams:flow:{flowId}",
+                f'tams:source:{item["source_id"]}',
+                *[
+                    f"tams:flow-collected-by:{c_id}"
+                    for c_id in item.get("collected_by", [])
+                ],
+            ]
+        ),
     )
     return model_dump(flow_segment), HTTPStatus.CREATED.value  # 201
 
 
 @app.delete("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
-def delete_flow_segments_by_id(
-    flowId: Annotated[str, Path(pattern=constants.FLOW_ID_PATTERN)]
-):
+def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
     parameters = app.current_event.query_string_parameters
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400
@@ -210,14 +213,13 @@ def delete_flow_segments_by_id(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    timerange_to_delete = TimeRange.from_str(get_flow_timerange(segments_table, flowId))
+    timerange_to_delete = TimeRange.from_str(get_flow_timerange(flowId))
     if parameters and "timerange" in parameters:
         timerange_to_delete = TimeRange.from_str(parameters["timerange"])
     deletion_request_dict = None
     if parameters and "object_id" in parameters:
         # Not able to handle return of Delete Request as delete requests do not support "object_id" query parameter
         delete_flow_segments(
-            segments_table,
             flowId,
             parameters,
             timerange_to_delete,
@@ -233,7 +235,8 @@ def delete_flow_segments_by_id(
         "timerange_to_delete": str(timerange_to_delete),
         "timerange_remaining": str(timerange_to_delete),
     }
-    put_deletion_request(del_queue, deletion_request_dict)
+    put_message(del_queue, deletion_request_dict)
+    merge_delete_request(deletion_request_dict)
     if deletion_request_dict is not None:
         return Response(
             status_code=HTTPStatus.ACCEPTED.value,  # 202
