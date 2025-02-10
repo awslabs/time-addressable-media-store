@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  ParentStackName:
+    Type: String
+
+  ApiGwArn:
+    Type: String
+
+Resources:
+
+  WebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Scope: REGIONAL
+      Name: !Ref ParentStackName
+      DefaultAction:
+        Allow: {}
+      Rules:
+        - Name: AWS-AWSManagedRulesCommonRuleSet
+          Priority: 0
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: True
+            CloudWatchMetricsEnabled: True
+            MetricName: AWS-AWSManagedRulesCommonRuleSet
+        - Name: AWS-AWSManagedRulesAmazonIpReputationList
+          Priority: 1
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: True
+            CloudWatchMetricsEnabled: True
+            MetricName: AWS-AWSManagedRulesAmazonIpReputationList
+        - Name: AWS-AWSManagedRulesKnownBadInputsRuleSet
+          Priority: 2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: True
+            CloudWatchMetricsEnabled: True
+            MetricName: AWS-AWSManagedRulesKnownBadInputsRuleSet
+      VisibilityConfig:
+        SampledRequestsEnabled: True
+        CloudWatchMetricsEnabled: True
+        MetricName: !Ref ParentStackName
+
+  WebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      WebACLArn: !GetAtt WebAcl.Arn
+      ResourceArn: !Ref ApiGwArn
