@@ -43,6 +43,30 @@ Parameters:
       - "No"
     Default: "Yes"
 
+  OAuthScopeHead:
+    Type: CommaDelimitedList
+    Default: aws.cognito.signin.user.admin,tams-api/read
+
+  OAuthScopeGet:
+    Type: CommaDelimitedList
+    Default: aws.cognito.signin.user.admin,tams-api/read
+
+  OAuthScopePut:
+    Type: CommaDelimitedList
+    Default: aws.cognito.signin.user.admin,tams-api/write
+
+  OAuthScopePost:
+    Type: CommaDelimitedList
+    Default: aws.cognito.signin.user.admin,tams-api/write
+
+  OAuthScopeDelete:
+    Type: CommaDelimitedList
+    Default: aws.cognito.signin.user.admin,tams-api/delete
+
+  OAuthScopeAny:
+    Type: CommaDelimitedList
+    Default: aws.cognito.signin.user.admin,tams-api/read,tams-api/write,tams-api/delete
+
 Mappings:
   Solution:
     Constants:
@@ -1256,3 +1280,18 @@ Outputs:
 
   AuthRoleName:
     Value: !Ref AuthRole
+
+  NeptuneEndpoint:
+    Value: !GetAtt NeptuneStack.Outputs.Endpoint
+
+  NeptuneClusterResourceId:
+    Value: !GetAtt NeptuneStack.Outputs.ClusterResourceId
+
+  LambdaSubnetIds:
+    Value: !If [CreateVpc, !GetAtt VpcStack.Outputs.PrivateSubnetIds, !Join [',', !Ref PrivateSubnetIds]]
+
+  LambdaSecurityGroup:
+    Value: !Ref LambdaSecurityGroup
+
+  UtilsLayerArn:
+    Value: !Ref UtilsLayer
