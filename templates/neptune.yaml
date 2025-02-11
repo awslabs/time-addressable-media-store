@@ -54,8 +54,6 @@ Resources:
           ToPort: 443
 
   TAMSNeptuneCluster:
-    DeletionPolicy: RetainExceptOnCreate
-    UpdateReplacePolicy: Retain
     Type: AWS::Neptune::DBCluster
     Properties:
       AvailabilityZones: !Ref VpcAZs
@@ -70,8 +68,6 @@ Resources:
         MaxCapacity: !Select [1, !Split [",", !Ref ServerlessScalingConfiguration]]
 
   TAMSNeptuneInstance:
-    DeletionPolicy: RetainExceptOnCreate
-    UpdateReplacePolicy: Retain
     Type: AWS::Neptune::DBInstance
     Properties:
       DBInstanceClass: db.serverless

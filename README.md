@@ -98,7 +98,7 @@ To delete the solution, use the SAM CLI, you can run the following:
 sam delete
 ```
 
-> **After using `sam delete` the S3 Bucket, DynamoDB table(s) and Neptune Database will still need to be deleted manually via the AWS Console if you do not want to retain the data.**
+> **After using `sam delete` the S3 Bucket and DynamoDB table(s) will still need to be deleted manually via the AWS Console if you do not want to retain the data.**
 
 ## Security
 
