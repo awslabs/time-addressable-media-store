@@ -43,35 +43,20 @@ Parameters:
       - "No"
     Default: "Yes"
 
-  OAuthScopeHead:
-    Type: CommaDelimitedList
-    Default: aws.cognito.signin.user.admin,tams-api/read
-
-  OAuthScopeGet:
-    Type: CommaDelimitedList
-    Default: aws.cognito.signin.user.admin,tams-api/read
-
-  OAuthScopePut:
-    Type: CommaDelimitedList
-    Default: aws.cognito.signin.user.admin,tams-api/write
-
-  OAuthScopePost:
-    Type: CommaDelimitedList
-    Default: aws.cognito.signin.user.admin,tams-api/write
-
-  OAuthScopeDelete:
-    Type: CommaDelimitedList
-    Default: aws.cognito.signin.user.admin,tams-api/delete
-
-  OAuthScopeAny:
-    Type: CommaDelimitedList
-    Default: aws.cognito.signin.user.admin,tams-api/read,tams-api/write,tams-api/delete
-
 Mappings:
   Solution:
     Constants:
       ApiVersion: "5.1"
       ServiceVersion: "3.0"
+
+  OAuth:
+    Scopes:
+      CognitoAdmin: aws.cognito.signin.user.admin
+      Head: tams-api/read
+      Get: tams-api/read
+      Put: tams-api/write
+      Post: tams-api/write
+      Delete: tams-api/delete
 
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
@@ -146,9 +131,9 @@ Resources:
         webhooks_enabled: !Ref EnableWebhooks
       Auth:
         AddDefaultAuthorizerToCorsPreflight: False
-        DefaultAuthorizer: Cognito
+        DefaultAuthorizer: Authorizor
         Authorizers:
-          Cognito:
+          Authorizor:
             UserPoolArn: !GetAtt UserPool.Arn
             Identity:
               Header: Authorization
@@ -1155,9 +1140,11 @@ Resources:
       AllowedOAuthFlows:
         - client_credentials
       AllowedOAuthScopes:
-        - tams-api/read
-        - tams-api/write
-        - tams-api/delete
+        - !FindInMap [OAuth, Scopes, Head]
+        - !FindInMap [OAuth, Scopes, Get]
+        - !FindInMap [OAuth, Scopes, Put]
+        - !FindInMap [OAuth, Scopes, Post]
+        - !FindInMap [OAuth, Scopes, Delete]
 
   UserPoolClientWeb:
     Type: AWS::Cognito::UserPoolClient
@@ -1183,7 +1170,7 @@ Resources:
       AllowedOAuthFlows:
         - implicit
       AllowedOAuthScopes:
-        - openid
+        - !FindInMap [OAuth, Scopes, CognitoAdmin]
       CallbackURLs:
         - https://localhost
       LogoutURLs:
