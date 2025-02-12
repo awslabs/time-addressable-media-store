@@ -9,6 +9,18 @@ Before deploying this solution a CloudWatch log role ARN needs to be created and
 - [Create the required IAM role](https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html?icmpid=apigateway_console_help#set-up-access-logging-permissions)
 - [Set up API Gateway to use this role](https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html?icmpid=apigateway_console_help#set-up-access-logging-using-console)
 
+### Verify your VPC configuration
+
+If you choose the option to deploy the solution in an existing VPC, you must ensure that the TAMS API Lambda functions running in the private subnets of your VPC can connect to other AWS services. The standard way to enable this is with [NAT gateways](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html).
+
+If your VPC doesn’t have NAT gateways, then you must provision them or choose the option to allow this solution to create a new VPC.
+
+The Lambda functions in this solution access the [Cognito User Pools API](https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/Welcome.html) which does not have a VPC Endpoint available and so the solution does not support deployment into an existing VPC without a NAT Gateway.
+
+#### VPC Endpoints
+
+It is advised to deploy [VPC Gateway Endpoints](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html) in your VPC for both S3 and DynamoDB since this will reduce traffic through the NAT Gateways as much as possible.
+
 ## Deploy the sample application
 
 The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
@@ -30,6 +42,10 @@ The first command will build the source of your application. The second command 
 - **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
 - **AWS Region**: The AWS region you want to deploy your app to.
 - **EnableWebhooks**: Specify whether you want the solution deployed with Webhooks.
+- **VpcId**: Specify an existing VPC Id, leave blank to have one created.
+- **VpcAZs**: Specify a comma-delimited list of the AZs used by the existing VPC subnets. Leave blank if VPC being created.
+- **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC. Leave blank if VPC being created.
+- **DeployWaf**: Specify whether you want the solution behind a WAF.
 - **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
 - **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
 - **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
@@ -81,6 +97,8 @@ To delete the solution, use the SAM CLI, you can run the following:
 ```bash
 sam delete
 ```
+
+> **After using `sam delete` the S3 Bucket and DynamoDB table(s) will still need to be deleted manually via the AWS Console if you do not want to retain the data.**
 
 ## Security
 

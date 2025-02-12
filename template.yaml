@@ -11,14 +11,59 @@ Parameters:
       - "No"
     Default: "Yes"
 
+  VpcId:
+    Description: The ID of an existing VPC, if one exists. Leave blank to have one created.
+    Type: String
+    Default: ""
+    AllowedPattern: '|vpc-[a-z0-9]+'
+
+  VpcAZs:
+    Description: Comma-separated list of availability zones (e.g. `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds.
+    Type: CommaDelimitedList
+    Default: ""
+
+  PrivateSubnetIds:
+    Description: Comma-separated list of private subnets (e.g. subnet-abc123,subnet-def456) to use when a VPC is specified. Must provide exactly one subnet per Availability Zone specified in VpcAZs.
+    Type: CommaDelimitedList
+    Default: ""
+    AllowedPattern: '|subnet-[a-z0-9]+'
+
+  NeptuneServerlessConfiguration:
+    Description: Neptune Serverless Scaling Configuration.
+    Type: String
+    Default: 1,128
+    ConstraintDescription: ServerlessScalingConfiguration must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1-128.
+    AllowedPattern: (12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9]),(12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9])
+
+  DeployWaf:
+    Description: Configure whether a WAF should be deployed infront of the API.
+    Type: String
+    AllowedValues:
+      - "Yes"
+      - "No"
+    Default: "Yes"
+
 Mappings:
   Solution:
     Constants:
-      ApiVersion: "5.1"
-      ServiceVersion: "2.1"
+      ApiVersion: "6.0"
+      ServiceVersion: "3.0"
+
+  OAuth:
+    Scopes:
+      CognitoAdmin: aws.cognito.signin.user.admin
+      Head: tams-api/read
+      Get: tams-api/read
+      Put: tams-api/write
+      Post: tams-api/write
+      Delete: tams-api/delete
 
 Conditions:
   SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
+
+  CreateVpc: !Equals [!Ref VpcId, ""]
+
+  CreateWaf: !Equals [!Ref DeployWaf, "Yes"]
 
 Transform: AWS::Serverless-2016-10-31
 
@@ -34,6 +79,14 @@ Globals:
     Environment:
       Variables:
         POWERTOOLS_LOG_LEVEL: INFO
+        NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+    Layers:
+      - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+      - !Ref UtilsLayer
+    VpcConfig:
+      SubnetIds: !If [CreateVpc, !Split [',', !GetAtt VpcStack.Outputs.PrivateSubnetIds], !Ref PrivateSubnetIds]
+      SecurityGroupIds:
+        - !Ref LambdaSecurityGroup
 
   Api:
     OpenApiVersion: 3.0.1
@@ -78,9 +131,9 @@ Resources:
         webhooks_enabled: !Ref EnableWebhooks
       Auth:
         AddDefaultAuthorizerToCorsPreflight: False
-        DefaultAuthorizer: Cognito
+        DefaultAuthorizer: Authorizor
         Authorizers:
-          Cognito:
+          Authorizor:
             UserPoolArn: !GetAtt UserPool.Arn
             Identity:
               Header: Authorization
@@ -90,44 +143,8 @@ Resources:
           Parameters:
             Location: api/openapi.yaml
 
-  MainTable:
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Type: AWS::DynamoDB::Table
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W74
-            reason: Encryption not required
-          - id: W78
-            reason: Backup not required
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: record_type
-          AttributeType: S
-        - AttributeName: id
-          AttributeType: S
-        - AttributeName: source_id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: record_type
-          KeyType: HASH
-        - AttributeName: id
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: source-id-index
-          KeySchema:
-            - AttributeName: source_id
-              KeyType: HASH
-          Projection:
-            ProjectionType: INCLUDE
-            NonKeyAttributes:
-              - flow_collection
-              - collected_by
-
   FlowSegmentsTable:
-    DeletionPolicy: Retain
+    DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Metadata:
@@ -162,6 +179,8 @@ Resources:
             ProjectionType: ALL
 
   WebhooksTable:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Metadata:
       cfn_nag:
@@ -196,7 +215,7 @@ Resources:
     Condition: SupportWebhooks
 
   MediaStorageBucket:
-    DeletionPolicy: Retain
+    DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
     Type: AWS::S3::Bucket
     Metadata:
@@ -248,15 +267,37 @@ Resources:
   UtilsLayer:
     Type: AWS::Serverless::LayerVersion
     Metadata:
-      BuildMethod: makefile
+      BuildMethod: python3.13
       BuildArchitecture: arm64
     Properties:
       RetentionPolicy: Delete
-      ContentUri: api/
+      ContentUri: layers/utils/
       CompatibleRuntimes:
         - python3.13
       CompatibleArchitectures:
         - arm64
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W5
+            reason: Outbound https to all epxected
+    Properties:
+      GroupDescription: Security group for Vpc Lambdas
+      VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcId, !Ref VpcId]
+      SecurityGroupEgress:
+        - Description: Explicit egress group locking down outbound access to only HTTPS
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: 443
+          FromPort: 443
+        - Description: Explicit egress group locking down outbound access to only Neptune
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: 8182
+          FromPort: 8182
 
   ServiceFunction:
     Type: AWS::Serverless::Function
@@ -264,14 +305,11 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_service/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-service
@@ -346,19 +384,15 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_sources/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-sources
           EVENT_BUS: !Ref EventBus
-          TABLE: !Ref MainTable
           USER_POOL_ID: !Ref UserPool
       Policies:
         - Version: "2012-10-17"
@@ -375,12 +409,13 @@ Resources:
               Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
             - Effect: Allow
               Action:
-                - dynamodb:Query
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-              Resource:
-                - !GetAtt MainTable.Arn
-                - !Sub ${MainTable.Arn}/index/source-id-index
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headSources:
           Type: Api
@@ -498,19 +533,15 @@ Resources:
         rules_to_suppress:
           - id: W76
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flows/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-flows
           EVENT_BUS: !Ref EventBus
-          TABLE: !Ref MainTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           USER_POOL_ID: !Ref UserPool
           BUCKET: !Ref MediaStorageBucket
@@ -531,15 +562,6 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:Query
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:DeleteItem
-              Resource:
-                - !GetAtt MainTable.Arn
-                - !Sub ${MainTable.Arn}/index/source-id-index
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
               Resource:
                 - !GetAtt FlowSegmentsTable.Arn
             - Effect: Allow
@@ -552,6 +574,15 @@ Resources:
                 - sqs:SendMessage
               Resource:
                 - !GetAtt DeleteRequestQueue.Arn
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headFlows:
           Type: Api
@@ -667,6 +698,78 @@ Resources:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
             Method: delete
+        headFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: head
+        getFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: get
+        putFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: put
+        deleteFlowsFlowidFlowCollection:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/flow_collection
+            Method: delete
+        headFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: head
+        getFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: get
+        putFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: put
+        deleteFlowsFlowidMaxBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/max_bit_rate
+            Method: delete
+        headFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: head
+        getFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: get
+        putFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: put
+        deleteFlowsFlowidAvgBitRate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/avg_bit_rate
+            Method: delete
         headFlowsFlowidReadonly:
           Type: Api
           Properties:
@@ -699,20 +802,16 @@ Resources:
         rules_to_suppress:
           - id: W76
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flow_segments/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-segments
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
-          TABLE: !Ref MainTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
           S3_QUEUE_URL: !Ref CleanupS3Queue
@@ -733,12 +832,6 @@ Resources:
               Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
             - Effect: Allow
               Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-              Resource:
-                - !GetAtt MainTable.Arn
-            - Effect: Allow
-              Action:
                 - dynamodb:Query
                 - dynamodb:PutItem
                 - dynamodb:DeleteItem
@@ -756,6 +849,15 @@ Resources:
                 - s3:GetObject
               Resource:
                 - !Sub ${MediaStorageBucket.Arn}/*
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headFlowsFlowidSegments:
           Type: Api
@@ -788,27 +890,26 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flow_delete_requests/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
-        - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-deletion
-          TABLE: !Ref MainTable
       Policies:
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
-                - dynamodb:Query
-                - dynamodb:GetItem
-              Resource:
-                - !GetAtt MainTable.Arn
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         getFlowDeleteRequests:
           Type: Api
@@ -835,18 +936,20 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/webhooks/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
       Timeout: 900
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-webhooks
           WEBHOOKS_TABLE: !Ref WebhooksTable
+          API_ID: !Ref Api
+          STAGE_NAME: !Ref Api.Stage
+          BUCKET: !Ref MediaStorageBucket
+          BUCKET_REGION: !Ref AWS::Region
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -855,6 +958,16 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !GetAtt WebhooksTable.Arn
+            - Effect: Allow
+              Action:
+                - apigateway:GET
+              Resource:
+                - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}/stages/${Api.Stage}
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
       Events:
         EventBridge:
           Type: EventBridgeRule
@@ -872,21 +985,17 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/sqs_delete_requests/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
-        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-sqs-delete-requests
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
-          TABLE: !Ref MainTable
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
       Policies:
@@ -899,16 +1008,6 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:Query
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:UpdateItem
-                - dynamodb:DeleteItem
-              Resource:
-                - !GetAtt MainTable.Arn
-                - !Sub ${MainTable.Arn}/index/source-id-index
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
                 - dynamodb:DeleteItem
               Resource:
                 - !GetAtt FlowSegmentsTable.Arn
@@ -917,6 +1016,15 @@ Resources:
                 - sqs:SendMessage
               Resource:
                 - !GetAtt CleanupS3Queue.Arn
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         SQSEvent:
           Type: SQS
@@ -931,13 +1039,11 @@ Resources:
       cfn_nag:
         rules_to_suppress:
           - id: W89
-            reason: VPC not required
+            reason: Vpc defined in Globals section
           - id: W92
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/sqs_object_cleanup/
-      Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
       Timeout: 900
       Environment:
         Variables:
@@ -1034,9 +1140,11 @@ Resources:
       AllowedOAuthFlows:
         - client_credentials
       AllowedOAuthScopes:
-        - tams-api/read
-        - tams-api/write
-        - tams-api/delete
+        - !FindInMap [OAuth, Scopes, Head]
+        - !FindInMap [OAuth, Scopes, Get]
+        - !FindInMap [OAuth, Scopes, Put]
+        - !FindInMap [OAuth, Scopes, Post]
+        - !FindInMap [OAuth, Scopes, Delete]
 
   UserPoolClientWeb:
     Type: AWS::Cognito::UserPoolClient
@@ -1062,7 +1170,7 @@ Resources:
       AllowedOAuthFlows:
         - implicit
       AllowedOAuthScopes:
-        - openid
+        - !FindInMap [OAuth, Scopes, CognitoAdmin]
       CallbackURLs:
         - https://localhost
       LogoutURLs:
@@ -1100,6 +1208,32 @@ Resources:
       Roles:
         authenticated: !GetAtt AuthRole.Arn
 
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/vpc.yaml
+    Condition: CreateVpc
+
+  NeptuneStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/neptune.yaml
+      Parameters:
+        VpcId: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcId, !Ref VpcId]
+        VpcAZs: !If [CreateVpc, !GetAtt VpcStack.Outputs.VpcAZs, !Join [',', !Ref VpcAZs]]
+        PrivateSubnetIds: !If [CreateVpc, !GetAtt VpcStack.Outputs.PrivateSubnetIds, !Join [',', !Ref PrivateSubnetIds]]
+        LambdaSecurityGroupId: !Ref LambdaSecurityGroup
+        ServerlessScalingConfiguration: !Ref NeptuneServerlessConfiguration
+
+  WafStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: templates/waf.yaml
+      Parameters:
+        ParentStackName: !Ref AWS::StackName
+        ApiGwArn: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}/stages/${Api.Stage}
+    Condition: CreateWaf
+
 Outputs:
   ApiEndpoint:
     Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Api.Stage}
@@ -1122,9 +1256,6 @@ Outputs:
   MediaStorageBucket:
     Value: !Ref MediaStorageBucket
 
-  MainTable:
-    Value: !Ref MainTable
-
   FlowSegmentsTable:
     Value: !Ref FlowSegmentsTable
 
@@ -1136,3 +1267,18 @@ Outputs:
 
   AuthRoleName:
     Value: !Ref AuthRole
+
+  NeptuneEndpoint:
+    Value: !GetAtt NeptuneStack.Outputs.Endpoint
+
+  NeptuneClusterResourceId:
+    Value: !GetAtt NeptuneStack.Outputs.ClusterResourceId
+
+  LambdaSubnetIds:
+    Value: !If [CreateVpc, !GetAtt VpcStack.Outputs.PrivateSubnetIds, !Join [',', !Ref PrivateSubnetIds]]
+
+  LambdaSecurityGroup:
+    Value: !Ref LambdaSecurityGroup
+
+  UtilsLayerArn:
+    Value: !Ref UtilsLayer

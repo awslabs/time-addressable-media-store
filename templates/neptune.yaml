@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: TAMS API Neptune Stack
+
+Parameters:
+
+  VpcId:
+    Description: Neptune VPC ID
+    Type: String
+
+  VpcAZs:
+    Description: Neptune AZs
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+
+  PrivateSubnetIds:
+    Description: Neptune VPC Private Subnets
+    Type: List<AWS::EC2::Subnet::Id>
+
+  LambdaSecurityGroupId:
+    Description: Lambda Security Group ID
+    Type: AWS::EC2::SecurityGroup::Id
+
+  ServerlessScalingConfiguration:
+    Description: Neptune Serverless Scaling Configuration.
+    Type: String
+    ConstraintDescription: "ServerlessScalingConfiguration must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1-128."
+    AllowedPattern: (12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9]),(12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9])
+    Default: 1,128
+
+Resources:
+
+  DBSubnetGroup:
+    Type: AWS::Neptune::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: TAMS Neptune DB Subnet Group
+      SubnetIds: !Ref PrivateSubnetIds
+
+  NeptuneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Neptune Lambdas
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: Allow Lambda access to Neptune
+          SourceSecurityGroupId: !Ref LambdaSecurityGroupId
+          IpProtocol: tcp
+          ToPort: 8182
+          FromPort: 8182
+      SecurityGroupEgress:
+        - Description: No outbound access
+          CidrIp: 0.0.0.0/32
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+
+  TAMSNeptuneCluster:
+    Type: AWS::Neptune::DBCluster
+    Properties:
+      AvailabilityZones: !Ref VpcAZs
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      EngineVersion: 1.3.4.0
+      IamAuthEnabled: True
+      StorageEncrypted: True
+      VpcSecurityGroupIds:
+        - !Ref NeptuneSecurityGroup
+      ServerlessScalingConfiguration:
+        MinCapacity: !Select [0, !Split [",", !Ref ServerlessScalingConfiguration]]
+        MaxCapacity: !Select [1, !Split [",", !Ref ServerlessScalingConfiguration]]
+
+  TAMSNeptuneInstance:
+    Type: AWS::Neptune::DBInstance
+    Properties:
+      DBInstanceClass: db.serverless
+      DBClusterIdentifier: !Ref TAMSNeptuneCluster
+
+Outputs:
+
+  ClusterResourceId:
+    Value: !GetAtt TAMSNeptuneCluster.ClusterResourceId
+
+  Endpoint:
+    Value: !GetAtt TAMSNeptuneCluster.Endpoint

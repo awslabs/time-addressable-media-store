@@ -16,7 +16,7 @@ from schema import (
     Webhook,
     Webhookpost,
 )
-from utils import model_dump_json
+from utils import filter_dict, model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -53,10 +53,7 @@ def get_service():
                 )
             else:
                 service.event_stream_mechanisms = [Eventstreamcommon(name="webhooks")]
-        return (
-            service.model_dump_json(by_alias=True, exclude_unset=True),
-            HTTPStatus.OK.value,
-        )  # 200
+        return model_dump(service), HTTPStatus.OK.value  # 200
     except Exception as e:
         raise NotFoundError from e  # 404
 
@@ -90,7 +87,7 @@ def post_service(service_post: Servicepost):
     return None, HTTPStatus.OK.value  # 200
 
 
-@app.route("/service/webhooks", method=["HEAD"])
+@app.head("/service/webhooks")
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def get_webhooks():
@@ -112,10 +109,9 @@ def get_webhooks():
             schema_dict[item["url"]]["events"].append(event)
         else:
             schema_dict[item["url"]] = {**item, "events": [event]}
-    return (
-        model_dump_json([Webhook(**v) for v in schema_dict.values()]),
-        HTTPStatus.OK.value,
-    )  # 200
+    return [
+        model_dump_webhook(Webhook(**item)) for item in schema_dict.values()
+    ], HTTPStatus.OK.value  # 200
 
 
 @app.post("/service/webhooks")
@@ -136,13 +132,12 @@ def post_webhooks(webhook: Webhookpost):
         for e in existing_events
         if e not in webhook.events
     ]
+    item_dict = model_dump_webhook(webhook)
     with webhooks_table.batch_writer() as batch:
         for event in webhook.events:
             batch.put_item(
                 Item={
-                    **webhook.model_dump(
-                        by_alias=True, exclude_unset=True, exclude={"events"}
-                    ),
+                    **filter_dict(item_dict, {"events"}),
                     "event": event,
                 }
             )
@@ -150,10 +145,7 @@ def post_webhooks(webhook: Webhookpost):
             batch.delete_item(Key=item)
     if len(webhook.events) == 0:
         return None, HTTPStatus.NO_CONTENT.value  # 204
-    return (
-        webhook.model_dump_json(by_alias=True, exclude_unset=True),
-        HTTPStatus.CREATED.value,
-    )  # 201
+    return item_dict, HTTPStatus.CREATED.value  # 201
 
 
 @logger.inject_lambda_context(
@@ -163,3 +155,9 @@ def post_webhooks(webhook: Webhookpost):
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@tracer.capture_method(capture_response=False)
+def model_dump_webhook(webhook: Webhook):
+    """Custom model dump to retain empty values from webhook"""
+    return webhook.model_dump(by_alias=True, exclude_unset=True)

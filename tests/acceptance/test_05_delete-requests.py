@@ -1,7 +1,6 @@
 import time
 from collections import deque
 
-import boto3
 import pytest
 import requests
 
@@ -153,18 +152,10 @@ def test_Flow_Delete_Request_Details_GET_404(api_client_cognito):
     )
 
 
-def test_Cleanup_Delete_Requests(region, stack, delete_requests):
-    dynamodb = boto3.resource("dynamodb", region_name=region)
-    table = dynamodb.Table(stack["outputs"]["MainTable"])
-    with table.batch_writer() as batch:
-        for request_id in delete_requests:
-            batch.delete_item(Key={"record_type": "delete-request", "id": request_id})
-
-
-def test_Webhooks_Table_Empty(region, stack, webhooks_enabled):
+def test_Webhooks_Table_Empty(session, region, stack, webhooks_enabled):
     if webhooks_enabled:
         # Arrange
-        dynamodb = boto3.resource("dynamodb", region_name=region)
+        dynamodb = session.resource("dynamodb", region_name=region)
         webhooks_table = dynamodb.Table(stack["outputs"]["WebhooksTable"])
         # Act
         scan = webhooks_table.scan(Select="COUNT")
@@ -172,9 +163,9 @@ def test_Webhooks_Table_Empty(region, stack, webhooks_enabled):
         assert 0 == scan["Count"]
 
 
-def test_FlowSegments_Table_Empty(region, stack):
+def test_FlowSegments_Table_Empty(session, region, stack):
     # Arrange
-    dynamodb = boto3.resource("dynamodb", region_name=region)
+    dynamodb = session.resource("dynamodb", region_name=region)
     segments_table = dynamodb.Table(stack["outputs"]["FlowSegmentsTable"])
     # Act
     scan = segments_table.scan(Select="COUNT")
@@ -182,19 +173,9 @@ def test_FlowSegments_Table_Empty(region, stack):
     assert 0 == scan["Count"]
 
 
-def test_Main_Table_Empty(region, stack):
+def test_S3_Bucket_Empty(session, region, stack):
     # Arrange
-    dynamodb = boto3.resource("dynamodb", region_name=region)
-    table = dynamodb.Table(stack["outputs"]["MainTable"])
-    # Act
-    scan = table.scan(Select="COUNT")
-    # Assert
-    assert 0 == scan["Count"]
-
-
-def test_S3_Bucket_Empty(region, stack):
-    # Arrange
-    sqs = boto3.client("sqs", region_name=region)
+    sqs = session.client("sqs", region_name=region)
     queue_attributes = sqs.get_queue_attributes(
         QueueUrl=stack["outputs"]["CleanupS3QueueUrl"],
         AttributeNames=[
@@ -216,7 +197,7 @@ def test_S3_Bucket_Empty(region, stack):
         )
         total_messages = sum(map(int, queue_attributes["Attributes"].values()))
     bucket_name = stack["outputs"]["MediaStorageBucket"]
-    s3 = boto3.resource("s3", region_name=region)
+    s3 = session.resource("s3", region_name=region)
     bucket = s3.Bucket(bucket_name)
     # Act
     objects_list = bucket.objects.all()

@@ -1,9 +1,7 @@
 import json
 import os
-from datetime import datetime
 from http import HTTPStatus
 
-import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
@@ -15,16 +13,24 @@ from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     NotFoundError,
 )
+from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
+from neptune import (
+    check_node_exists,
+    enhance_resources,
+    query_node,
+    query_node_property,
+    query_node_tags,
+    query_sources,
+    set_node_property,
+)
 from schema import Source, Tags
+from typing_extensions import Annotated
 from utils import (
     generate_link_url,
-    get_ddb_args,
     get_username,
     model_dump,
-    model_dump_json,
     publish_event,
     validate_query_string,
 )
@@ -34,13 +40,13 @@ logger = Logger()
 app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
 metrics = Metrics(namespace="Powertools")
 
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["TABLE"])
 record_type = "source"
 event_bus = os.environ["EVENT_BUS"]
 
+SOURCE_ID_PATTERN = Source.model_fields["id"].metadata[0].pattern
 
-@app.route("/sources", method=["HEAD"])
+
+@app.head("/sources")
 @app.get("/sources")
 @tracer.capture_method(capture_response=False)
 def list_sources():
@@ -50,29 +56,10 @@ def list_sources():
     custom_headers = {}
     if parameters and "limit" in parameters:
         custom_headers["X-Paging-Limit"] = parameters["limit"]
-    valid_parameters = [
-        "format",
-        "label",
-        "limit",
-        "page",
-    ]
-    args = get_ddb_args(parameters, valid_parameters, True, record_type)
-    query = table.query(
-        KeyConditionExpression=Key("record_type").eq(record_type), **args
-    )
-    items = query["Items"]
-    while "LastEvaluatedKey" in query and len(items) < args["Limit"]:
-        query = table.query(
-            KeyConditionExpression=Key("record_type").eq(record_type),
-            **args,
-            ExclusiveStartKey=query["LastEvaluatedKey"],
-        )
-        items.extend(query["Items"])
-    if "LastEvaluatedKey" in query:
-        custom_headers["X-Paging-NextKey"] = query["LastEvaluatedKey"]["id"]
-        custom_headers["Link"] = generate_link_url(
-            app.current_event, query["LastEvaluatedKey"]["id"]
-        )
+    items, next_page = query_sources(parameters)
+    if next_page:
+        custom_headers["X-Paging-NextKey"] = str(next_page)
+        custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
@@ -83,74 +70,60 @@ def list_sources():
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump_json(
-            [Source(**item, **get_collections(item["id"])) for item in items]
-        ),
+        body=model_dump([Source(**item) for item in items]),
         headers=custom_headers,
     )
 
 
-@app.route("/sources/<sourceId>", method=["HEAD"])
+@app.head("/sources/<sourceId>")
 @app.get("/sources/<sourceId>")
 @tracer.capture_method(capture_response=False)
-def get_source_details(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
-    )
-    if "Item" not in item:
-        raise NotFoundError("The requested Source does not exist.")  # 404
+def get_source_details(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
+    try:
+        item = query_node(record_type, sourceId)
+    except ValueError as e:
+        raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    item["Item"] = {**item["Item"], **get_collections(sourceId)}
-    source: Source = Source(**item["Item"])
-    return (
-        model_dump_json(source),
-        HTTPStatus.OK.value,
-    )  # 200
+    return model_dump(Source(**item)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/sources/<sourceId>/tags", method=["HEAD"])
+@app.head("/sources/<sourceId>/tags")
 @app.get("/sources/<sourceId>/tags")
 @tracer.capture_method(capture_response=False)
-def get_source_tags(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId}, ProjectionExpression="tags"
-    )
-    if "Item" not in item:
-        raise NotFoundError("The requested Source does not exist.")  # 404
+def get_source_tags(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
+    try:
+        tags = query_node_tags(record_type, sourceId)
+    except ValueError as e:
+        raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return (
-        model_dump_json(Tags(**(item["Item"].get("tags", {})))),
-        HTTPStatus.OK.value,
-    )  # 200
+    return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
 
 
-@app.route("/sources/<sourceId>/tags/<name>", method=["HEAD"])
+@app.head("/sources/<sourceId>/tags/<name>")
 @app.get("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def get_source_tag_value(sourceId: str, name: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId}, ProjectionExpression="tags"
-    )
-    if (
-        "Item" not in item
-        or "tags" not in item["Item"]
-        or name not in item["Item"]["tags"]
-    ):
+def get_source_tag_value(
+    sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)], name: str
+):
+    try:
+        tags = query_node_tags(record_type, sourceId)
+    except ValueError as e:
+        raise NotFoundError("The requested Source or tag does not exist.") from e  # 404
+    if name not in tags:
         raise NotFoundError("The requested Source or tag does not exist.")  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return item["Item"]["tags"][name], HTTPStatus.OK.value  # 200
+    return tags[name], HTTPStatus.OK.value  # 200
 
 
 @app.put("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def put_source_tag_value(sourceId: str, name: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
-    )
-    if "Item" not in item:
+def put_source_tag_value(
+    sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)], name: str
+):
+    if not check_node_exists(record_type, sourceId):
         raise NotFoundError(
             "The requested Source does not exist, or the tag name in the path is invalid."
         )  # 404
@@ -160,67 +133,58 @@ def put_source_tag_value(sourceId: str, name: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source tag value.")  # 400
-    source: Source = Source(**item["Item"])
-    if source.tags is None:
-        source.tags = Tags(root={name: body})
-    else:
-        source.tags.root[name] = body
     username = get_username(app.current_event.request_context)
-    source.updated = datetime.now()  # now
-    source.updated_by = username
-    item_dict = model_dump(source)
-    table.put_item(Item={"record_type": record_type, **item_dict})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": body})
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
 @app.delete("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def delete_source_tag(sourceId: str, name: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
+def delete_source_tag(
+    sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)], name: str
+):
+    try:
+        item = query_node(record_type, sourceId)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested Source ID or tag in the path is invalid."
+        ) from e  # 404
+    if name not in item["tags"]:
+        raise NotFoundError(
+            "The requested Source ID or tag in the path is invalid."
+        )  # 404
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": None})
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
     )
-    if "Item" not in item:
-        raise NotFoundError(
-            "The requested Source ID or tag in the path is invalid."
-        )  # 404
-    source: Source = Source(**item["Item"])
-    if source.tags is None or name not in source.tags.root:
-        raise NotFoundError(
-            "The requested Source ID or tag in the path is invalid."
-        )  # 404
-    source.updated = datetime.now()  # now
-    del source.tags.root[name]
-    item_dict = model_dump(source)
-    table.put_item(Item={"record_type": record_type, **item_dict})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/sources/<sourceId>/description", method=["HEAD"])
+@app.head("/sources/<sourceId>/description")
 @app.get("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def get_source_description(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
-        ProjectionExpression="description",
-    )
-    if "Item" not in item:
-        raise NotFoundError("The requested Source does not exist.")  # 404
+def get_source_description(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
+    try:
+        description = query_node_property(record_type, sourceId, "description")
+    except ValueError as e:
+        raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    if "description" not in item["Item"]:
-        return None, HTTPStatus.OK.value  # 200
-    return item["Item"]["description"], HTTPStatus.OK.value  # 200
+    return description, HTTPStatus.OK.value  # 200
 
 
 @app.put("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def put_source_description(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
-    )
-    if "Item" not in item:
+def put_source_description(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
+    if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The requested Source does not exist.")  # 404
     try:
         body = json.loads(app.current_event.body)
@@ -228,59 +192,56 @@ def put_source_description(sourceId: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source description.")  # 400
-    source: Source = Source(**item["Item"])
     username = get_username(app.current_event.request_context)
-    source.updated = datetime.now()  # now
-    source.updated_by = username
-    source.description = body
-    item_dict = model_dump(source)
-    table.put_item(Item={"record_type": record_type, **item_dict})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    item_dict = set_node_property(
+        record_type, sourceId, username, {"source.description": body}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
 @app.delete("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def delete_source_description(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
-    )
-    if "Item" not in item:
+def delete_source_description(
+    sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]
+):
+    if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The Source ID in the path is invalid.")  # 404
-    source: Source = Source(**item["Item"])
-    source.updated = datetime.now()  # now
-    source.description = None
-    item_dict = model_dump(source)
-    table.put_item(Item={"record_type": record_type, **item_dict})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, sourceId, username, {"source.description": None}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
-@app.route("/sources/<sourceId>/label", method=["HEAD"])
+@app.head("/sources/<sourceId>/label")
 @app.get("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def get_source_label(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId}, ProjectionExpression="label"
-    )
-    if "Item" not in item:
+def get_source_label(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
+    try:
+        label = query_node_property(record_type, sourceId, "label")
+    except ValueError as e:
         raise NotFoundError(
             "The requested Source does not exist, or does not have a label set."
-        )  # 404
+        ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    if "label" not in item["Item"]:
-        return None, HTTPStatus.OK.value  # 200
-    return item["Item"]["label"], HTTPStatus.OK.value  # 200
+    return label, HTTPStatus.OK.value  # 200
 
 
 @app.put("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def put_source_label(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
-    )
-    if "Item" not in item:
+def put_source_label(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
+    if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The requested Source does not exist.")  # 404
     try:
         body = json.loads(app.current_event.body)
@@ -288,31 +249,32 @@ def put_source_label(sourceId: str):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source label.")  # 400
-    source: Source = Source(**item["Item"])
     username = get_username(app.current_event.request_context)
-    source.updated = datetime.now()  # now
-    source.updated_by = username
-    source.label = body
-    item_dict = model_dump(source)
-    table.put_item(Item={"record_type": record_type, **item_dict})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    item_dict = set_node_property(
+        record_type, sourceId, username, {"source.label": body}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
 @app.delete("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def delete_source_label(sourceId: str):
-    item = table.get_item(
-        Key={"record_type": record_type, "id": sourceId},
-    )
-    if "Item" not in item:
+def delete_source_label(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
+    if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The requested Source ID in the path is invalid.")  # 404
-    source: Source = Source(**item["Item"])
-    source.updated = datetime.now()  # now
-    source.label = None
-    item_dict = model_dump(source)
-    table.put_item(Item={"record_type": record_type, **item_dict})
-    publish_event(f"{record_type}s/updated", {record_type: item_dict}, [sourceId])
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, sourceId, username, {"source.label": None}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
     return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
@@ -326,41 +288,14 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 
 @tracer.capture_method(capture_response=False)
-def get_collections(source_id):
-    query = table.query(
-        IndexName=f"{record_type}-id-index",
-        KeyConditionExpression=Key(f"{record_type}_id").eq(source_id),
+def get_event_resources(obj: dict) -> list:
+    """Generate a list of event resources for the given source object."""
+    return enhance_resources(
+        [
+            f'tams:source:{obj["id"]}',
+            *[
+                f"tams:source-collected-by:{c_id}"
+                for c_id in obj.get("collected_by", [])
+            ],
+        ]
     )
-    source_collection = []
-    collected_by = []
-    if "Items" in query:
-        for flow_details in query["Items"]:
-            if "flow_collection" in flow_details:
-                for flow in flow_details["flow_collection"]:
-                    item = table.get_item(
-                        Key={"record_type": "flow", "id": flow["id"]},
-                        ProjectionExpression=f"{record_type}_id",
-                    )
-                    if "Item" in item:
-                        source_collection.append(
-                            {
-                                "id": item["Item"][f"{record_type}_id"],
-                                "role": flow["role"],
-                            }
-                        )
-            if "collected_by" in flow_details:
-                for flow_id in flow_details["collected_by"]:
-                    item = table.get_item(
-                        Key={"record_type": "flow", "id": flow_id},
-                        ProjectionExpression=f"{record_type}_id",
-                    )
-                    if "Item" in item:
-                        collected_by.append(item["Item"][f"{record_type}_id"])
-    # De-dup lists before returning them
-    return {
-        f"{record_type}_collection": [
-            {"id": x[0], "role": x[1]}
-            for x in list(set((x["id"], x["role"]) for x in source_collection))
-        ],
-        "collected_by": list(set(collected_by)),
-    }
