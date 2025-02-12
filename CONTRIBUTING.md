@@ -57,3 +57,20 @@ If you discover a potential security issue in this project we ask that you notif
 ## Licensing
 
 See the [LICENSE](LICENSE) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
+
+## Contributing to the codebase
+
+Documentation contributions can be made by cloning the repository, making
+changes to the files and then
+[issuing a Pull Request](#contributing-via-pull-requests). Small changes can be
+made by using the Github visual editor too.
+
+For contributions to the architecture or code, please read the
+[Local development guide](docs/LOCAL_DEVELOPMENT.md) for instructions on how to
+setup a local environment and run the tests. After issuing a
+[Pull Request](#contributing-via-pull-requests) an automated test suite will run
+and be reported on the Pull Request page. Make sure all the tests pass to
+facilitate and speed up code reviews. New features should include unit tests and
+acceptance tests when appropriate.
+
+If you need guidance or help, please let us know in the relevant Github issue.
