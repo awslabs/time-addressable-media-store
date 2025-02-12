@@ -13,7 +13,7 @@ info:
     could for example be implemented using an AWS S3 compatible store using presigned URLs or by
     a simple file system storage with an HTTP frontend. Clients should parse the /service endpoint
     and handle the media store type in use appropriately.
-  version: '5.1'
+  version: '6.0'
 paths:
   /:
     head:
@@ -27,8 +27,14 @@ paths:
           $ref: '#/components/responses/trait_resource_listing_head_200'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-integration:
         type: mock
         requestTemplates:
@@ -58,8 +64,14 @@ paths:
                 - flow-delete-requests
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-integration:
         type: mock
         requestTemplates:
@@ -85,12 +97,30 @@ paths:
           description: The specified path or method does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
-          - Fn::FindInMap: [OAuth, Scopes, Post]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Post
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-integration:
         type: mock
         requestTemplates:
@@ -113,8 +143,14 @@ paths:
           $ref: '#/components/responses/trait_resource_listing_head_200'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-integration:
         type: mock
         requestTemplates:
@@ -140,8 +176,14 @@ paths:
                 $ref: '#/components/schemas/service'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-integration:
         type: aws_proxy
         httpMethod: POST
@@ -167,8 +209,14 @@ paths:
           description: Bad request. Invalid service JSON.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Post]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Post
       x-amazon-apigateway-request-validator: body-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -190,8 +238,14 @@ paths:
           description: Webhooks are not supported by this API implementation
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-integration:
         type: aws_proxy
         httpMethod: POST
@@ -221,8 +275,14 @@ paths:
           description: Webhooks are not supported by this API implementation
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-integration:
         type: aws_proxy
         httpMethod: POST
@@ -268,8 +328,14 @@ paths:
           description: Webhooks are not supported by this API implementation
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Post]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Post
       x-amazon-apigateway-request-validator: body-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -334,8 +400,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_400'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -406,8 +478,14 @@ paths:
           description: Bad request. Invalid query options.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -436,8 +514,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -462,8 +546,14 @@ paths:
           description: The requested Source does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -492,8 +582,14 @@ paths:
           description: The requested Source does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -518,8 +614,14 @@ paths:
           description: The requested Source does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -554,8 +656,14 @@ paths:
           description: The requested Source or tag does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -580,8 +688,14 @@ paths:
           description: The requested Source or tag does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -610,8 +724,14 @@ paths:
           description: The requested Source does not exist, or the tag name in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -632,8 +752,14 @@ paths:
           description: The requested Source ID or tag in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -662,8 +788,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -688,8 +820,14 @@ paths:
           description: The requested Source does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -718,8 +856,14 @@ paths:
           description: The requested Source does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -740,8 +884,14 @@ paths:
           description: The Source ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -770,8 +920,14 @@ paths:
           description: The requested Source does not exist, or does not have a label set.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -796,8 +952,14 @@ paths:
           description: The requested Source does not exist, or does not have a label set.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -826,8 +988,14 @@ paths:
           description: The requested Source does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -848,8 +1016,14 @@ paths:
           description: The requested Source ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -945,8 +1119,14 @@ paths:
           description: Bad request. Invalid query options.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1043,8 +1223,14 @@ paths:
           description: Bad request. Invalid query options.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1088,8 +1274,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1129,8 +1321,14 @@ paths:
           description: Bad request. Invalid query options.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1167,8 +1365,14 @@ paths:
           description: The requested Flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1205,8 +1409,14 @@ paths:
           description: The requested Flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1235,8 +1445,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1261,8 +1477,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1297,8 +1519,14 @@ paths:
           description: The requested flow or tag does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1323,8 +1551,14 @@ paths:
           description: The requested flow or tag does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1355,8 +1589,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1379,8 +1619,14 @@ paths:
           description: The requested flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1409,8 +1655,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1435,8 +1687,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1467,8 +1725,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1491,8 +1755,14 @@ paths:
           description: The requested flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1521,8 +1791,14 @@ paths:
           description: The requested Flow does not exist, or does not have a label set.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1547,8 +1823,14 @@ paths:
           description: The requested Flow does not exist, or does not have a label set.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1579,8 +1861,14 @@ paths:
           description: The requested Flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1601,8 +1889,14 @@ paths:
           description: The requested Flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1631,8 +1925,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1657,8 +1957,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1687,8 +1993,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1717,8 +2029,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1743,8 +2061,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1775,8 +2099,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1799,8 +2129,14 @@ paths:
           description: The requested flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1829,8 +2165,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1856,8 +2198,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1889,8 +2237,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1913,8 +2267,14 @@ paths:
           description: The requested flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1943,8 +2303,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -1970,8 +2336,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2003,8 +2375,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2027,8 +2405,14 @@ paths:
           description: The requested flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2119,8 +2503,14 @@ paths:
           description: The flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2234,8 +2624,14 @@ paths:
           description: The flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2295,8 +2691,14 @@ paths:
           description: The flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Post]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Post
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2346,8 +2748,14 @@ paths:
           description: The requested flow ID in the path is invalid.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2409,8 +2817,14 @@ paths:
           description: The requested flow does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Post]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Post
       x-amazon-apigateway-request-validator: parameters-and-body
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2430,8 +2844,14 @@ paths:
           $ref: '#/components/responses/trait_resource_listing_head_200'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-integration:
         type: mock
         requestTemplates:
@@ -2462,8 +2882,14 @@ paths:
                 $ref: '#/components/schemas/deletionrequestslist'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-integration:
         type: aws_proxy
         httpMethod: POST
@@ -2490,8 +2916,14 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2520,8 +2952,14 @@ paths:
           description: The requested flow delete request does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
       x-amazon-apigateway-request-validator: parameters-only
       x-amazon-apigateway-integration:
         type: aws_proxy
@@ -2542,12 +2980,30 @@ paths:
           description: The specified path or method does not exist.
       security:
       - Authorizor:
-          - Fn::FindInMap: [OAuth, Scopes, CognitoAdmin]
-          - Fn::FindInMap: [OAuth, Scopes, Head]
-          - Fn::FindInMap: [OAuth, Scopes, Get]
-          - Fn::FindInMap: [OAuth, Scopes, Put]
-          - Fn::FindInMap: [OAuth, Scopes, Post]
-          - Fn::FindInMap: [OAuth, Scopes, Delete]
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - CognitoAdmin
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Head
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Get
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Put
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Post
+        - Fn::FindInMap:
+          - OAuth
+          - Scopes
+          - Delete
       x-amazon-apigateway-integration:
         type: mock
         requestTemplates:
