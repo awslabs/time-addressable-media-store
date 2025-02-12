@@ -158,18 +158,28 @@ def get_key_and_args(flow_id: str, parameters: None | dict) -> dict | bool:
             args["KeyConditionExpression"],
             Key("object_id").eq(parameters["object_id"]),
         )
-    elif timerange_filter and timerange_filter.start:
-        args["KeyConditionExpression"] = And(
-            args["KeyConditionExpression"],
-            get_timerange_expression(Key, TimeRangeBoundary.END, timerange_filter),
-        )
+    elif timerange_filter:
+        if timerange_filter.start:
+            args["KeyConditionExpression"] = And(
+                args["KeyConditionExpression"],
+                get_timerange_expression(Key, TimeRangeBoundary.END, timerange_filter),
+            )
+        else:
+            # Get the end of the first overlapping segment and use that to set the key filter when a start timerange is not specified.
+            exact_timerange_end = get_exact_timerange_end(
+                flow_id, timerange_filter.end.to_nanosec()
+            )
+            args["KeyConditionExpression"] = And(
+                args["KeyConditionExpression"],
+                Key("timerange_end").lte(exact_timerange_end),
+            )
     # Build Filter expression
     if timerange_filter:
         if timerange_filter.start and "object_id" in parameters:
             args["FilterExpression"] = get_timerange_expression(
                 Attr, TimeRangeBoundary.END, timerange_filter
             )
-        if timerange_filter.end:
+        if timerange_filter.start and timerange_filter.end:
             args["FilterExpression"] = get_timerange_expression(
                 Attr, TimeRangeBoundary.START, timerange_filter
             )
@@ -252,3 +262,21 @@ def delete_flow_segments(
     item_dict["updated"] = datetime.now().strftime(constants.DATETIME_FORMAT)
     put_message(del_queue, item_dict)
     merge_delete_request(item_dict)
+
+
+@tracer.capture_method(capture_response=False)
+def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
+    """Get the exact timerange end of a segment the overlaps with the specified timerange end value"""
+    items = segments_table.query(
+        KeyConditionExpression=And(
+            Key("flow_id").eq(flow_id), Key("timerange_end").gte(timerange_end)
+        ),
+        Limit=1,
+        ScanIndexForward=True,
+        Select="SPECIFIC_ATTRIBUTES",
+        ProjectionExpression="timerange_end",
+    )
+    if items["Items"]:
+        if items["Items"][0]["timerange_end"] != timerange_end:
+            return items["Items"][0]["timerange_end"]
+    return timerange_end
