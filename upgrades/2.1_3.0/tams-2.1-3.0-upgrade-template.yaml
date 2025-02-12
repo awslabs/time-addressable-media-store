@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  DynamoDbTableName:
+    Type: String
+
+  NeptuneEndpoint:
+    Type: String
+
+  NeptuneClusterResourceId:
+    Type: String
+
+  PrivateSubnetIds:
+    Type: CommaDelimitedList
+
+  LambdaSecurityGroup:
+    Type: String
+
+  UtilsLayerArn:
+    Type: String
+
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  NeptuneImportFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      Timeout: 900
+      MemorySize: 1024
+      Handler: index.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
+          MAIN_TABLE: !Ref DynamoDbTableName
+          NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:4
+        - !Ref UtilsLayerArn
+      VpcConfig:
+        SubnetIds: !Ref PrivateSubnetIds
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDbTableName}
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
+      InlineCode: |
+        import os
+        import json
+        import boto3
+        from neptune import (
+            neptune,
+            qb,
+            merge_source,
+            merge_flow,
+            merge_delete_request,
+            generate_flow_collection_query,
+        )
+
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(os.environ["MAIN_TABLE"])
+
+        def perform_etl():
+            collections = {}
+            for record_type in ["source", "flow", "delete-request"]:
+                key_condition = {
+                    "record_type": {
+                        "ComparisonOperator": "EQ",
+                        "AttributeValueList": [record_type],
+                    }
+                }
+                query = table.query(KeyConditions=key_condition)
+                items = query["Items"]
+                while "LastEvaluatedKey" in query:
+                    query = table.query(
+                        KeyConditions=key_condition, ExclusiveStartKey=query["LastEvaluatedKey"]
+                    )
+                    items.extend(query["Items"])
+                for item in items:
+                    item.pop("record_type")
+                    item.pop("collected_by", None)
+                    item.pop("source_collection", None)
+                    if "flow_collection" in item:
+                        collections[item["id"]] = item.pop("flow_collection")
+                    match record_type:
+                        case "source":
+                            merge_source(item)
+                        case "flow":
+                            merge_flow(item, {})
+                        case "delete-request":
+                            merge_delete_request(item)
+
+            for flow_id, flow_collection in collections.items():
+                query = qb.match().node(ref_name="f", labels="flow", properties={"id": flow_id})
+                query = query + generate_flow_collection_query(flow_collection)
+                neptune.execute_open_cypher_query(openCypherQuery=query.get())
+
+
+        def lambda_handler(event, context):
+            perform_etl()
+            query = "MATCH (n) RETURN count(labels(n)), labels(n)"
+            results = neptune.execute_open_cypher_query(openCypherQuery=query)
+            print(json.dumps(results, indent=2))
