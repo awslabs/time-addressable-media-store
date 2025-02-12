@@ -18,20 +18,8 @@ Resources:
       DefaultAction:
         Allow: {}
       Rules:
-        - Name: AWS-AWSManagedRulesCommonRuleSet
-          Priority: 0
-          Statement:
-            ManagedRuleGroupStatement:
-              VendorName: AWS
-              Name: AWSManagedRulesCommonRuleSet
-          OverrideAction:
-            None: {}
-          VisibilityConfig:
-            SampledRequestsEnabled: True
-            CloudWatchMetricsEnabled: True
-            MetricName: AWS-AWSManagedRulesCommonRuleSet
         - Name: AWS-AWSManagedRulesAmazonIpReputationList
-          Priority: 1
+          Priority: 0
           Statement:
             ManagedRuleGroupStatement:
               VendorName: AWS
@@ -43,7 +31,7 @@ Resources:
             CloudWatchMetricsEnabled: True
             MetricName: AWS-AWSManagedRulesAmazonIpReputationList
         - Name: AWS-AWSManagedRulesKnownBadInputsRuleSet
-          Priority: 2
+          Priority: 1
           Statement:
             ManagedRuleGroupStatement:
               VendorName: AWS
