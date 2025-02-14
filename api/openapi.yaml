@@ -3028,6 +3028,7 @@ components:
       - urn:x-nmos:format:audio
       - urn:x-nmos:format:data
       - urn:x-nmos:format:multi
+      - urn:x-nmos:format:image
       type: string
     mimetype:
       title: MIME Type
@@ -3222,6 +3223,7 @@ components:
       - $ref: '#/components/schemas/flowaudio'
       - $ref: '#/components/schemas/flowdata'
       - $ref: '#/components/schemas/flowmulti'
+      - $ref: '#/components/schemas/flowimage'
     servicepost:
       title: Update Service Info
       description: Post update to the service info
@@ -3297,6 +3299,7 @@ components:
           - urn:x-nmos:format:audio
           - urn:x-nmos:format:data
           - urn:x-nmos:format:multi
+          - urn:x-nmos:format:image
           format: uri
         label:
           description: Freeform string label for the Source
@@ -3579,6 +3582,40 @@ components:
               data_type:
                 description: The type of information encoded in the flow, identified using a URN. e.g. The data_type may be urn:x-tams:data:bounding-box, and the codec `application/json`.
                 type: string
+    flowimage:
+      type: object
+      description: Describes a image Flow
+      title: Image Flow
+      allOf:
+      - $ref: '#/components/schemas/flowcore'
+      - type: object
+        required:
+        - format
+        - essence_parameters
+        - codec
+        properties:
+          format:
+            description: The primary content type URN for the flow.
+            type: string
+            enum:
+            - urn:x-nmos:format:image
+          essence_parameters:
+            type: object
+            description: Describes the parameters of the essence inside this image Flow
+            title: Image Flow Essence Parameters
+            required:
+            - frame_width
+            - frame_height
+            additionalProperties: false
+            properties:
+              frame_width:
+                description: The width of the picture in pixels.
+                type: integer
+                exclusiveMinimum: 0
+              frame_height:
+                description: The height of the picture in pixels.
+                type: integer
+                exclusiveMinimum: 0
     flowmulti:
       type: object
       description: Describes a multi-essence Flow
