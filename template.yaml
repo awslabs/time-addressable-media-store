@@ -1237,15 +1237,23 @@ Resources:
 Outputs:
   ApiEndpoint:
     Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Api.Stage}
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiEndpoint
 
   UserPoolId:
     Value: !Ref UserPool
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolId
 
   TokenUrl:
     Value: !Sub https://${AWS::AccountId}-${AWS::StackName}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+    Export:
+      Name: !Sub ${AWS::StackName}-TokenUrl
 
   UserPoolClientId:
     Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolClientId
 
   UserPoolClientWebId:
     Value: !Ref UserPoolClientWeb
@@ -1267,6 +1275,8 @@ Outputs:
 
   AuthRoleName:
     Value: !Ref AuthRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AuthRoleName
 
   NeptuneEndpoint:
     Value: !GetAtt NeptuneStack.Outputs.Endpoint

@@ -37,14 +37,17 @@ sam build --use-container
 sam deploy --guided
 ```
 
+**NOTE: The Neptune database takes approximately 20mins to create. Neptune also requires a VPC which is why there are VPC parameters mentioned below.**
+
 The first command will build the source of your application. The second command will package and deploy your application to AWS, with a series of prompts:
 
 - **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
 - **AWS Region**: The AWS region you want to deploy your app to.
 - **EnableWebhooks**: Specify whether you want the solution deployed with Webhooks.
 - **VpcId**: Specify an existing VPC Id, leave blank to have one created.
-- **VpcAZs**: Specify a comma-delimited list of the AZs used by the existing VPC subnets. Leave blank if VPC being created.
-- **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC. Leave blank if VPC being created.
+- **VpcAZs**: Specify a comma-separated list of availability zones (for example `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds. Leave blank if VPC being created.
+- **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC.
+- **NeptuneServerlessConfiguration**: Neptune Serverless Scaling Configuration. Must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1–128.
 - **DeployWaf**: Specify whether you want the solution behind a WAF.
 - **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
 - **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
@@ -53,6 +56,8 @@ The first command will build the source of your application. The second command 
 You can find your API Gateway Endpoint URL in the output values displayed after deployment.
 
 ## Usage
+
+**Note:** An associated repository [time-addressable-media-store-tools](https://github.com/aws-samples/time-addressable-media-store-tools) is available to be used as a sample to give you a basic Web UI to help visualize your TAMS Store.
 
 Access to the API is controlled by Cognito. The solution comes with an App Client already created for you. If required, you can create others for differing access patterns as required.
 
