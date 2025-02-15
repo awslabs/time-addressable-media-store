@@ -1099,7 +1099,9 @@ Resources:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
       UserPoolId: !Ref UserPool
-      Domain: !Sub ${AWS::AccountId}-${AWS::StackName}
+      Domain: !Sub
+        - ${AWS::AccountId}-tams-${id}
+        - id: !Select [4, !Split ['-', !Select [2, !Split [/, !Ref 'AWS::StackId']]]]
 
   UserPoolResourceServer:
     Type: AWS::Cognito::UserPoolResourceServer
