@@ -1248,7 +1248,9 @@ Outputs:
       Name: !Sub ${AWS::StackName}-UserPoolId
 
   TokenUrl:
-    Value: !Sub https://${AWS::AccountId}-${AWS::StackName}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+    Value: !Sub
+      - https://${AWS::AccountId}-tams-${id}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+      - id: !Select [4, !Split ['-', !Select [2, !Split [/, !Ref 'AWS::StackId']]]]
     Export:
       Name: !Sub ${AWS::StackName}-TokenUrl
 
