@@ -1267,6 +1267,8 @@ Outputs:
 
   MediaStorageBucket:
     Value: !Ref MediaStorageBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-MediaStorageBucket
 
   FlowSegmentsTable:
     Value: !Ref FlowSegmentsTable
