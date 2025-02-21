@@ -465,6 +465,8 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
         .node(ref_name="s", labels="source", properties={"id": flow_dict["source_id"]})
         .merge()
         .node(ref_name="f", labels="flow", properties={"id": flow_dict["id"]})
+        .merge()
+        .node(ref_name="f")
         .related_to(label="represents")
         .node(ref_name="s")
         .merge()
@@ -488,6 +490,28 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
     if query_collection:
         query = query + query_collection
     neptune.execute_open_cypher_query(openCypherQuery=query.get())
+    # Check if source was updated
+    if (
+        existing_dict.get("source_id")
+        and flow_dict["source_id"] != existing_dict["source_id"]
+    ):
+        # Delete the old represents edge
+        query_delete = (
+            qb.match()
+            .node(labels="flow", properties={"id": existing_dict["id"]})
+            .related_to(ref_name="r", label="represents")
+            .node(labels="source", properties={"id": existing_dict["source_id"]})
+            .delete(ref_name="r")
+            .get()
+        )
+        neptune.execute_open_cypher_query(openCypherQuery=query_delete)
+        # Delete source if no longer referenced by any other flows
+        if check_delete_source(existing_dict["source_id"]):
+            publish_event(
+                "sources/deleted",
+                {"source_id": existing_dict["source_id"]},
+                enhance_resources([f'tams:source:{existing_dict["source_id"]}']),
+            )
     # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
     return query_node("flow", flow_dict["id"])
 
@@ -635,10 +659,10 @@ def update_flow_segments_updated(flow_id: str) -> None:
                 [
                     f'tams:flow:{item_dict["id"]}',
                     f'tams:source:{item_dict["source_id"]}',
-                    *[
+                    *set(
                         f"tams:flow-collected-by:{c_id}"
                         for c_id in item_dict.get("collected_by", [])
-                    ],
+                    ),
                 ]
             ),
         )
@@ -668,8 +692,10 @@ def enhance_resources(resources) -> list:
             r[len("tams:source:") :] for r in resources if r.startswith("tams:source:")
         )
         resources.extend(
-            f"tams:source-collected-by:{s_id}"
-            for s_id in get_source_collected_by(source_id)
+            set(
+                f"tams:source-collected-by:{s_id}"
+                for s_id in get_source_collected_by(source_id)
+            )
         )
     if all(not r.startswith("tams:flow-collected-by:") for r in resources) and any(
         r.startswith("tams:flow:") for r in resources
@@ -678,7 +704,10 @@ def enhance_resources(resources) -> list:
             r[len("tams:flow:") :] for r in resources if r.startswith("tams:flow:")
         )
         resources.extend(
-            f"tams:flow-collected-by:{s_id}" for s_id in get_flow_collected_by(flow_id)
+            set(
+                f"tams:flow-collected-by:{s_id}"
+                for s_id in get_flow_collected_by(flow_id)
+            )
         )
     return resources
 

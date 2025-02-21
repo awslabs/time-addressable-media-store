@@ -172,24 +172,26 @@ def post_flow_segments_by_id(
     item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
         0 if segment_timerange.includes_end() else 1
     )
-    put_item = segments_table.put_item(
+    segments_table.put_item(
         Item={**item_dict, "flow_id": flowId}, ReturnValues="ALL_OLD"
     )
     update_flow_segments_updated(flowId)
-    # Determine return code
-    if "Attributes" in put_item:
-        return None, HTTPStatus.NO_CONTENT.value  # 204
+    schema_item = Flowsegment(**item_dict)
+    get_url = get_nonsigned_url(schema_item.object_id)
+    schema_item.get_urls = (
+        schema_item.get_urls.append(get_url) if schema_item.get_urls else [get_url]
+    )
     publish_event(
         "flows/segments_added",
-        {"flow_id": flowId, "segments": [model_dump(Flowsegment(**item_dict))]},
+        {"flow_id": flowId, "segments": [model_dump(schema_item)]},
         enhance_resources(
             [
                 f"tams:flow:{flowId}",
                 f'tams:source:{item["source_id"]}',
-                *[
+                *set(
                     f"tams:flow-collected-by:{c_id}"
                     for c_id in item.get("collected_by", [])
-                ],
+                ),
             ]
         ),
     )
@@ -286,6 +288,14 @@ def get_presigned_url(key):
 
 
 @tracer.capture_method(capture_response=False)
+def get_nonsigned_url(key):
+    return GetUrl(
+        label=f'aws.{bucket_region}:s3:{app.current_event.stage_variables.get("name", "example-store-name")}',
+        url=f"https://{bucket}.s3.{bucket_region}.amazonaws.com/{key}",
+    )
+
+
+@tracer.capture_method(capture_response=False)
 def generate_urls_parallel(keys):
     # Asynchronous call to pre-signed url API
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -314,10 +324,7 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
         if accept_get_urls == "":
             item.get_urls = None
         else:
-            get_url = GetUrl(
-                label=f'aws.{bucket_region}:s3:{stage_variables.get("name", "example-store-name")}',
-                url=f"https://{bucket}.s3.{bucket_region}.amazonaws.com/{item.object_id}",
-            )
+            get_url = get_nonsigned_url(item.object_id)
             item.get_urls = (
                 item.get_urls.append(get_url) if item.get_urls else [get_url]
             )

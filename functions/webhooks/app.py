@@ -131,17 +131,12 @@ def lambda_handler(event: dict, context: LambdaContext):
         items.extend(query["Items"])
     schema_items = get_matching_webhooks(event)
     if event.detail_type == "flows/segments_added":
-        get_url = {
-            "label": f"aws.{bucket_region}:s3:{store_name}",
-            "url": f'https://{bucket}.s3.{bucket_region}.amazonaws.com/{event.detail["segments"][0]["object_id"]}',
-        }
-        get_urls = event.detail["segments"][0].get("get_urls", [])
-        get_urls.append(get_url)
         need_presigned_urls = any(
             item.accept_get_urls is None
             or any(":s3.presigned:" in label for label in (item.accept_get_urls or []))
             for item in schema_items
         )
+        get_urls = event.detail["segments"][0].get("get_urls", [])
         if need_presigned_urls:
             get_urls.append(
                 {
