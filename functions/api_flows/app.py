@@ -767,6 +767,8 @@ def get_event_resources(obj: dict) -> list:
         [
             f'tams:flow:{obj["id"]}',
             f'tams:source:{obj["source_id"]}',
-            *[f"tams:flow-collected-by:{c_id}" for c_id in obj.get("collected_by", [])],
+            *set(
+                f"tams:flow-collected-by:{c_id}" for c_id in obj.get("collected_by", [])
+            ),
         ]
     )

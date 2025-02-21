@@ -183,10 +183,10 @@ def post_flow_segments_by_id(
             [
                 f"tams:flow:{flowId}",
                 f'tams:source:{item["source_id"]}',
-                *[
+                *set(
                     f"tams:flow-collected-by:{c_id}"
                     for c_id in item.get("collected_by", [])
-                ],
+                ),
             ]
         ),
     )

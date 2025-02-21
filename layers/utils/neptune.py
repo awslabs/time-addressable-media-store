@@ -635,10 +635,10 @@ def update_flow_segments_updated(flow_id: str) -> None:
                 [
                     f'tams:flow:{item_dict["id"]}',
                     f'tams:source:{item_dict["source_id"]}',
-                    *[
+                    *set(
                         f"tams:flow-collected-by:{c_id}"
                         for c_id in item_dict.get("collected_by", [])
-                    ],
+                    ),
                 ]
             ),
         )
@@ -668,8 +668,10 @@ def enhance_resources(resources) -> list:
             r[len("tams:source:") :] for r in resources if r.startswith("tams:source:")
         )
         resources.extend(
-            f"tams:source-collected-by:{s_id}"
-            for s_id in get_source_collected_by(source_id)
+            set(
+                f"tams:source-collected-by:{s_id}"
+                for s_id in get_source_collected_by(source_id)
+            )
         )
     if all(not r.startswith("tams:flow-collected-by:") for r in resources) and any(
         r.startswith("tams:flow:") for r in resources
@@ -678,7 +680,10 @@ def enhance_resources(resources) -> list:
             r[len("tams:flow:") :] for r in resources if r.startswith("tams:flow:")
         )
         resources.extend(
-            f"tams:flow-collected-by:{s_id}" for s_id in get_flow_collected_by(flow_id)
+            set(
+                f"tams:flow-collected-by:{s_id}"
+                for s_id in get_flow_collected_by(flow_id)
+            )
         )
     return resources
 
