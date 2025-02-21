@@ -172,13 +172,10 @@ def post_flow_segments_by_id(
     item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
         0 if segment_timerange.includes_end() else 1
     )
-    put_item = segments_table.put_item(
+    segments_table.put_item(
         Item={**item_dict, "flow_id": flowId}, ReturnValues="ALL_OLD"
     )
     update_flow_segments_updated(flowId)
-    # Determine return code
-    if "Attributes" in put_item:
-        return None, HTTPStatus.NO_CONTENT.value  # 204
     publish_event(
         "flows/segments_added",
         {"flow_id": flowId, "segments": [model_dump(Flowsegment(**item_dict))]},
