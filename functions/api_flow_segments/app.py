@@ -36,7 +36,7 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowcore, Flowsegment, GetUrl, Uuid
+from schema import Deletionrequest, Flowsegment, GetUrl, Uuid
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
@@ -53,14 +53,12 @@ tracer = Tracer()
 logger = Logger()
 app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
 metrics = Metrics(namespace="Powertools")
-
-
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
-FLOW_ID_PATTERN = Flowcore.model_fields["id"].metadata[0].pattern
+UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/flows/<flowId>/segments")
@@ -141,7 +139,7 @@ def get_flow_segments_by_id(
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(
     flow_segment: Flowsegment,
-    flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)],
+    flowId: Annotated[str, Path(pattern=UUID_PATTERN)],
 ):
     try:
         item = query_node("flow", flowId)
@@ -200,7 +198,7 @@ def post_flow_segments_by_id(
 
 @app.delete("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
-def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
+def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
     parameters = app.current_event.query_string_parameters
     if not validate_query_string(parameters, app.current_event.request_context):
         raise BadRequestError("Bad request. Invalid query options.")  # 400
