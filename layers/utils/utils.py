@@ -98,6 +98,7 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
     )
 
 
+@tracer.capture_method(capture_response=False)
 @lru_cache()
 def get_user_pool():
     return idp.describe_user_pool(UserPoolId=user_pool_id)["UserPool"]
