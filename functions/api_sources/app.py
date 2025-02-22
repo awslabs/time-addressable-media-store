@@ -31,6 +31,7 @@ from utils import (
     generate_link_url,
     get_username,
     model_dump,
+    parse_claims,
     publish_event,
     validate_query_string,
 )
@@ -133,7 +134,7 @@ def put_source_tag_value(
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source tag value.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": body})
     publish_event(
         f"{record_type}s/updated",
@@ -158,7 +159,7 @@ def delete_source_tag(
         raise NotFoundError(
             "The requested Source ID or tag in the path is invalid."
         )  # 404
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": None})
     publish_event(
         f"{record_type}s/updated",
@@ -192,7 +193,7 @@ def put_source_description(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTE
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source description.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.description": body}
     )
@@ -211,7 +212,7 @@ def delete_source_description(
 ):
     if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The Source ID in the path is invalid.")  # 404
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.description": None}
     )
@@ -249,7 +250,7 @@ def put_source_label(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid Source label.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.label": body}
     )
@@ -266,7 +267,7 @@ def put_source_label(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
 def delete_source_label(sourceId: Annotated[str, Path(pattern=SOURCE_ID_PATTERN)]):
     if not check_node_exists(record_type, sourceId):
         raise NotFoundError("The requested Source ID in the path is invalid.")  # 404
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, sourceId, username, {"source.label": None}
     )

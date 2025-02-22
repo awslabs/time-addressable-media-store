@@ -4,6 +4,7 @@ import os
 import urllib.parse
 import uuid
 from datetime import datetime, timezone
+from functools import lru_cache
 from itertools import batched
 
 import boto3
@@ -28,6 +29,8 @@ sqs = boto3.client("sqs")
 s3 = boto3.client(
     "s3", config=Config(s3={"addressing_style": "virtual"})
 )  # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
+idp = boto3.client("cognito-idp")
+user_pool_id = os.environ.get("USER_POOL_ID", "")
 
 
 @tracer.capture_method(capture_response=False)
@@ -42,7 +45,7 @@ def base_delete_request_dict(
         "updated": now,
         "status": "created",
         "flow_id": flow_id,
-        "created_by": get_username(request_context),
+        "created_by": get_username(parse_claims(request_context)),
     }
 
 
@@ -87,28 +90,43 @@ def put_message_batches(queue: str, items: list) -> list:
 
 
 @tracer.capture_method(capture_response=False)
-def get_username(request_context: APIGatewayEventRequestContext) -> str:
+def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, str]:
+    """Extract just the username and client_id values from the authorizer claims"""
+    return (
+        request_context.authorizer.claims.get("username", ""),
+        request_context.authorizer.claims.get("client_id", ""),
+    )
+
+
+@lru_cache()
+def get_user_pool():
+    return idp.describe_user_pool(UserPoolId=user_pool_id)["UserPool"]
+
+
+@tracer.capture_method(capture_response=False)
+@lru_cache()
+def get_username(claims_tuple: tuple[str, str]) -> str:
     """Dervive a suitable username from the API Gateway request details"""
-    idp = boto3.client("cognito-idp")
-    if "username" in request_context.authorizer.claims:
-        user_pool = idp.describe_user_pool(UserPoolId=os.environ["USER_POOL_ID"])[
-            "UserPool"
-        ]
+    username, client_id = claims_tuple
+    if username:
+        user_pool = get_user_pool()
         if "UsernameAttributes" in user_pool:
             user_attributes = idp.admin_get_user(
-                UserPoolId=os.environ["USER_POOL_ID"],
-                Username=request_context.authorizer.claims["username"],
+                UserPoolId=os.environ["USER_POOL_ID"], Username=username
             )["UserAttributes"]
             user_attributes = {a["Name"]: a["Value"] for a in user_attributes}
-            if "email" in user_pool["UsernameAttributes"]:
-                return user_attributes["email"]
-            if "phone_number" in user_pool["UsernameAttributes"]:
-                return user_attributes["phone_number"]
-        return request_context.authorizer.claims["username"]
-    if "client_id" in request_context.authorizer.claims:
+            # Check attributes in order of preference
+            for attr in ("email", "phone_number"):
+                if (
+                    user_pool["UsernameAttributes"].get(attr)
+                    and attr in user_attributes
+                ):
+                    return user_attributes[attr]
+        return username
+    if client_id:
         user_pool_client = idp.describe_user_pool_client(
             UserPoolId=os.environ["USER_POOL_ID"],
-            ClientId=request_context.authorizer.claims["client_id"],
+            ClientId=client_id,
         )
         return user_pool_client["UserPoolClient"]["ClientName"]
     return "NoAuth"

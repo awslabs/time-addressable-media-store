@@ -58,6 +58,7 @@ from utils import (
     generate_presigned_url,
     get_username,
     model_dump,
+    parse_claims,
     publish_event,
     put_message,
     validate_query_string,
@@ -169,7 +170,7 @@ def put_flow_by_id(flow: Flow, flowId: Annotated[str, Path(pattern=FLOW_ID_PATTE
     else:
         flow.root.created = now
     # Set these if not supplied
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     if not flow.root.created_by and not existing_item:
         flow.root.created_by = username
     if not flow.root.updated_by and existing_item:
@@ -286,7 +287,7 @@ def put_flow_tag_value(
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow tag value.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": body})
     publish_event(
         f"{record_type}s/updated",
@@ -314,7 +315,7 @@ def delete_flow_tag_value(
         )  # 403
     if name not in item["tags"]:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": None})
     publish_event(
         f"{record_type}s/updated",
@@ -355,7 +356,7 @@ def put_flow_description(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow description.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.description": body}
     )
@@ -381,7 +382,7 @@ def delete_flow_description(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.description": None}
     )
@@ -426,7 +427,7 @@ def put_flow_label(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
         body = None
     if not isinstance(body, str):
         raise BadRequestError("Bad request. Invalid flow label.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": body})
     publish_event(
         f"{record_type}s/updated",
@@ -450,7 +451,7 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(record_type, flowId, username, {"flow.label": None})
     publish_event(
         f"{record_type}s/updated",
@@ -495,7 +496,7 @@ def put_flow_flow_collection(
         )  # 403
     if not validate_flow_collection(flowId, flow_collection):
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_flow_collection(flowId, username, model_dump(flow_collection))
     publish_event(
         f"{record_type}s/updated",
@@ -519,7 +520,7 @@ def delete_flow_flow_collection(flowId: Annotated[str, Path(pattern=FLOW_ID_PATT
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_flow_collection(flowId, username, [])
     publish_event(
         f"{record_type}s/updated",
@@ -560,7 +561,7 @@ def put_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)])
         body = None
     if not isinstance(body, int):
         raise BadRequestError("Bad request. Invalid flow max bit rate.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.max_bit_rate": body}
     )
@@ -586,7 +587,7 @@ def delete_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.max_bit_rate": None}
     )
@@ -629,7 +630,7 @@ def put_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)])
         body = None
     if not isinstance(body, int):
         raise BadRequestError("Bad request. Invalid flow avg bit rate.")  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.avg_bit_rate": body}
     )
@@ -655,7 +656,7 @@ def delete_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.avg_bit_rate": None}
     )
@@ -693,7 +694,7 @@ def put_flow_read_only(flowId: Annotated[str, Path(pattern=FLOW_ID_PATTERN)]):
         raise BadRequestError(
             "Bad request. Invalid flow read_only value. Value must be boolean."
         )  # 400
-    username = get_username(app.current_event.request_context)
+    username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
         record_type, flowId, username, {"flow.read_only": body}
     )
