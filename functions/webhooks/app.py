@@ -13,7 +13,7 @@ from boto3.dynamodb.conditions import And, Attr, Key, Or
 from requests import Session
 from requests.adapters import HTTPAdapter, Retry
 from schema import Flow, Flowsegment, Source, Webhook
-from utils import generate_presigned_url, model_dump
+from utils import generate_presigned_url, get_store_name, model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -21,8 +21,6 @@ metrics = Metrics(namespace="Powertools")
 
 dynamodb = boto3.resource("dynamodb")
 webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
-api_id = os.environ["API_ID"]
-stage_name = os.environ["STAGE_NAME"]
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 
@@ -32,12 +30,6 @@ attribute_mappings = {
     "flow-collected-by": "flow_collected_by_ids",
     "source-collected-by": "source_collected_by_ids",
 }
-
-store_name = (
-    boto3.client("apigateway")
-    .get_stage(restApiId=api_id, stageName=stage_name)["variables"]
-    .get("name", "example-store-name")
-)
 
 
 @tracer.capture_method(capture_response=False)
@@ -140,7 +132,7 @@ def lambda_handler(event: dict, context: LambdaContext):
         if need_presigned_urls:
             get_urls.append(
                 {
-                    "label": f"aws.{bucket_region}:s3.presigned:{store_name}",
+                    "label": f"aws.{bucket_region}:s3.presigned:{get_store_name()}",
                     "url": generate_presigned_url(
                         "get_object", bucket, event.detail["segments"][0]["object_id"]
                     ),

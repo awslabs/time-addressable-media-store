@@ -123,12 +123,6 @@ Resources:
     Properties:
       StageName: Prod
       Mode: overwrite
-      Variables:
-        api_version: !FindInMap [Solution, Constants, ApiVersion]
-        service_version: !Sub
-          - aws.${ServiceVersion}
-          - ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
-        webhooks_enabled: !Ref EnableWebhooks
       Auth:
         AddDefaultAuthorizerToCorsPreflight: False
         DefaultAuthorizer: Authorizor
@@ -142,6 +136,33 @@ Resources:
           Name: AWS::Include
           Parameters:
             Location: api/openapi.yaml
+
+  ServiceInformationParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub ${AWS::StackName}-service-information
+      Type: String
+      DataType: text
+      Description: The TAMS API Service Information
+      Value: !Sub
+        - |
+          {
+            "type": "urn:x-tams:service.example",
+            "api_version": "${ApiVersion}",
+            "service_version": "aws.${ServiceVersion}",
+            "media_store": {
+              "type": "http_object_store"
+            },
+            "event_stream_mechanisms": [${WebhooksEventStream}]
+          }
+        - ApiVersion: !FindInMap [Solution, Constants, ApiVersion]
+          ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
+          WebhooksEventStream: !If
+            - SupportWebhooks
+            - !Sub
+              - '{"name": "webhooks", "docs": "https://bbc.github.io/tams/${ApiVersion}/index.html#/operations/POST_webhooks"}'
+              - ApiVersion: !FindInMap [Solution, Constants, ApiVersion]
+            - ""
 
   FlowSegmentsTable:
     DeletionPolicy: RetainExceptOnCreate
@@ -313,7 +334,22 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-service
+          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
           WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - ssm:DescribeParameters
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:*
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:PutParameter
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
       Events:
         getService:
           Type: Api
@@ -345,20 +381,6 @@ Resources:
             RestApiId: !Ref Api
             Path: /service/webhooks
             Method: post
-
-  ServiceFunctionRoleApiPolicy:
-    Type: AWS::IAM::RolePolicy
-    Properties:
-      RoleName: !Ref ServiceFunctionRole
-      PolicyName: apigateway-PATCH
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - apigateway:PATCH
-            Resource:
-              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}/stages/${Api.Stage}
 
   ServiceFunctionRoleWebhooksPolicy:
     Type: AWS::IAM::RolePolicy
@@ -817,6 +839,7 @@ Resources:
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
           USER_POOL_ID: !Ref UserPool
+          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -858,6 +881,11 @@ Resources:
               Condition:
                 StringEquals:
                   neptune-db:QueryLanguage: OpenCypher
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
       Events:
         headFlowsFlowidSegments:
           Type: Api
@@ -946,10 +974,9 @@ Resources:
         Variables:
           POWERTOOLS_SERVICE_NAME: tams-webhooks
           WEBHOOKS_TABLE: !Ref WebhooksTable
-          API_ID: !Ref Api
-          STAGE_NAME: !Ref Api.Stage
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
+          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -960,9 +987,9 @@ Resources:
                 - !GetAtt WebhooksTable.Arn
             - Effect: Allow
               Action:
-                - apigateway:GET
+                - ssm:GetParameter
               Resource:
-                - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${Api}/stages/${Api.Stage}
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
             - Effect: Allow
               Action:
                 - s3:GetObject

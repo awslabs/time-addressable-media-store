@@ -30,7 +30,9 @@ s3 = boto3.client(
     "s3", config=Config(s3={"addressing_style": "virtual"})
 )  # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 idp = boto3.client("cognito-idp")
+ssm = boto3.client("ssm")
 user_pool_id = os.environ.get("USER_POOL_ID", "")
+info_param_name = os.environ.get("SERVICE_INFO_PARAMETER", "")
 
 
 @tracer.capture_method(capture_response=False)
@@ -96,6 +98,13 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
         request_context.authorizer.claims.get("username", ""),
         request_context.authorizer.claims.get("client_id", ""),
     )
+
+
+@tracer.capture_method(capture_response=False)
+def get_store_name():
+    get_parameter = ssm.get_parameter(Name=info_param_name)
+    service_dict = json.loads(get_parameter["Parameter"]["Value"])
+    return service_dict.get("name", "example-store-name")
 
 
 @tracer.capture_method(capture_response=False)
