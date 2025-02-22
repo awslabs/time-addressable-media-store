@@ -18,6 +18,7 @@ app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
 metrics = Metrics(namespace="Powertools")
 
 dynamodb = boto3.resource("dynamodb")
+agw = boto3.client("apigateway")
 table_name = os.environ.get("WEBHOOKS_TABLE", None)
 ssm = boto3.client("ssm")
 info_param_name = os.environ["SERVICE_INFO_PARAMETER"]

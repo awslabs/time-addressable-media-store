@@ -76,13 +76,6 @@ Globals:
     Runtime: python3.13
     Architectures:
       - arm64
-    Environment:
-      Variables:
-        POWERTOOLS_LOG_LEVEL: INFO
-        NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
-    Layers:
-      - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
-      - !Ref UtilsLayer
     VpcConfig:
       SubnetIds: !If [CreateVpc, !Split [',', !GetAtt VpcStack.Outputs.PrivateSubnetIds], !Ref PrivateSubnetIds]
       SecurityGroupIds:
@@ -117,6 +110,32 @@ Resources:
     Properties:
       ResourceGroupName: !Ref ApplicationResourceGroup
       AutoConfigurationEnabled: True
+
+  CognitoUtilsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      Tracing: Disabled
+      VpcConfig: !Ref AWS::NoValue
+      CodeUri: functions/cognito_utils/
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:DescribeUserPool
+                - cognito-idp:AdminGetUser
+                - cognito-idp:DescribeUserPoolClient
+              Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
 
   Api:
     Type: AWS::Serverless::Api
@@ -331,10 +350,15 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_service/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-service
           SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
       Policies:
         - Version: "2012-10-17"
@@ -411,11 +435,16 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_sources/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-sources
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
-          USER_POOL_ID: !Ref UserPool
+          COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -425,10 +454,8 @@ Resources:
               Resource: !GetAtt EventBus.Arn
             - Effect: Allow
               Action:
-                - cognito-idp:DescribeUserPool
-                - cognito-idp:AdminGetUser
-                - cognito-idp:DescribeUserPoolClient
-              Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
+                - lambda:InvokeFunction
+              Resource: !GetAtt CognitoUtilsFunction.Arn
             - Effect: Allow
               Action:
                 - neptune-db:ReadDataViaQuery
@@ -560,12 +587,17 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flows/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-flows
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
-          USER_POOL_ID: !Ref UserPool
+          COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
           BUCKET: !Ref MediaStorageBucket
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
       Policies:
@@ -577,10 +609,8 @@ Resources:
               Resource: !GetAtt EventBus.Arn
             - Effect: Allow
               Action:
-                - cognito-idp:DescribeUserPool
-                - cognito-idp:AdminGetUser
-                - cognito-idp:DescribeUserPoolClient
-              Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
+                - lambda:InvokeFunction
+              Resource: !GetAtt CognitoUtilsFunction.Arn
             - Effect: Allow
               Action:
                 - dynamodb:Query
@@ -829,16 +859,21 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flow_segments/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-segments
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
-          USER_POOL_ID: !Ref UserPool
+          COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
           SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
       Policies:
         - Version: "2012-10-17"
@@ -849,10 +884,8 @@ Resources:
               Resource: !GetAtt EventBus.Arn
             - Effect: Allow
               Action:
-                - cognito-idp:DescribeUserPool
-                - cognito-idp:AdminGetUser
-                - cognito-idp:DescribeUserPoolClient
-              Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
+                - lambda:InvokeFunction
+              Resource: !GetAtt CognitoUtilsFunction.Arn
             - Effect: Allow
               Action:
                 - dynamodb:Query
@@ -923,9 +956,14 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/api_flow_delete_requests/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-deletion
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -969,10 +1007,15 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/webhooks/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-webhooks
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           WEBHOOKS_TABLE: !Ref WebhooksTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
@@ -1017,10 +1060,15 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/sqs_delete_requests/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-sqs-delete-requests
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           S3_QUEUE_URL: !Ref CleanupS3Queue
@@ -1071,10 +1119,15 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       CodeUri: functions/sqs_object_cleanup/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
       Timeout: 900
       Environment:
         Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-cleanup
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           BUCKET: !Ref MediaStorageBucket
       Policies:
