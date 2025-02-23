@@ -11,15 +11,22 @@ Before deploying this solution a CloudWatch log role ARN needs to be created and
 
 ### Verify your VPC configuration
 
-If you choose the option to deploy the solution in an existing VPC, you must ensure that the TAMS API Lambda functions running in the private subnets of your VPC can connect to other AWS services. The standard way to enable this is with [NAT gateways](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html).
-
-If your VPC doesn’t have NAT gateways, then you must provision them or choose the option to allow this solution to create a new VPC.
-
-The Lambda functions in this solution access the [Cognito User Pools API](https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/Welcome.html) which does not have a VPC Endpoint available and so the solution does not support deployment into an existing VPC without a NAT Gateway.
+If you choose the option to deploy the solution in an existing VPC, you must ensure that the TAMS API Lambda functions running in the private subnets of your VPC can connect to other AWS services. This can be achieved with [NAT gateways](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html). However, this solution does not require internet access as long the required [VPC Endpoints](https://docs.aws.amazon.com/whitepapers/latest/aws-privatelink/what-are-vpc-endpoints.html) are available.
 
 #### VPC Endpoints
 
-It is advised to deploy [VPC Gateway Endpoints](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html) in your VPC for both S3 and DynamoDB since this will reduce traffic through the NAT Gateways as much as possible.
+If you choose to let this solution deploy a new VPC all the required VPC Endpoints will be created automatically.
+
+If you are choosing to use an existing VPC then you should ensure that the subnets being supplied are able to access the internet or ensure you have the following VPC Endpoints in place:
+
+| Service  | Endpoint Type |
+| -------- | ------------- |
+| s3       | Gateway       |
+| dynamodb | Gateway       |
+| sqs      | Interface     |
+| events   | Interface     |
+| ssm      | Interface     |
+| lambda   | Interface     |
 
 ## Deploy the sample application
 
