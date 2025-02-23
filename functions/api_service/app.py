@@ -10,7 +10,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from schema import Service, Servicepost, Webhook, Webhookpost
-from utils import filter_dict, model_dump
+from utils import filter_dict, info_param_name, model_dump, ssm
 
 tracer = Tracer()
 logger = Logger()
@@ -19,8 +19,6 @@ metrics = Metrics(namespace="Powertools")
 
 dynamodb = boto3.resource("dynamodb")
 table_name = os.environ.get("WEBHOOKS_TABLE", None)
-ssm = boto3.client("ssm")
-info_param_name = os.environ["SERVICE_INFO_PARAMETER"]
 
 
 @app.get("/service")
