@@ -30,7 +30,9 @@ s3 = boto3.client(
     "s3", config=Config(s3={"addressing_style": "virtual"})
 )  # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 idp = boto3.client("cognito-idp")
+ssm = boto3.client("ssm")
 user_pool_id = os.environ.get("USER_POOL_ID", "")
+info_param_name = os.environ.get("SERVICE_INFO_PARAMETER", "")
 
 
 @tracer.capture_method(capture_response=False)
@@ -99,8 +101,17 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
 
 
 @tracer.capture_method(capture_response=False)
+def get_store_name() -> str:
+    """Parse store name from SSM parameter value or return default if not found"""
+    get_parameter = ssm.get_parameter(Name=info_param_name)
+    service_dict = json.loads(get_parameter["Parameter"]["Value"])
+    return service_dict.get("name", "example-store-name")
+
+
+@tracer.capture_method(capture_response=False)
 @lru_cache()
-def get_user_pool():
+def get_user_pool() -> dict:
+    """Retrieve the user pool details"""
     return idp.describe_user_pool(UserPoolId=user_pool_id)["UserPool"]
 
 
@@ -224,6 +235,7 @@ def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
 
 @tracer.capture_method(capture_response=False)
 def deserialise_neptune_obj(obj: dict) -> dict:
+    """Return a new dict with serialised properties deserialised into dict/list"""
     deserialised = {}
     for prop_name, prop_value in obj.items():
         if prop_name.startswith(constants.SERIALISE_PREFIX):

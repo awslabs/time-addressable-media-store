@@ -43,6 +43,7 @@ from utils import (
     check_object_exists,
     generate_link_url,
     generate_presigned_url,
+    get_store_name,
     model_dump,
     publish_event,
     put_message,
@@ -288,7 +289,7 @@ def get_presigned_url(key):
 @tracer.capture_method(capture_response=False)
 def get_nonsigned_url(key):
     return GetUrl(
-        label=f'aws.{bucket_region}:s3:{app.current_event.stage_variables.get("name", "example-store-name")}',
+        label=f"aws.{bucket_region}:s3:{get_store_name()}",
         url=f"https://{bucket}.s3.{bucket_region}.amazonaws.com/{key}",
     )
 
@@ -317,7 +318,6 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
             set(item.object_id for item in schema_items)
         )
     # Add url to items
-    stage_variables = app.current_event.stage_variables
     for item in schema_items:
         if accept_get_urls == "":
             item.get_urls = None
@@ -328,7 +328,7 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
             )
             if item.object_id in presigned_urls:
                 presigned_get_url = GetUrl(
-                    label=f'aws.{bucket_region}:s3.presigned:{stage_variables.get("name", "example-store-name")}',
+                    label=f"aws.{bucket_region}:s3.presigned:{get_store_name()}",
                     url=presigned_urls[item.object_id],
                 )
                 item.get_urls.append(presigned_get_url)
