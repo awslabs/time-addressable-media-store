@@ -26,6 +26,7 @@ tracer = Tracer()
 
 events = boto3.client("events")
 sqs = boto3.client("sqs")
+lmda = boto3.client("lambda")
 s3 = boto3.client(
     "s3", config=Config(s3={"addressing_style": "virtual"})
 )  # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
@@ -33,6 +34,7 @@ idp = boto3.client("cognito-idp")
 ssm = boto3.client("ssm")
 user_pool_id = os.environ.get("USER_POOL_ID", "")
 info_param_name = os.environ.get("SERVICE_INFO_PARAMETER", "")
+cognito_lambda = os.environ.get("COGNITO_LAMBDA_NAME", "")
 
 
 @tracer.capture_method(capture_response=False)
@@ -105,7 +107,7 @@ def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
     get_parameter = ssm.get_parameter(Name=info_param_name)
     service_dict = json.loads(get_parameter["Parameter"]["Value"])
-    return service_dict.get("name", "example-store-name")
+    return service_dict.get("name", "tams")
 
 
 @tracer.capture_method(capture_response=False)
@@ -119,29 +121,22 @@ def get_user_pool() -> dict:
 @lru_cache()
 def get_username(claims_tuple: tuple[str, str]) -> str:
     """Dervive a suitable username from the API Gateway request details"""
-    username, client_id = claims_tuple
-    if username:
-        user_pool = get_user_pool()
-        if "UsernameAttributes" in user_pool:
-            user_attributes = idp.admin_get_user(
-                UserPoolId=os.environ["USER_POOL_ID"], Username=username
-            )["UserAttributes"]
-            user_attributes = {a["Name"]: a["Value"] for a in user_attributes}
-            # Check attributes in order of preference
-            for attr in ("email", "phone_number"):
-                if (
-                    user_pool["UsernameAttributes"].get(attr)
-                    and attr in user_attributes
-                ):
-                    return user_attributes[attr]
-        return username
-    if client_id:
-        user_pool_client = idp.describe_user_pool_client(
-            UserPoolId=os.environ["USER_POOL_ID"],
-            ClientId=client_id,
+    invoke = lmda.invoke(
+        FunctionName=cognito_lambda,
+        InvocationType="RequestResponse",
+        LogType="None",
+        Payload=json.dumps(
+            {
+                "username": claims_tuple[0],
+                "client_id": claims_tuple[1],
+            }
+        ),
+    )
+    if invoke["StatusCode"] != 200:
+        raise ClientError(
+            operation_name="LambdaInvoke", error_response=invoke["FunctionError"]
         )
-        return user_pool_client["UserPoolClient"]["ClientName"]
-    return "NoAuth"
+    return invoke["Payload"].read().decode("utf-8")
 
 
 @tracer.capture_method(capture_response=False)
