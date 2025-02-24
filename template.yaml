@@ -47,7 +47,7 @@ Mappings:
   Solution:
     Constants:
       ApiVersion: "6.0"
-      ServiceVersion: "3.0"
+      ServiceVersion: "3.1"
 
   OAuth:
     Scopes:
