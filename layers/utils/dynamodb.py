@@ -151,6 +151,9 @@ def get_key_and_args(flow_id: str, parameters: None | dict) -> dict | bool:
         if "timerange" in parameters
         else None
     )
+    # Ignore timerange filter if it is eternity
+    if timerange_filter == TimeRange.eternity():
+        timerange_filter = None
     # Update Key Expression
     if "object_id" in parameters:
         args["IndexName"] = "object-id-index"
