@@ -138,7 +138,7 @@ def get_username(claims_tuple: tuple[str, str]) -> str:
         raise ClientError(
             operation_name="LambdaInvoke", error_response=invoke["FunctionError"]
         )
-    return invoke["Payload"].read().decode("utf-8")
+    return json.loads(invoke["Payload"].read().decode("utf-8"))
 
 
 @tracer.capture_method(capture_response=False)
