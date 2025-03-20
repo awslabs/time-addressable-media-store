@@ -51,10 +51,8 @@ def get_matching_webhooks(event):
     query = webhooks_table.query(**args)
     items = query["Items"]
     while "LastEvaluatedKey" in query:
-        query = webhooks_table.query(
-            **args,
-            ExclusiveStartKey=query["LastEvaluatedKey"],
-        )
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = webhooks_table.query(**args)
         items.extend(query["Items"])
     return [Webhook(**item, events=[item["event"]]) for item in items]
 
