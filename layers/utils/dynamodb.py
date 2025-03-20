@@ -219,10 +219,8 @@ def delete_flow_segments(
         and "LastEvaluatedKey" in query
         and context.get_remaining_time_in_millis() > constants.LAMBDA_TIME_REMAINING
     ):
-        query = segments_table.query(
-            **args,
-            ExclusiveStartKey=query["LastEvaluatedKey"],
-        )
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**args)
         # Pop first and/or last item in array if they are not entirely covered by the deletion timerange
         query["Items"] = pop_outliers(timerange_to_delete, query["Items"])
         if len(query["Items"]) > 0:

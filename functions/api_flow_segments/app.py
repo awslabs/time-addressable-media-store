@@ -87,9 +87,8 @@ def get_flow_segments_by_id(
     items = query["Items"]
     custom_headers = {}
     while "LastEvaluatedKey" in query and len(items) < args["Limit"]:
-        query = segments_table.query(
-            **args, ExclusiveStartKey=query["LastEvaluatedKey"]
-        )
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**args)
         items.extend(query["Items"])
     match len(items):
         case 0:
@@ -273,9 +272,8 @@ def check_overlapping_segments(flow_id, segment_timerange):
     query = segments_table.query(**args)
     items = query["Items"]
     while "LastEvaluatedKey" in query:
-        query = segments_table.query(
-            **args, ExclusiveStartKey=query["LastEvaluatedKey"]
-        )
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**args)
         items.extend(query["Items"])
     return len(items) > 0
 
