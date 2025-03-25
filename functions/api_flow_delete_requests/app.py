@@ -2,7 +2,13 @@ from http import HTTPStatus
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
-from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    NotFoundError,
+)
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
+)
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from neptune import query_delete_requests, query_node
@@ -54,3 +60,8 @@ def get_flow_delete_requests_by_id(requestId: str):
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(ex: RequestValidationError):
+    raise BadRequestError(ex.errors())  # 400
