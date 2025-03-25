@@ -119,28 +119,6 @@ def add_securitySchemes(spec):
     )
 
 
-def add_apigateway_request_validators(spec):
-    # Add request validators for use by API Gateway
-    spec["x-amazon-apigateway-request-validators"] = OrderedDict(
-        {
-            "parameters-only": {
-                "validateRequestParameters": True,
-                "validateRequestBody": False,
-            },
-            "body-only": {
-                "validateRequestParameters": False,
-                "validateRequestBody": True,
-            },
-            "parameters-and-body": OrderedDict(
-                {
-                    "validateRequestParameters": True,
-                    "validateRequestBody": True,
-                }
-            ),
-        }
-    )
-
-
 def parse_query_parameters(spec):
     # Loop path methods and add API Gateway integration
     query_params = defaultdict(lambda: defaultdict(dict))
@@ -316,16 +294,9 @@ def main():
     while replacements > 0:
         replacements = process_openapi_spec(openapi_spec)
 
-    add_apigateway_request_validators(openapi_spec)
-
     # Loop path methods and add API Gateway integration
     for path in openapi_spec["paths"]:
         for method in openapi_spec["paths"][path]:
-            validate_params = (
-                "parameters" in openapi_spec["paths"][path]
-                or "parameters" in openapi_spec["paths"][path][method]
-            )
-            validate_body = method == "post" or method == "put"
             if method != "parameters":
                 openapi_spec["paths"][path][method]["security"] = [
                     {
@@ -335,18 +306,6 @@ def main():
                         ]
                     }
                 ]
-                if validate_params and validate_body:
-                    openapi_spec["paths"][path][method][
-                        "x-amazon-apigateway-request-validator"
-                    ] = "parameters-and-body"
-                elif validate_params:
-                    openapi_spec["paths"][path][method][
-                        "x-amazon-apigateway-request-validator"
-                    ] = "parameters-only"
-                elif validate_body:
-                    openapi_spec["paths"][path][method][
-                        "x-amazon-apigateway-request-validator"
-                    ] = "body-only"
                 function_resource = (
                     f'{path.split("/")[1].title().replace("-", "")}Function'
                 )
