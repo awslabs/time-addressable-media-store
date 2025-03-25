@@ -15,6 +15,9 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
     ServiceError,
 )
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
+)
 from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -259,6 +262,11 @@ def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(ex: RequestValidationError):
+    raise BadRequestError(ex.errors())  # 400
 
 
 @tracer.capture_method(capture_response=False)
