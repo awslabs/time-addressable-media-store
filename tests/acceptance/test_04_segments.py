@@ -73,7 +73,8 @@ def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Invalid request body" == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.storage
@@ -1185,7 +1186,8 @@ def test_Create_Flow_Segment_POST_400_request(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Invalid request body" == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
