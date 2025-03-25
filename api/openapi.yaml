@@ -36,14 +36,10 @@ paths:
           - Scopes
           - Head
       x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 200}'
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: {}
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
         passthroughBehavior: when_no_templates
     get:
       summary: List Root Endpoints
@@ -73,63 +69,10 @@ paths:
           - Scopes
           - Get
       x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: |
-            {
-              "statusCode": 200
-            }
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: |
-                [
-                  "service",
-                  "flows",
-                  "sources",
-                  "flow-delete-requests"
-                ]
-        passthroughBehavior: when_no_templates
-    x-amazon-apigateway-any-method:
-      responses:
-        '404':
-          description: The specified path or method does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 404}'
-        responses:
-          default:
-            statusCode: '404'
-            responseTemplates:
-              application/json: {}
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
         passthroughBehavior: when_no_templates
   /service:
     head:
@@ -152,14 +95,10 @@ paths:
           - Scopes
           - Head
       x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 200}'
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: {}
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
         passthroughBehavior: when_no_templates
     get:
       summary: Service Information
@@ -2798,14 +2737,10 @@ paths:
           - Scopes
           - Head
       x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 200}'
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: {}
+        type: aws_proxy
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowDeleteRequestsFunction.Arn}/invocations
         passthroughBehavior: when_no_templates
     get:
       summary: List Flow Delete Requests
@@ -2909,53 +2844,6 @@ paths:
         httpMethod: POST
         uri:
           Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowDeleteRequestsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
-  /{proxy+}:
-    x-amazon-apigateway-any-method:
-      parameters:
-      - name: proxy
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '404':
-          description: The specified path or method does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 404}'
-        responses:
-          default:
-            statusCode: '404'
-            responseTemplates:
-              application/json: {}
         passthroughBehavior: when_no_templates
 components:
   schemas:
