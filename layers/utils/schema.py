@@ -973,10 +973,6 @@ class Flowcore(BaseModel):
         None,
         description="If set to 'true', implementations SHOULD reject client requests to update Flow metadata (other than the read_only property), Flow Segments and media objects",
     )
-    codec: Optional[constr(pattern=r"^[^\s/]+/[^\s/]+$")] = Field(
-        None,
-        description="A MIME type identification of the (lossy or lossless) coding used for the flow content.",
-    )
     container: Optional[constr(pattern=r"^[^\s/]+/[^\s/]+$")] = Field(
         None, description="The container MIME type for flow segments."
     )
@@ -1028,6 +1024,10 @@ class Flowaudio(Flowcore):
         description="Describes the parameters of the essence inside this audio Flow",
         title="Audio Flow Essence Parameters",
     )
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") = Field(
+        None,
+        description="A MIME type identification of the (lossy or lossless) coding used for the flow content.",
+    )
 
 
 class Flowdata(Flowcore):
@@ -1043,6 +1043,10 @@ class Flowdata(Flowcore):
         description="Describes the parameters of the essence inside this data Flow",
         title="Data Flow Essence Parameters",
     )
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") = Field(
+        None,
+        description="A MIME type identification of the (lossy or lossless) coding used for the flow content.",
+    )
 
 
 class Flowmulti(Flowcore):
@@ -1052,6 +1056,10 @@ class Flowmulti(Flowcore):
 
     format: Format3 = Field(
         ..., description="The primary content type URN for the flow."
+    )
+    codec: Optional[constr(pattern=r"^[^\s/]+/[^\s/]+$")] = Field(
+        None,
+        description="A MIME type identification of the (lossy or lossless) coding used for the flow content.",
     )
 
 
@@ -1067,6 +1075,10 @@ class Flowvideo(Flowcore):
         ...,
         description="Describes the parameters of the essence inside this video Flow",
         title="Video Flow Essence Parameters",
+    )
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") = Field(
+        None,
+        description="A MIME type identification of the (lossy or lossless) coding used for the flow content.",
     )
 
 
