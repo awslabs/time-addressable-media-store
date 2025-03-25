@@ -123,7 +123,8 @@ def test_Update_Service_Information_POST_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Invalid request body" == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Register_Webhook_URL_POST_201_create(api_client_cognito, webhooks_enabled):
@@ -189,7 +190,8 @@ def test_Register_Webhook_URL_POST_400(api_client_cognito, webhooks_enabled):
         assert 400 == response.status_code
         assert "content-type" in response_headers_lower
         assert "application/json" == response_headers_lower["content-type"]
-        assert "Invalid request body" == response.json()["message"]
+        assert isinstance(response.json()["message"], list)
+        assert 0 < len(response.json()["message"])
 
 
 def test_Register_Webhook_URL_POST_404(api_client_cognito, webhooks_enabled):

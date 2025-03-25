@@ -189,7 +189,8 @@ def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
     )
     # Assert
     assert 400 == response.status_code
-    assert "Invalid request body" == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Replace_Flow_PUT_403(api_client_cognito):
@@ -2068,7 +2069,8 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Invalid request body" == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito):
