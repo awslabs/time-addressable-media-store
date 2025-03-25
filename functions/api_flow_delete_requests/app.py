@@ -18,10 +18,13 @@ metrics = Metrics()
 record_type = "delete_request"
 
 
+@app.head("/flow-delete-requests")
 @app.get("/flow-delete-requests")
 @tracer.capture_method(capture_response=False)
 def get_flow_delete_requests():
     items = query_delete_requests()
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
     return (
         model_dump([Deletionrequest(**item) for item in items]),
         HTTPStatus.OK.value,
@@ -39,10 +42,7 @@ def get_flow_delete_requests_by_id(requestId: str):
             "The requested flow delete request does not exist."
         ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
-        return (
-            None,
-            HTTPStatus.OK.value,
-        )  # 200
+        return None, HTTPStatus.OK.value  # 200
     deletion_request: Deletionrequest = Deletionrequest(**item)
     return model_dump(deletion_request), HTTPStatus.OK.value  # 200
 

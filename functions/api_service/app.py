@@ -23,12 +23,29 @@ dynamodb = boto3.resource("dynamodb")
 table_name = os.environ.get("WEBHOOKS_TABLE", None)
 
 
+@app.head("/")
+@app.get("/")
+@tracer.capture_method(capture_response=False)
+def get_root():
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return [
+        "service",
+        "flows",
+        "sources",
+        "flow-delete-requests",
+    ], HTTPStatus.OK.value  # 200
+
+
+@app.head("/service")
 @app.get("/service")
 @tracer.capture_method(capture_response=False)
 def get_service():
     try:
         get_parameter = ssm.get_parameter(Name=info_param_name)
         service = Service(**json.loads(get_parameter["Parameter"]["Value"]))
+        if app.current_event.request_context.http_method == "HEAD":
+            return None, HTTPStatus.OK.value  # 200
         return model_dump(service), HTTPStatus.OK.value  # 200
     except Exception as e:
         raise NotFoundError from e  # 404

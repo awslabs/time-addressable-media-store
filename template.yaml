@@ -413,6 +413,24 @@ Resources:
               Resource:
                 - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
       Events:
+        headRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /
+            Method: head
+        getRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /
+            Method: get
+        headService:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service
+            Method: head
         getService:
           Type: Api
           Properties:
@@ -1019,6 +1037,12 @@ Resources:
                 StringEquals:
                   neptune-db:QueryLanguage: OpenCypher
       Events:
+        headFlowDeleteRequests:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flow-delete-requests
+            Method: head
         getFlowDeleteRequests:
           Type: Api
           Properties:

@@ -163,114 +163,6 @@ def parse_essence_parameters(spec):
     return essence_params
 
 
-def set_root_get_mock(spec):
-    spec["paths"]["/"]["get"]["x-amazon-apigateway-integration"] = OrderedDict(
-        {
-            "type": "mock",
-            "requestTemplates": {"application/json": '{\n  "statusCode": 200\n}\n'},
-            "responses": {
-                "default": OrderedDict(
-                    {
-                        "statusCode": "200",
-                        "responseTemplates": {
-                            "application/json": '[\n  "service",\n  "flows",\n  "sources",\n  "flow-delete-requests"\n]\n'
-                        },
-                    }
-                )
-            },
-            "passthroughBehavior": "when_no_templates",
-        }
-    )
-
-
-def set_root_any_mock(spec):
-    spec["paths"]["/"]["x-amazon-apigateway-any-method"] = OrderedDict(
-        {
-            "responses": {
-                "404": {"description": "The specified path or method does not exist."}
-            },
-            "security": [
-                {
-                    "Authorizor": [
-                        {"Fn::FindInMap": ["OAuth", "Scopes", "CognitoAdmin"]},
-                        {"Fn::FindInMap": ["OAuth", "Scopes", "Head"]},
-                        {"Fn::FindInMap": ["OAuth", "Scopes", "Get"]},
-                        {"Fn::FindInMap": ["OAuth", "Scopes", "Put"]},
-                        {"Fn::FindInMap": ["OAuth", "Scopes", "Post"]},
-                        {"Fn::FindInMap": ["OAuth", "Scopes", "Delete"]},
-                    ]
-                }
-            ],
-            "x-amazon-apigateway-integration": OrderedDict(
-                {
-                    "type": "mock",
-                    "requestTemplates": {"application/json": '{"statusCode": 404}'},
-                    "responses": {
-                        "default": OrderedDict(
-                            {
-                                "statusCode": "404",
-                                "responseTemplates": {"application/json": {}},
-                            }
-                        )
-                    },
-                    "passthroughBehavior": "when_no_templates",
-                }
-            ),
-        }
-    )
-
-
-def set_proxy_any_mock(spec):
-    spec["paths"]["/{proxy+}"] = OrderedDict(
-        {
-            "x-amazon-apigateway-any-method": {
-                "parameters": [
-                    OrderedDict(
-                        {
-                            "name": "proxy",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string"},
-                        }
-                    )
-                ],
-                "responses": {
-                    "404": {
-                        "description": "The specified path or method does not exist."
-                    }
-                },
-                "security": [
-                    {
-                        "Authorizor": [
-                            {"Fn::FindInMap": ["OAuth", "Scopes", "CognitoAdmin"]},
-                            {"Fn::FindInMap": ["OAuth", "Scopes", "Head"]},
-                            {"Fn::FindInMap": ["OAuth", "Scopes", "Get"]},
-                            {"Fn::FindInMap": ["OAuth", "Scopes", "Put"]},
-                            {"Fn::FindInMap": ["OAuth", "Scopes", "Post"]},
-                            {"Fn::FindInMap": ["OAuth", "Scopes", "Delete"]},
-                        ]
-                    }
-                ],
-                "x-amazon-apigateway-integration": OrderedDict(
-                    {
-                        "type": "mock",
-                        "requestTemplates": {"application/json": '{"statusCode": 404}'},
-                        "responses": {
-                            "default": OrderedDict(
-                                {
-                                    "statusCode": "404",
-                                    "responseTemplates": {"application/json": {}},
-                                }
-                            )
-                        },
-                        "passthroughBehavior": "when_no_templates",
-                    }
-                ),
-            }
-        }
-    )
-
-
 def main():
     # Read the spec from YAML file into OrderedDict to preserve easy to read structure when written back.
     with open(
@@ -313,44 +205,18 @@ def main():
                     function_resource = "ServiceFunction"
                 elif "/segments" in path:
                     function_resource = "FlowSegmentsFunction"
-                if (
-                    method == "head"
-                    and len(openapi_spec["paths"][path][method]["responses"].keys())
-                    == 1
-                ):
-                    openapi_spec["paths"][path][method][
-                        "x-amazon-apigateway-integration"
-                    ] = OrderedDict(
-                        {
-                            "type": "mock",
-                            "requestTemplates": {
-                                "application/json": '{"statusCode": 200}'
-                            },
-                            "responses": {
-                                "default": OrderedDict(
-                                    {
-                                        "statusCode": "200",
-                                        "responseTemplates": {"application/json": {}},
-                                    }
-                                )
-                            },
-                            "passthroughBehavior": "when_no_templates",
-                        }
-                    )
-                else:
-                    openapi_spec["paths"][path][method][
-                        "x-amazon-apigateway-integration"
-                    ] = OrderedDict(
-                        {
-                            "type": "aws_proxy",
-                            "httpMethod": "POST",
-                            "uri": {
-                                "Fn::Sub": f"arn:${{AWS::Partition}}:apigateway:${{AWS::Region}}:lambda:path/2015-03-31/functions/${{{function_resource}.Arn}}/invocations"
-                            },
-                            "passthroughBehavior": "when_no_templates",
-                        }
-                    )
-                # event_name = method + get_event_name_suffix(path)
+                openapi_spec["paths"][path][method][
+                    "x-amazon-apigateway-integration"
+                ] = OrderedDict(
+                    {
+                        "type": "aws_proxy",
+                        "httpMethod": "POST",
+                        "uri": {
+                            "Fn::Sub": f"arn:${{AWS::Partition}}:apigateway:${{AWS::Region}}:lambda:path/2015-03-31/functions/${{{function_resource}.Arn}}/invocations"
+                        },
+                        "passthroughBehavior": "when_no_templates",
+                    }
+                )
 
                 if "requestBody" in openapi_spec["paths"][path][method]:
                     if "content" in openapi_spec["paths"][path][method]["requestBody"]:
@@ -407,10 +273,6 @@ def main():
                                 openapi_spec["paths"][path][method]["responses"][code][
                                     "content"
                                 ]["application/json"].pop("examples")
-
-    set_root_get_mock(openapi_spec)
-    set_root_any_mock(openapi_spec)
-    set_proxy_any_mock(openapi_spec)
 
     # Convert final spec to string for final manipulation
     spec_yaml_string = yaml.dump(openapi_spec, width=1000, default_flow_style=False)
