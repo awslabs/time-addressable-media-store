@@ -4,6 +4,7 @@ query_params = {
             "label": "str",
             "tag.{name}": "str",
             "tag_exists.{name}": "bool",
+            "format": "str",
             "page": "str",
             "limit": "int",
         },
