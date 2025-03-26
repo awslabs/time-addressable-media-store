@@ -103,6 +103,7 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
 
 
 @tracer.capture_method(capture_response=False)
+@lru_cache()
 def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
     get_parameter = ssm.get_parameter(Name=info_param_name)
