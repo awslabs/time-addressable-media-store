@@ -403,7 +403,7 @@ def test_List_Flows_HEAD_400(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"bad": "query"},
+        params={"timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -418,7 +418,7 @@ def test_List_Flows_HEAD_400_codec(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"codec": "audio/aac", "bad": "query"}
+        "HEAD", path, params={"codec": "audio/aac", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -433,7 +433,7 @@ def test_List_Flows_HEAD_400_format(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"format": "urn:x-nmos:format:data", "bad": "query"}
+        "HEAD", path, params={"format": "urn:x-nmos:format:data", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -448,7 +448,7 @@ def test_List_Flows_HEAD_400_frame_height(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"frame_height": "1080", "bad": "query"}
+        "HEAD", path, params={"frame_height": "1080", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -463,7 +463,7 @@ def test_List_Flows_HEAD_400_frame_width(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"frame_width": "1920", "bad": "query"}
+        "HEAD", path, params={"frame_width": "1920", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -478,7 +478,7 @@ def test_List_Flows_HEAD_400_label(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"label": "pytest", "bad": "query"}
+        "HEAD", path, params={"label": "pytest", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -493,7 +493,7 @@ def test_List_Flows_HEAD_400_limit(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"limit": "2", "bad": "query"}
+        "HEAD", path, params={"limit": "2", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -508,7 +508,7 @@ def test_List_Flows_HEAD_400_page(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"page": "1", "bad": "query"}
+        "HEAD", path, params={"page": "1", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -523,7 +523,7 @@ def test_List_Flows_HEAD_400_source_id(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"source_id": DATA_FLOW["source_id"], "bad": "query"}
+        "HEAD", path, params={"source_id": DATA_FLOW["source_id"], "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -538,7 +538,7 @@ def test_List_Flows_HEAD_400_tag_name(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"tag.test": "this", "bad": "query"}
+        "HEAD", path, params={"tag.test": "this", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -553,7 +553,7 @@ def test_List_Flows_HEAD_400_tag_exists_name(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"tag_exists.text": "false", "bad": "query"}
+        "HEAD", path, params={"tag_exists.text": "false", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -568,7 +568,7 @@ def test_List_Flows_HEAD_400_timerange(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"timerange": "()", "bad": "query"}
+        "HEAD", path, params={"timerange": "()", "format": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -827,13 +827,14 @@ def test_List_Flows_GET_400(api_client_cognito):
     # Arrange
     path = "/flows"
     # Act
-    response = api_client_cognito.request("GET", path, params={"bad": "query"})
+    response = api_client_cognito.request("GET", path, params={"timerange": "bad"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_codec(api_client_cognito):
@@ -842,14 +843,15 @@ def test_List_Flows_GET_400_codec(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"codec": "audio/aac", "bad": "query"}
+        "GET", path, params={"codec": "audio/aac", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_format(api_client_cognito):
@@ -858,14 +860,15 @@ def test_List_Flows_GET_400_format(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"format": "urn:x-nmos:format:data", "bad": "query"}
+        "GET", path, params={"format": "urn:x-nmos:format:data", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_frame_height(api_client_cognito):
@@ -874,14 +877,15 @@ def test_List_Flows_GET_400_frame_height(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"frame_height": "1080", "bad": "query"}
+        "GET", path, params={"frame_height": "1080", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_frame_width(api_client_cognito):
@@ -890,14 +894,15 @@ def test_List_Flows_GET_400_frame_width(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"frame_width": "1920", "bad": "query"}
+        "GET", path, params={"frame_width": "1920", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_label(api_client_cognito):
@@ -906,14 +911,15 @@ def test_List_Flows_GET_400_label(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"label": "pytest", "bad": "query"}
+        "GET", path, params={"label": "pytest", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_limit(api_client_cognito):
@@ -922,14 +928,15 @@ def test_List_Flows_GET_400_limit(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"limit": "2", "bad": "query"}
+        "GET", path, params={"limit": "2", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_page(api_client_cognito):
@@ -938,14 +945,15 @@ def test_List_Flows_GET_400_page(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"page": "1", "bad": "query"}
+        "GET", path, params={"page": "1", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_source_id(api_client_cognito):
@@ -954,14 +962,15 @@ def test_List_Flows_GET_400_source_id(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"source_id": DATA_FLOW["source_id"], "bad": "query"}
+        "GET", path, params={"source_id": DATA_FLOW["source_id"], "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_tag_name(api_client_cognito):
@@ -970,14 +979,15 @@ def test_List_Flows_GET_400_tag_name(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"tag.test": "this", "bad": "query"}
+        "GET", path, params={"tag.test": "this", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_tag_exists_name(api_client_cognito):
@@ -986,14 +996,15 @@ def test_List_Flows_GET_400_tag_exists_name(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"tag_exists.text": "false", "bad": "query"}
+        "GET", path, params={"tag_exists.text": "false", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Flows_GET_400_timerange(api_client_cognito):
@@ -1002,14 +1013,15 @@ def test_List_Flows_GET_400_timerange(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"timerange": "()", "bad": "query"}
+        "GET", path, params={"timerange": "()", "format": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Flow_Details_HEAD_200(api_client_cognito):
@@ -1060,7 +1072,7 @@ def test_Flow_Details_HEAD_400(api_client_cognito):
     # Arrange
     path = f'/flows/{MULTI_FLOW["id"]}'
     # Act
-    response = api_client_cognito.request("HEAD", path, params={"bad": "query"})
+    response = api_client_cognito.request("HEAD", path, params={"timerange": "bad"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
@@ -1074,7 +1086,7 @@ def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito):
     path = f'/flows/{MULTI_FLOW["id"]}'
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"include_timerange": "true", "bad": "query"}
+        "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1089,7 +1101,7 @@ def test_Flow_Details_HEAD_400_timerange(api_client_cognito):
     path = f'/flows/{MULTI_FLOW["id"]}'
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"include_timerange": "true", "bad": "query"}
+        "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1169,13 +1181,14 @@ def test_Flow_Details_GET_400(api_client_cognito):
     # Arrange
     path = f'/flows/{DATA_FLOW["id"]}'
     # Act
-    response = api_client_cognito.request("GET", path, params={"bad": "query"})
+    response = api_client_cognito.request("GET", path, params={"timerange": "bad"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Flow_Details_GET_400_include_timerange(api_client_cognito):
@@ -1183,14 +1196,15 @@ def test_Flow_Details_GET_400_include_timerange(api_client_cognito):
     path = f'/flows/{DATA_FLOW["id"]}'
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"include_timerange": "true", "bad": "query"}
+        "GET", path, params={"include_timerange": "true", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Flow_Details_GET_400_timerange(api_client_cognito):
@@ -1198,14 +1212,15 @@ def test_Flow_Details_GET_400_timerange(api_client_cognito):
     path = f'/flows/{DATA_FLOW["id"]}'
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"include_timerange": "true", "bad": "query"}
+        "GET", path, params={"include_timerange": "true", "timerange": "bad"}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Flow_Details_GET_404(api_client_cognito):
