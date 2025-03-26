@@ -58,6 +58,7 @@ bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
+store_name = get_store_name()
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 
@@ -287,7 +288,7 @@ def get_presigned_url(key):
 @tracer.capture_method(capture_response=False)
 def get_nonsigned_url(key):
     return GetUrl(
-        label=f"aws.{bucket_region}:s3:{get_store_name()}",
+        label=f"aws.{bucket_region}:s3:{store_name}",
         url=f"https://{bucket}.s3.{bucket_region}.amazonaws.com/{key}",
     )
 
@@ -326,7 +327,7 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
             )
             if item.object_id in presigned_urls:
                 presigned_get_url = GetUrl(
-                    label=f"aws.{bucket_region}:s3.presigned:{get_store_name()}",
+                    label=f"aws.{bucket_region}:s3.presigned:{store_name}",
                     url=presigned_urls[item.object_id],
                 )
                 item.get_urls.append(presigned_get_url)

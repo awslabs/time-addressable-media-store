@@ -23,6 +23,8 @@ dynamodb = boto3.resource("dynamodb")
 webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
+store_name = get_store_name()
+
 
 attribute_mappings = {
     "flow": "flow_ids",
@@ -130,7 +132,7 @@ def lambda_handler(event: dict, context: LambdaContext):
         if need_presigned_urls:
             get_urls.append(
                 {
-                    "label": f"aws.{bucket_region}:s3.presigned:{get_store_name()}",
+                    "label": f"aws.{bucket_region}:s3.presigned:{store_name}",
                     "url": generate_presigned_url(
                         "get_object", bucket, event.detail["segments"][0]["object_id"]
                     ),
