@@ -1,6 +1,7 @@
 import json
 import os
 from http import HTTPStatus
+from typing import Optional
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -16,7 +17,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
-from aws_lambda_powertools.event_handler.openapi.params import Path
+from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from neptune import (
@@ -28,7 +29,7 @@ from neptune import (
     query_sources,
     set_node_property,
 )
-from schema import Source, Tags, Uuid
+from schema import Contentformat, Source, Tags, Uuid
 from typing_extensions import Annotated
 from utils import (
     generate_link_url,
@@ -36,7 +37,6 @@ from utils import (
     model_dump,
     parse_claims,
     publish_event,
-    validate_query_string,
 )
 
 tracer = Tracer()
@@ -55,10 +55,15 @@ UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 @app.head("/sources")
 @app.get("/sources")
 @tracer.capture_method(capture_response=False)
-def list_sources():
+def list_sources(
+    _label: Annotated[Optional[str], Query(alias="label")] = None,
+    _tag_value: Annotated[Optional[str], Query(alias="tag.{name}")] = None,
+    _tag_exists: Annotated[Optional[bool], Query(alias="tag_exists.{name}")] = None,
+    _format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
+    _page: Annotated[Optional[str], Query(alias="page")] = None,
+    _limit: Annotated[Optional[int], Query(alias="limit")] = None,
+):
     parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
     custom_headers = {}
     if parameters and "limit" in parameters:
         custom_headers["X-Paging-Limit"] = parameters["limit"]

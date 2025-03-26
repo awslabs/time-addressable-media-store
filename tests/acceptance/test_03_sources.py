@@ -171,7 +171,7 @@ def test_List_Sources_HEAD_400(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"bad": "query"},
+        params={"format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -188,7 +188,7 @@ def test_List_Sources_HEAD_400_label(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"label": "pytest", "bad": "query"},
+        params={"label": "pytest", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -205,7 +205,7 @@ def test_List_Sources_HEAD_400_limit(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"limit": "2", "bad": "query"},
+        params={"limit": "2", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -222,7 +222,7 @@ def test_List_Sources_HEAD_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"page": "1", "bad": "query"},
+        params={"page": "1", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -239,7 +239,7 @@ def test_List_Sources_HEAD_400_tag_name(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"tag.test": "this", "bad": "query"},
+        params={"tag.test": "this", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -256,7 +256,7 @@ def test_List_Sources_HEAD_400_tag_exists_name(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"tag_exists.test": "false", "bad": "query"},
+        params={"tag_exists.test": "false", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -442,14 +442,15 @@ def test_List_Sources_GET_400(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"bad": "query"},
+        params={"format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Sources_GET_400_format(api_client_cognito):
@@ -460,14 +461,15 @@ def test_List_Sources_GET_400_format(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"format": "urn:x-nmos:format:data", "bad": "query"},
+        params={"format": "urn:x-nmos:format:data", "limit": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Sources_GET_400_label(api_client_cognito):
@@ -478,14 +480,15 @@ def test_List_Sources_GET_400_label(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"label": "pytest", "bad": "query"},
+        params={"label": "pytest", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Sources_GET_400_limit(api_client_cognito):
@@ -496,14 +499,15 @@ def test_List_Sources_GET_400_limit(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"limit": "2", "bad": "query"},
+        params={"limit": "2", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Sources_GET_400_page(api_client_cognito):
@@ -514,14 +518,15 @@ def test_List_Sources_GET_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"page": "1", "bad": "query"},
+        params={"page": "1", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Sources_GET_400_tag_name(api_client_cognito):
@@ -532,14 +537,15 @@ def test_List_Sources_GET_400_tag_name(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"tag.test": "this", "bad": "query"},
+        params={"tag.test": "this", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_List_Sources_GET_400_tag_exists_name(api_client_cognito):
@@ -550,14 +556,15 @@ def test_List_Sources_GET_400_tag_exists_name(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"tag_exists.test": "false", "bad": "query"},
+        params={"tag_exists.test": "false", "format": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Source_Details_HEAD_200(api_client_cognito):

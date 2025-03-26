@@ -386,7 +386,7 @@ def test_List_Flow_Segments_HEAD_400(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"bad": "query"},
+        params={"timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -405,7 +405,7 @@ def test_List_Flow_Segments_HEAD_400_accept_get_urls(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"accept_get_urls": "", "bad": "query"},
+        params={"accept_get_urls": "", "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -424,7 +424,7 @@ def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"limit": 2, "bad": "query"},
+        params={"limit": 2, "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -443,7 +443,10 @@ def test_List_Flow_Segments_HEAD_400_object_id(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005", "bad": "query"},
+        params={
+            "object_id": "20000000-0000-1000-8000-000000000005",
+            "timerange": "bad",
+        },
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -462,7 +465,7 @@ def test_List_Flow_Segments_HEAD_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"page": "200000000", "bad": "query"},
+        params={"page": "200000000", "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -481,7 +484,7 @@ def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"reverse_order": "true", "bad": "query"},
+        params={"reverse_order": "true", "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -500,7 +503,7 @@ def test_List_Flow_Segments_HEAD_400_timerange(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"timerange": "[3:5_4:5)", "bad": "query"},
+        params={"timerange": "[3:5_4:5)", "limit": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -953,14 +956,15 @@ def test_List_Flow_Segments_GET_400(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"bad": "query"},
+        params={"timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
@@ -972,14 +976,15 @@ def test_List_Flow_Segments_GET_400_limit(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"limit": 2, "bad": "query"},
+        params={"limit": 2, "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
@@ -991,14 +996,18 @@ def test_List_Flow_Segments_GET_400_object_id(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005", "bad": "query"},
+        params={
+            "object_id": "20000000-0000-1000-8000-000000000005",
+            "timerange": "bad",
+        },
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
@@ -1010,14 +1019,15 @@ def test_List_Flow_Segments_GET_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"page": "200000000", "bad": "query"},
+        params={"page": "200000000", "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
@@ -1029,14 +1039,15 @@ def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"reverse_order": "true", "bad": "query"},
+        params={"reverse_order": "true", "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
@@ -1048,14 +1059,15 @@ def test_List_Flow_Segments_GET_400_timerange(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"timerange": "[3:5_4:5)", "bad": "query"},
+        params={"timerange": "[3:5_4:5)", "limit": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
@@ -1414,14 +1426,15 @@ def test_Delete_Flow_Segment_DELETE_400(api_client_cognito):
     response = api_client_cognito.request(
         "DELETE",
         path,
-        params={"bad": "query"},
+        params={"timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments
@@ -1432,32 +1445,18 @@ def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito):
     response = api_client_cognito.request(
         "DELETE",
         path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005", "bad": "query"},
+        params={
+            "object_id": "20000000-0000-1000-8000-000000000005",
+            "timerange": "bad",
+        },
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
-
-
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_400_timerange(api_client_cognito):
-    # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-        params={"timerange": "[3:5_4:5)", "bad": "query"},
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid query options." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 @pytest.mark.segments

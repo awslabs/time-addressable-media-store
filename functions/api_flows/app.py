@@ -3,6 +3,7 @@ import os
 import uuid
 from datetime import datetime
 from http import HTTPStatus
+from typing import Optional
 
 # pylint: disable=no-member
 import constants
@@ -21,7 +22,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
-from aws_lambda_powertools.event_handler.openapi.params import Path
+from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import get_flow_timerange
@@ -44,6 +45,7 @@ from neptune import (
 )
 from schema import (
     Collectionitem,
+    Contentformat,
     Deletionrequest,
     Flow,
     Flowcollection,
@@ -51,7 +53,9 @@ from schema import (
     Flowstoragepost,
     Httprequest,
     MediaObject,
+    Mimetype,
     Tags,
+    Timerange,
     Uuid,
 )
 from typing_extensions import Annotated
@@ -64,7 +68,6 @@ from utils import (
     parse_claims,
     publish_event,
     put_message,
-    validate_query_string,
 )
 
 tracer = Tracer()
@@ -79,15 +82,33 @@ bucket = os.environ["BUCKET"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
+TIMERANGE_PATTERN = Timerange.model_fields["root"].metadata[0].pattern
+MIMETYPE_PATTERN = Mimetype.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/flows")
 @app.get("/flows")
 @tracer.capture_method(capture_response=False)
-def get_flows():
+def get_flows(
+    _source_id: Annotated[
+        Optional[str], Query(alias="source_id", pattern=UUID_PATTERN)
+    ] = None,
+    _timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+    _format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
+    _codec: Annotated[
+        Optional[str], Query(alias="codec", pattern=MIMETYPE_PATTERN)
+    ] = None,
+    _label: Annotated[Optional[str], Query(alias="label")] = None,
+    _tag_value: Annotated[Optional[str], Query(alias="tag.{name}")] = None,
+    _tag_exists: Annotated[Optional[bool], Query(alias="tag_exists.{name}")] = None,
+    _frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
+    _frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
+    _page: Annotated[Optional[str], Query(alias="page")] = None,
+    _limit: Annotated[Optional[int], Query(alias="limit")] = None,
+):
     parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
     custom_headers = {}
     if parameters and "limit" in parameters:
         custom_headers["X-Paging-Limit"] = parameters["limit"]
@@ -128,10 +149,16 @@ def get_flows():
 @app.head("/flows/<flowId>")
 @app.get("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
-def get_flow_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_flow_by_id(
+    flowId: Annotated[str, Path(pattern=UUID_PATTERN)],
+    _include_timerange: Annotated[
+        Optional[bool], Query(alias="include_timerange")
+    ] = None,
+    _timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+):
     parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
     try:
         item = query_node(record_type, flowId)
     except ValueError as e:

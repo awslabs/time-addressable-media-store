@@ -2,6 +2,7 @@ import concurrent.futures
 import json
 import os
 from http import HTTPStatus
+from typing import Optional
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -18,7 +19,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
-from aws_lambda_powertools.event_handler.openapi.params import Path
+from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
@@ -39,7 +40,7 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, GetUrl, Uuid
+from schema import Deletionrequest, Flowsegment, GetUrl, Timerange, Uuid
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
@@ -50,7 +51,6 @@ from utils import (
     model_dump,
     publish_event,
     put_message,
-    validate_query_string,
 )
 
 tracer = Tracer()
@@ -66,6 +66,7 @@ del_queue = os.environ["DELETE_QUEUE_URL"]
 store_name = get_store_name()
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
+TIMERANGE_PATTERN = Timerange.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/flows/<flowId>/segments")
@@ -73,10 +74,18 @@ UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 @tracer.capture_method(capture_response=False)
 def get_flow_segments_by_id(
     flowId: str,
+    _object_id: Annotated[Optional[str], Query(alias="object_id")] = None,
+    _timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+    _reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    _accept_get_urls: Annotated[
+        Optional[str], Query(alias="accept_get_urls", pattern=r"^([^,]+(,[^,]+)*)?$")
+    ] = None,
+    _page: Annotated[Optional[str], Query(alias="page")] = None,
+    _limit: Annotated[Optional[int], Query(alias="limit")] = None,
 ):  # There is a special case here where 404 is defined for an invalid (bad format) flowId
     parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
     try:
         Uuid(root=flowId)
     except ValidationError as ex:
@@ -204,10 +213,14 @@ def post_flow_segments_by_id(
 
 @app.delete("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
-def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def delete_flow_segments_by_id(
+    flowId: Annotated[str, Path(pattern=UUID_PATTERN)],
+    _timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+    _object_id: Annotated[Optional[str], Query(alias="object_id")] = None,
+):
     parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
     try:
         item = query_node("flow", flowId)
     except ValueError as e:
