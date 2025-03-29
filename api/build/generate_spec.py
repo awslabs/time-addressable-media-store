@@ -2,7 +2,7 @@
 import json
 import re
 import sys
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 
 import yaml
 
@@ -117,31 +117,6 @@ def add_securitySchemes(spec):
             }
         }
     )
-
-
-def parse_query_parameters(spec):
-    # Loop path methods and add API Gateway integration
-    query_params = defaultdict(lambda: defaultdict(dict))
-    for path in spec["paths"]:
-        for method in spec["paths"][path]:
-            if method != "parameters":
-                # Parse Parameters out into separate dict
-                if "parameters" in spec["paths"][path][method]:
-                    for parameter in spec["paths"][path][method]["parameters"]:
-                        if "$ref" in parameter:
-                            parameter = spec_lookup(
-                                spec, parameter["$ref"].split("/")[1:]
-                            )
-                        if parameter["in"] == "query":
-                            if "$ref" in parameter["schema"]:
-                                parameter["schema"] = spec_lookup(
-                                    spec,
-                                    parameter["schema"]["$ref"].split("/")[1:],
-                                )
-                            query_params[path][method.upper()][parameter["name"]] = (
-                                type_map[parameter["schema"]["type"]]
-                            )
-    return query_params
 
 
 def parse_essence_parameters(spec):
@@ -283,11 +258,9 @@ def main():
     with open("./api/openapi.yaml", "w", encoding="utf-8") as f:
         f.write(spec_yaml_string)
 
-    query_params = parse_query_parameters(openapi_spec)
     essence_params = parse_essence_parameters(openapi_spec)
 
     with open("./layers/utils/params.py", "w", encoding="utf-8") as fw:
-        fw.write(f"query_params = {json.dumps(query_params, indent=4)}\n\n")
         fw.write(f"essence_params = {json.dumps(essence_params, indent=4)}\n")
 
 
