@@ -90,35 +90,6 @@ def process_openapi_spec(spec):
     return len(external_schemas)
 
 
-def get_event_name_suffix(value):
-    """Simple function to create valid Cloudformation Serverless event name"""
-    dash_path = re.sub(r"[{}_]", "", value).replace("/", "-").strip("-")
-    if dash_path == "":
-        return "Root"
-    return "".join(v.title() for v in dash_path.split("-"))
-
-
-def add_securitySchemes(spec):
-    spec["components"]["securitySchemes"] = OrderedDict(
-        {
-            "Authorizor": {
-                "type": "apiKey",
-                "name": "Authorization",
-                "in": "header",
-                "x-amazon-apigateway-authtype": "cognito_user_pools",
-                "x-amazon-apigateway-authorizer": {
-                    "type": "cognito_user_pools",
-                    "providerARNs": [
-                        {
-                            "Fn::Sub": "arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}"
-                        }
-                    ],
-                },
-            }
-        }
-    )
-
-
 def parse_essence_parameters(spec):
     essence_params = {}
     for component in spec["components"]:
@@ -146,116 +117,15 @@ def main():
         openapi_spec = ordered_load(
             f.read(), Loader=yaml.SafeLoader, object_pairs_hook=OrderedDict
         )
-    # Update spec to be 3.0.1 (source is 3.1.0 and not supported by API Gateway)
-    openapi_spec["openapi"] = "3.0.1"
-    openapi_spec["info"].pop("contact")
-    openapi_spec["info"].pop("license")
-    # Remove sections that are not needed for API Gateway
-    for key in ["webhooks", "servers", "security"]:
-        openapi_spec.pop(key)
-    add_securitySchemes(openapi_spec)
-
     # Embed external schemas into the spec
     replacements = process_openapi_spec(openapi_spec)
     # Keep processing until no external schemas are found
     while replacements > 0:
         replacements = process_openapi_spec(openapi_spec)
 
-    # Loop path methods and add API Gateway integration
-    for path in openapi_spec["paths"]:
-        for method in openapi_spec["paths"][path]:
-            if method != "parameters":
-                openapi_spec["paths"][path][method]["security"] = [
-                    {
-                        "Authorizor": [
-                            {"Fn::FindInMap": ["OAuth", "Scopes", "CognitoAdmin"]},
-                            {"Fn::FindInMap": ["OAuth", "Scopes", method.capitalize()]},
-                        ]
-                    }
-                ]
-                function_resource = (
-                    f'{path.split("/")[1].title().replace("-", "")}Function'
-                )
-                if path == "/":
-                    function_resource = "ServiceFunction"
-                elif "/segments" in path:
-                    function_resource = "FlowSegmentsFunction"
-                openapi_spec["paths"][path][method][
-                    "x-amazon-apigateway-integration"
-                ] = OrderedDict(
-                    {
-                        "type": "aws_proxy",
-                        "httpMethod": "POST",
-                        "uri": {
-                            "Fn::Sub": f"arn:${{AWS::Partition}}:apigateway:${{AWS::Region}}:lambda:path/2015-03-31/functions/${{{function_resource}.Arn}}/invocations"
-                        },
-                        "passthroughBehavior": "when_no_templates",
-                    }
-                )
-
-                if "requestBody" in openapi_spec["paths"][path][method]:
-                    if "content" in openapi_spec["paths"][path][method]["requestBody"]:
-                        if (
-                            "application/json"
-                            in openapi_spec["paths"][path][method]["requestBody"][
-                                "content"
-                            ]
-                        ):
-                            if (
-                                "example"
-                                in openapi_spec["paths"][path][method]["requestBody"][
-                                    "content"
-                                ]["application/json"]
-                            ):
-                                openapi_spec["paths"][path][method]["requestBody"][
-                                    "content"
-                                ]["application/json"].pop("example")
-                            if (
-                                "examples"
-                                in openapi_spec["paths"][path][method]["requestBody"][
-                                    "content"
-                                ]["application/json"]
-                            ):
-                                openapi_spec["paths"][path][method]["requestBody"][
-                                    "content"
-                                ]["application/json"].pop("examples")
-
-                for code, response in openapi_spec["paths"][path][method][
-                    "responses"
-                ].items():
-                    if "content" in response:
-                        if (
-                            "application/json"
-                            in openapi_spec["paths"][path][method]["responses"][code][
-                                "content"
-                            ]
-                        ):
-                            if (
-                                "example"
-                                in openapi_spec["paths"][path][method]["responses"][
-                                    code
-                                ]["content"]["application/json"]
-                            ):
-                                openapi_spec["paths"][path][method]["responses"][code][
-                                    "content"
-                                ]["application/json"].pop("example")
-                            if (
-                                "examples"
-                                in openapi_spec["paths"][path][method]["responses"][
-                                    code
-                                ]["content"]["application/json"]
-                            ):
-                                openapi_spec["paths"][path][method]["responses"][code][
-                                    "content"
-                                ]["application/json"].pop("examples")
-
-    # Convert final spec to string for final manipulation
-    spec_yaml_string = yaml.dump(openapi_spec, width=1000, default_flow_style=False)
-    # Add comments to remove variable names from parameters as this is not supported by API Gateway
-    spec_yaml_string = spec_yaml_string.replace(".{name}", ".name #{name}")
-
     # Write completed API Spec out
-    with open("./api/openapi.yaml", "w", encoding="utf-8") as f:
+    spec_yaml_string = yaml.dump(openapi_spec, width=1000, default_flow_style=False)
+    with open("./api/build/openapi.yaml", "w", encoding="utf-8") as f:
         f.write(spec_yaml_string)
 
     essence_params = parse_essence_parameters(openapi_spec)
