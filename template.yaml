@@ -510,6 +510,36 @@ Resources:
               AuthorizationScopes:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Post]
+        anyRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /
+            Method: Any
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+                - !FindInMap [OAuth, Scopes, Get]
+                - !FindInMap [OAuth, Scopes, Put]
+                - !FindInMap [OAuth, Scopes, Post]
+                - !FindInMap [OAuth, Scopes, Delete]
+        proxyPath:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /{proxy+}
+            Method: Any
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+                - !FindInMap [OAuth, Scopes, Get]
+                - !FindInMap [OAuth, Scopes, Put]
+                - !FindInMap [OAuth, Scopes, Post]
+                - !FindInMap [OAuth, Scopes, Delete]
 
   ServiceFunctionRoleWebhooksPolicy:
     Type: AWS::IAM::RolePolicy
