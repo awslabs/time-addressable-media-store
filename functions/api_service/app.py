@@ -12,10 +12,12 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
+from aws_lambda_powertools.event_handler.openapi.params import Body
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from schema import Service, Servicepost, Webhook, Webhookpost
+from typing_extensions import Annotated
 from utils import filter_dict, info_param_name, model_dump, ssm
 
 tracer = Tracer()
@@ -59,7 +61,7 @@ def get_service():
 
 @app.post("/service")
 @tracer.capture_method(capture_response=False)
-def post_service(service_post: Servicepost):
+def post_service(service_post: Annotated[Servicepost, Body()]):
     get_parameter = ssm.get_parameter(Name=info_param_name)
     service = Service(**json.loads(get_parameter["Parameter"]["Value"]))
     # Update service with all populated values of the service_post
@@ -116,7 +118,7 @@ def get_webhooks():
 
 @app.post("/service/webhooks")
 @tracer.capture_method(capture_response=False)
-def post_webhooks(webhook: Webhookpost):
+def post_webhooks(webhook: Annotated[Webhookpost, Body()]):
     if table_name is None:
         raise NotFoundError(
             "Webhooks are not supported by this API implementation"

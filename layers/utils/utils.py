@@ -3,6 +3,7 @@ import math
 import os
 import urllib.parse
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 from functools import lru_cache
 from itertools import batched
@@ -12,6 +13,7 @@ import boto3
 # pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Tracer
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import (
     APIGatewayEventRequestContext,
@@ -19,7 +21,7 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from mediatimestamp.immutable import TimeRange
-from params import essence_params, query_params
+from params import essence_params
 from pydantic import BaseModel
 
 tracer = Tracer()
@@ -192,20 +194,31 @@ def remove_null(obj: dict | list) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def validate_query_string(
-    params: None | dict, request_context: APIGatewayEventRequestContext
-) -> bool:
-    """Checks if supplied parameters are valid names for the path and method of the request"""
+def parse_tag_parameters(params: None) -> tuple[dict, dict]:
+    """Parse Tags Value and Exist parameters from request query string parameters"""
+    values = {}
+    exists = {}
     if params is None:
-        return True
-    query_string_parameters_keys = query_params[request_context.resource_path][
-        request_context.http_method
-    ].keys()
-    for key in params.keys():
-        if key not in query_string_parameters_keys:
-            if not key.startswith("tag.") and not key.startswith("tag_exists."):
-                return False
-    return True
+        return (values, exists)
+    for key, value in params.items():
+        if key.startswith("tag."):
+            values[key[len("tag.") :]] = value
+        if key.startswith("tag_exists."):
+            if value.lower() in ["true", "false"]:
+                exists[key[len("tag_exists.") :]] = value.lower() == "true"
+            else:
+                raise BadRequestError(
+                    [
+                        {
+                            "type": "bool_parsing",
+                            "loc": ["query", key],
+                            "msg": "Input should be a valid boolean, unable to interpret input",
+                            "input": value,
+                            "url": "https://errors.pydantic.dev/2.10/v/bool_parsing",
+                        }
+                    ]
+                )  # 400
+    return (values, exists)
 
 
 @tracer.capture_method(capture_response=False)
@@ -247,23 +260,12 @@ def deserialise_neptune_obj(obj: dict) -> dict:
 
 
 @tracer.capture_method(capture_response=False)
-def parse_parameters(parameters: dict) -> tuple[int, int, dict, list]:
+def parse_parameters(parameters: dict) -> tuple[defaultdict, list]:
     """Parses API Gateway parameters into the structure used by OpenCypher query"""
-    source_id = parameters.get("source_id", None)
-    page = int(parameters.get("page", 0))
-    limit = min(
-        int(parameters.get("limit", constants.DEFAULT_PAGE_LIMIT)),
-        constants.MAX_PAGE_LIMIT,
-    )
     where_literals = []
-    return_dict = {
-        "source_properties": {"id": source_id} if source_id else {},
-        "properties": {},
-        "essence_properties": {},
-        "tag_properties": {},
-    }
+    return_dict = defaultdict(dict)
     for key, value in parameters.items():
-        if key not in ["page", "limit", "source_id", "timerange"]:
+        if value:
             if key in essence_params:
                 if essence_params[key] == "int":
                     return_dict["essence_properties"][key] = int(value)
@@ -271,19 +273,18 @@ def parse_parameters(parameters: dict) -> tuple[int, int, dict, list]:
                     return_dict["essence_properties"][key] = float(value)
                 elif essence_params[key] == "bool":
                     return_dict["essence_properties"][key] = value.lower() == "true"
-            elif key.startswith("tag.") or key.startswith("tag_exists."):
-                tag_name = key.split(".", 1)[-1]
-                if key.startswith("tag."):
-                    return_dict["tag_properties"][tag_name] = value
-                elif key.startswith("tag_exists."):
-                    if value.lower() in ["true", "false"]:
-                        if value.lower() == "true":
-                            where_literals.append(f"t.{tag_name} IS NOT NULL")
-                        else:
-                            where_literals.append(f"t.{tag_name} IS NULL")
+            elif key == "tag_values":
+                for tag_name, tag_value in value.items():
+                    return_dict["tag_properties"][tag_name] = tag_value
+            elif key == "tag_exists":
+                for tag_name, tag_exists in value.items():
+                    if tag_exists:
+                        where_literals.append(f"t.{tag_name} IS NOT NULL")
+                    else:
+                        where_literals.append(f"t.{tag_name} IS NULL")
             else:
                 return_dict["properties"][key] = value
-    return page, limit, return_dict, where_literals
+    return return_dict, where_literals
 
 
 @tracer.capture_method(capture_response=False)

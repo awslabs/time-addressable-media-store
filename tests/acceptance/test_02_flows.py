@@ -1477,7 +1477,8 @@ def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid flow tag value." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Flow_Tag_PUT_403(api_client_cognito):
@@ -1680,7 +1681,8 @@ def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid flow description." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Flow_Description_PUT_403(api_client_cognito):
@@ -1886,7 +1888,8 @@ def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid flow label." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Flow_Label_PUT_404(api_client_cognito):
@@ -2217,7 +2220,8 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid flow max bit rate." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito):
@@ -2227,7 +2231,7 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito):
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="test",
+        json=6000000,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -2381,7 +2385,8 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid flow avg bit rate." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito):
@@ -2391,7 +2396,7 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito):
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="test",
+        json=6000000,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -2545,10 +2550,8 @@ def test_Set_Flow_Read_Only_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Bad request. Invalid flow read_only value. Value must be boolean."
-        == response.json()["message"]
-    )
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
