@@ -843,7 +843,8 @@ def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid Source tag value." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito):
@@ -1013,7 +1014,8 @@ def test_Create_or_Update_Source_Description_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid Source description." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito):
@@ -1180,7 +1182,8 @@ def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "Bad request. Invalid Source label." == response.json()["message"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
 
 
 def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito):

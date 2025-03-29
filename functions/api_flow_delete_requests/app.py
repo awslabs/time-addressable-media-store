@@ -9,10 +9,12 @@ from aws_lambda_powertools.event_handler.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
+from aws_lambda_powertools.event_handler.openapi.params import Path
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from neptune import query_delete_requests, query_node
 from schema import Deletionrequest
+from typing_extensions import Annotated
 from utils import model_dump
 
 tracer = Tracer()
@@ -40,9 +42,9 @@ def get_flow_delete_requests():
 @app.head("/flow-delete-requests/<requestId>")
 @app.get("/flow-delete-requests/<requestId>")
 @tracer.capture_method(capture_response=False)
-def get_flow_delete_requests_by_id(requestId: str):
+def get_flow_delete_requests_by_id(request_id: Annotated[str, Path(alias="requestId")]):
     try:
-        item = query_node(record_type, requestId)
+        item = query_node(record_type, request_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow delete request does not exist."
