@@ -52,7 +52,9 @@ from utils import (
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
+app = APIGatewayRestResolver(
+    enable_validation=True, cors=CORSConfig(expose_headers=["*"])
+)
 metrics = Metrics(namespace="Powertools")
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]

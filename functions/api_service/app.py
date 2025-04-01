@@ -14,7 +14,9 @@ from utils import filter_dict, info_param_name, model_dump, ssm
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
+app = APIGatewayRestResolver(
+    enable_validation=True, cors=CORSConfig(expose_headers=["*"])
+)
 metrics = Metrics(namespace="Powertools")
 
 dynamodb = boto3.resource("dynamodb")
