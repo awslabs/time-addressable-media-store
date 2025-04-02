@@ -163,8 +163,6 @@ Resources:
             Identity:
               Header: Authorization
 
-              # AuthorizationScopes:
-              #   - !FindInMap ["OAuth", "Scopes", "CognitoAdmin"]
   ServiceInformationParameter:
     Type: AWS::SSM::Parameter
     Properties:
