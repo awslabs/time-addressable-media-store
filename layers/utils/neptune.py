@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime, timezone
+from time import sleep
 
 import boto3
 
@@ -28,6 +29,20 @@ neptune = boto3.client(
     endpoint_url=f'https://{os.environ["NEPTUNE_ENDPOINT"]}:8182',
 )
 qb = QueryBuilder()
+
+
+@tracer.capture_method(capture_response=False)
+def execute_open_cypher_query(query, max_retries=3, base_delay=0.01):
+    for attempt in range(max_retries + 1):
+        try:
+            return neptune.execute_open_cypher_query(openCypherQuery=query)
+        except neptune.exceptions.BadRequestException as e:
+            if attempt == max_retries:
+                print(f"Failed after {max_retries} retries: {e}")
+                raise e
+            delay = base_delay * (2**attempt)
+            print(f"Attempt {attempt + 1} failed, retrying in {delay} seconds: {e}")
+            sleep(delay)
 
 
 @tracer.capture_method(capture_response=False)
@@ -174,7 +189,7 @@ def check_delete_source(source_id: str) -> bool:
     query = query.replace(
         "DETACH DELETE source", "DETACH DELETE source DELETE t"
     )  # Limitation in Cymple library, unable to stack DELETE
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
+    results = execute_open_cypher_query(query)
     return len(results["results"]) > 0
 
 
@@ -190,7 +205,7 @@ def get_flow_source_id(flow_id: str) -> str | None:
             .return_literal("s.id as source_id")
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         return results["results"][0]["source_id"]
     except IndexError:
         return None
@@ -212,7 +227,7 @@ def get_source_collected_by(source_id: str) -> list:
             .return_literal("collect(s.id) as source_collected_by")
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         return results["results"][0]["source_collected_by"]
     except IndexError:
         return []
@@ -230,7 +245,7 @@ def get_flow_collected_by(flow_id: str) -> list:
             .return_literal("collect(f.id) as flow_collected_by")
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         return results["results"][0]["flow_collected_by"]
     except IndexError:
         return []
@@ -245,7 +260,7 @@ def query_node(record_type: str, record_id: str) -> dict:
             .return_literal(constants.RETURN_LITERAL[record_type])
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         deserialised_results = [
             deserialise_neptune_obj(result[record_type])
             for result in results["results"]
@@ -264,7 +279,7 @@ def check_node_exists(record_type: str, record_id: str) -> bool:
         .return_literal("n.id")
         .get()
     )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
+    results = execute_open_cypher_query(query)
     return len(results["results"]) > 0
 
 
@@ -280,7 +295,7 @@ def query_node_tags(record_type: str, record_id: str) -> dict:
             .return_literal("t {.*} AS tags")
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         return results["results"][0]["tags"]
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
@@ -296,7 +311,7 @@ def query_node_property(record_type: str, record_id: str, prop_name: str) -> any
             .return_literal(f"n.{prop_name} AS property")
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         return results["results"][0]["property"]
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
@@ -316,7 +331,7 @@ def query_flow_collection(flow_id: str) -> list:
             .return_literal("f.id as id, collect(c {.*, id: fc.id}) AS flow_collection")
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         return results["results"][0]["flow_collection"]
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
@@ -361,7 +376,7 @@ def query_sources(parameters: dict) -> tuple[list, int]:
         .limit(limit)
         .get()
     )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
+    results = execute_open_cypher_query(query)
     deserialised_results = [
         deserialise_neptune_obj(result["source"]) for result in results["results"]
     ]
@@ -415,7 +430,7 @@ def query_flows(parameters: dict) -> tuple[list, int]:
         .limit(limit)
         .get()
     )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
+    results = execute_open_cypher_query(query)
     deserialised_results = [
         deserialise_neptune_obj(result["flow"]) for result in results["results"]
     ]
@@ -432,7 +447,7 @@ def query_delete_requests() -> list:
         .order_by("delete_request.id")
         .get()
     )
-    results = neptune.execute_open_cypher_query(openCypherQuery=query)
+    results = execute_open_cypher_query(query)
     deserialised_results = [
         deserialise_neptune_obj(result["delete_request"])
         for result in results["results"]
@@ -458,7 +473,7 @@ def merge_source(source_dict: dict) -> None:
     # Add Set for Source Tags
     if tags:
         query = query.set(serialise_neptune_obj(tags, "t."))
-    neptune.execute_open_cypher_query(openCypherQuery=query.get())
+    execute_open_cypher_query(query.get())
 
 
 @tracer.capture_method(capture_response=False)
@@ -536,7 +551,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
     query_collection = generate_flow_collection_query(flow_collection)
     if query_collection:
         query = query + query_collection
-    neptune.execute_open_cypher_query(openCypherQuery=query.get())
+    execute_open_cypher_query(query.get())
     # Check if source was updated
     if (
         existing_dict.get("source_id")
@@ -551,7 +566,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
             .delete(ref_name="r")
             .get()
         )
-        neptune.execute_open_cypher_query(openCypherQuery=query_delete)
+        execute_open_cypher_query(query_delete)
         # Delete source if no longer referenced by any other flows
         if check_delete_source(existing_dict["source_id"]):
             publish_event(
@@ -585,7 +600,7 @@ def merge_delete_request(delete_request_dict: dict) -> None:
     # Add Set for Error
     if error:
         query = query.set(serialise_neptune_obj(error, "e."))
-    neptune.execute_open_cypher_query(openCypherQuery=query.get())
+    execute_open_cypher_query(query.get())
 
 
 @tracer.capture_method(capture_response=False)
@@ -612,7 +627,7 @@ def delete_flow(flow_id: str) -> str | None:
         query = query.replace(
             "DETACH DELETE flow", "DETACH DELETE flow DELETE t DELETE e"
         )  # Limitation in Cymple library, unable to stack DELETE
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         return results["results"][0]["source_id"]
     except IndexError:
         return None
@@ -631,7 +646,7 @@ def set_node_property_base(record_type: str, record_id: str, props: dict) -> dic
             .return_literal(constants.RETURN_LITERAL[record_type])
             .get()
         )
-        results = neptune.execute_open_cypher_query(openCypherQuery=query)
+        results = execute_open_cypher_query(query)
         deserialised_results = [
             deserialise_neptune_obj(result[record_type])
             for result in results["results"]
@@ -681,7 +696,7 @@ def set_flow_collection(flow_id: str, username: str, flow_collection: list) -> d
     )
     if query_collection:
         query = query + query_collection
-    neptune.execute_open_cypher_query(openCypherQuery=query.get())
+    execute_open_cypher_query(query.get())
     # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
     return query_node("flow", flow_id)
 
