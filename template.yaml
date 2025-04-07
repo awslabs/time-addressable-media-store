@@ -299,6 +299,25 @@ Resources:
       VisibilityTimeout: 900
       MessageRetentionPeriod: 86400
 
+  WebhooksDeliveryQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      KmsMasterKeyId: alias/aws/sqs
+      VisibilityTimeout: 30
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt WebhooksDeliveryQueueDLQ.Arn
+        maxReceiveCount: 1
+    Condition: SupportWebhooks
+
+  WebhooksDeliveryQueueDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      KmsMasterKeyId: alias/aws/sqs
+      VisibilityTimeout: 30
+      MessageRetentionPeriod: 86400
+    Condition: SupportWebhooks
+
   EventBus:
     Type: AWS::Events::EventBus
     Properties:
@@ -1010,16 +1029,15 @@ Resources:
       Layers:
         - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
         - !Ref UtilsLayer
-      Timeout: 900
       Environment:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-webhooks
-          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           WEBHOOKS_TABLE: !Ref WebhooksTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
           SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
+          WEBHOOKS_QUEUE_URL: !Ref WebhooksDeliveryQueue
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1038,6 +1056,11 @@ Resources:
                 - s3:GetObject
               Resource:
                 - !Sub ${MediaStorageBucket.Arn}/*
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - !GetAtt WebhooksDeliveryQueue.Arn
       Events:
         EventBridge:
           Type: EventBridgeRule
@@ -1047,6 +1070,34 @@ Resources:
             Pattern:
               source:
                 - tams.api
+    Condition: SupportWebhooks
+
+  WebhooksDeliveryFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      VpcConfig: !Ref AWS::NoValue
+      CodeUri: functions/webhooks_delivery/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_SERVICE_NAME: tams-webhooks
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WebhooksDeliveryQueue.Arn
+            BatchSize: 10
+            Enabled: True
     Condition: SupportWebhooks
 
   SqsDeleteRequestsFunction:
