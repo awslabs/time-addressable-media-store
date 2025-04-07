@@ -3,17 +3,14 @@ from collections import defaultdict
 from functools import reduce
 
 import boto3
-from aws_lambda_powertools import Logger, Metrics, Tracer, single_metric
-from aws_lambda_powertools.metrics import MetricUnit
+from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
     EventBridgeEvent,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key, Or
-from requests import Session
-from requests.adapters import HTTPAdapter, Retry
-from schema import Flow, Flowsegment, Source, Webhook
-from utils import generate_presigned_url, get_store_name, model_dump
+from schema import Webhook
+from utils import generate_presigned_url, get_store_name, model_dump, put_message
 
 tracer = Tracer()
 logger = Logger()
@@ -23,6 +20,7 @@ dynamodb = boto3.resource("dynamodb")
 webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
+webhooks_queue = os.environ["WEBHOOKS_QUEUE_URL"]
 store_name = get_store_name()
 
 
@@ -60,49 +58,11 @@ def get_matching_webhooks(event):
 
 
 @tracer.capture_method(capture_response=False)
-def post_event(event, item, get_urls):
-    retries = Retry(
-        total=5,
-        backoff_factor=0.1,
-        status_forcelist=[500],
-        allowed_methods=["POST"],
+def post_event(event, item, get_urls=None):
+    put_message(
+        webhooks_queue,
+        {"event": event.raw_event, "item": model_dump(item), "get_urls": get_urls},
     )
-    s = Session()
-    headers = {"Content-Type": "application/json"}
-    if item.api_key_name and item.api_key_value:
-        headers[item.api_key_name] = item.api_key_value
-    s.mount(item.url, HTTPAdapter(max_retries=retries))
-    # Use associated model to clean the response data
-    match event.detail_type:
-        case "flows/created" | "flows/updated":
-            event.detail["flow"] = model_dump(Flow(**event.detail["flow"]))
-        case "source/created" | "source/updated":
-            event.detail["source"] = model_dump(Source(**event.detail["source"]))
-        case "flows/segments_added":
-            event.detail["segments"][0]["get_urls"] = get_urls
-            event.detail["segments"][0] = model_dump(
-                Flowsegment(**event.detail["segments"][0])
-            )
-    response = s.post(
-        item.url,
-        headers=headers,
-        json={
-            "event_timestamp": event.time,
-            "event_type": event.detail_type,
-            "event": event.detail,
-        },
-        timeout=30,
-    )
-    with single_metric(
-        namespace="Powertools",
-        name=f"StatusCode-{response.status_code}",
-        unit=MetricUnit.Count,
-        value=1,
-    ) as metric:
-        metric.add_dimension(name="url", value=item.url)
-        metric.add_dimension(name="event_type", value=event.detail_type)
-    logger.info(f"Status Code: {response.status_code}")
-    logger.info(response.text)
 
 
 @logger.inject_lambda_context(log_event=True)
@@ -140,7 +100,7 @@ def lambda_handler(event: dict, context: LambdaContext):
             )
     for item in schema_items:
         if event.detail_type != "flows/segments_added":
-            post_event(event, item, None)
+            post_event(event, item)
         elif (
             item.accept_get_urls is None
         ):  # Explictly check for None since empty list is falsey
