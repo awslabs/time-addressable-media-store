@@ -81,22 +81,6 @@ Globals:
       SecurityGroupIds:
         - !Ref LambdaSecurityGroup
 
-  Api:
-    OpenApiVersion: 3.0.1
-    EndpointConfiguration:
-      Type: REGIONAL
-    TracingEnabled: True
-    MethodSettings:
-      - ResourcePath: /*
-        HttpMethod: '*'
-        DataTraceEnabled: True
-        LoggingLevel: INFO
-        MetricsEnabled: True
-    Cors:
-      AllowMethods: '''*'''
-      AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
-      AllowOrigin: '''*'''
-
 Resources:
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
@@ -153,6 +137,16 @@ Resources:
         could for example be implemented using an AWS S3 compatible store using presigned URLs or by
         a simple file system storage with an HTTP frontend. Clients should parse the /service endpoint
         and handle the media store type in use appropriately.
+      OpenApiVersion: 3.0.1
+      EndpointConfiguration:
+        Type: REGIONAL
+      TracingEnabled: True
+      MethodSettings:
+        - ResourcePath: /*
+          HttpMethod: '*'
+          DataTraceEnabled: True
+          LoggingLevel: INFO
+          MetricsEnabled: True
       StageName: Prod
       Auth:
         AddDefaultAuthorizerToCorsPreflight: False
