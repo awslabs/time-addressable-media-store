@@ -16,21 +16,21 @@ with patch('boto3.client') as mock_method:
         from webhooks import app
 
 
-@patch('webhooks.app.tracer', Mock())
 class TestWebhooks():
 
     def test_get_matching_webhooks_single_resource(self, mock_webhooks_table):
         # Setup
+        event_type = "flow.created"
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
-                "detail-type": "video.created",
+                "detail-type": event_type,
                 "resources": ["arn:flow:123"]
             }
         )
 
         expected_items = [{
-            "event": "flow.created",
+            "event": event_type,
             "video_ids": ["123"],
             "url": "https://example.com"
         }]
@@ -45,21 +45,22 @@ class TestWebhooks():
 
         # Verify
         assert len(result) == 1
-        assert result[0].events == ["flow.created"]
+        assert result[0].events == [event_type]
         mock_webhooks_table.query.assert_called_once()
 
     def test_get_matching_webhooks_multiple_resources(self, mock_webhooks_table):
         # Setup
+        event_type = "flow.created"
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
-                "detail-type": "batch.processed",
+                "detail-type": event_type,
                 "resources": ["arn:flow:123", "arn:flow:456"]
             }
         )
 
         expected_items = [{
-            "event": "batch.processed",
+            "event": event_type,
             "video_ids": ["123", "456"],
             "url": "https://example.com"
         }]
@@ -74,7 +75,7 @@ class TestWebhooks():
 
         # Verify
         assert len(result) == 1
-        assert result[0].events == ["batch.processed"]
+        assert result[0].events == [event_type]
 
     def test_get_matching_webhooks_pagination(self, mock_webhooks_table):
         # Setup
@@ -126,15 +127,15 @@ class TestWebhooks():
         # Verify
         assert len(result) == 0
 
-    def test_post_event_detail_type(self, mock_session, mock_response, mock_flow):
+    def test_post_event_detail_type(self, mock_session, mock_response_ok, stub_flow):
         # Setup
-        mock_session.post.return_value = mock_response
+        mock_session.post.return_value = mock_response_ok
         detail_type = "flows/created"
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
                 "detail-type": detail_type,
-                "detail": {"flow": mock_flow}
+                "detail": {"flow": stub_flow}
             }
         )
         item = Webhookpost(url="https://example.com/webhook", events=[])
@@ -154,15 +155,15 @@ class TestWebhooks():
         assert "event_timestamp" in called_args[1]["json"]
         assert called_args[1]["json"]["event_type"] == detail_type
 
-    def test_post_event_with_api_key(self, mock_session, mock_source, mock_response):
+    def test_post_event_with_api_key(self, mock_session, stub_source, mock_response_ok):
         # Setup
-        mock_session.post.return_value = mock_response
+        mock_session.post.return_value = mock_response_ok
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
                 "detail-type": "source/created",
                 "detail": {
-                    "source": mock_source
+                    "source": stub_source
                 }
             }
         )
@@ -187,17 +188,17 @@ class TestWebhooks():
             "X-API-Key": "secret-key"
         }
 
-    def test_post_event_segments_added(self, mock_session, mock_flow, mock_flowsegment, mock_response):
+    def test_post_event_segments_added(self, mock_session, stub_flow, stub_flowsegment, mock_response_ok):
         # Setup
-        mock_session.post.return_value = mock_response
+        mock_session.post.return_value = mock_response_ok
         get_urls = [{"url": "https://example.com/video"}]
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
                 "detail-type": "flows/segments_added",
                 "detail": {
-                    "flow": mock_flow,
-                    "segments": [mock_flowsegment]
+                    "flow": stub_flow,
+                    "segments": [stub_flowsegment]
                 }
             }
         )
@@ -223,15 +224,15 @@ class TestWebhooks():
         ("flows/created", "flow"),
         ("flows/updated", "flow"),
     ])
-    def test_post_event_flow_types(self, mock_session, mock_response, mock_flow, detail_type, detail_key):
+    def test_post_event_flow_types(self, mock_session, mock_response_ok, stub_flow, detail_type, detail_key):
         # Setup
-        mock_session.post.return_value = mock_response
+        mock_session.post.return_value = mock_response_ok
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
                 "detail-type": detail_type,
                 "detail": {
-                    "flow": mock_flow
+                    "flow": stub_flow
                 }
             }
         )
@@ -251,18 +252,18 @@ class TestWebhooks():
         ("source/created", "source"),
         ("source/updated", "source"),
     ])
-    def test_post_event_source_types(self, mock_session, mock_response, mock_source, detail_type, detail_key):
+    def test_post_event_source_types(self, mock_session, mock_response_ok, stub_source, detail_type, detail_key):
         # Setup
-        mock_session.post.return_value = mock_response
+        mock_session.post.return_value = mock_response_ok
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
                 "detail-type": detail_type,
                 "detail": {
-                    # "source": mock_source,
+                    # "source": stub_source,
                     detail_key: {
-                        "id": mock_source["id"],
-                        "format": mock_source["format"]
+                        "id": stub_source["id"],
+                        "format": stub_source["format"]
                     },
                 }
             }
@@ -279,13 +280,13 @@ class TestWebhooks():
         called_args = mock_session.post.call_args
         assert called_args[1]["json"]["event_type"] == detail_type
 
-    def test_post_event_timeout(self, mock_flow):
+    def test_post_event_timeout(self, stub_flow):
         # Setup
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
                 "detail-type": "flows/created",
-                "detail": {"flow": mock_flow}
+                "detail": {"flow": stub_flow}
             }
         )
         item = Webhookpost(url="https://example.com/webhook", events=[])

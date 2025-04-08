@@ -1,6 +1,5 @@
 import logging
-from unittest.mock import Mock, patch
-from unittest.mock import MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from requests import Response
 
 import pytest
@@ -14,7 +13,7 @@ def mock_webhooks_table():
 
 
 @pytest.fixture
-def mock_response():
+def mock_response_ok():
     response = Mock(spec=Response)
     response.status_code = 200
     return response
@@ -29,7 +28,7 @@ def mock_session():
 
 
 @pytest.fixture
-def mock_source():
+def stub_source():
     return {
         "id": "5da9130f-883b-4da4-8ad2-adb54b925e9f",
         "label": "Studio Camera 1",
@@ -71,7 +70,7 @@ def mock_source():
 
 
 @pytest.fixture
-def mock_flow():
+def stub_flow():
     return {
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "source_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -98,7 +97,7 @@ def mock_flow():
 
 
 @pytest.fixture
-def mock_flowsegment():
+def stub_flowsegment():
     return {
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "flow_id": "550e8400-e29b-41d4-a716-446655440001",
