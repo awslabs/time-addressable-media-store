@@ -4,3 +4,6 @@ boto3
 mediatimestamp
 cymple
 pyaml
+aws-lambda-powertools==3.9.0
+pydantic==2.11.2
+aws-xray-sdk==2.14.0
