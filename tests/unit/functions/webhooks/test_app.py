@@ -279,7 +279,7 @@ class TestWebhooks():
         called_args = mock_session.post.call_args
         assert called_args[1]["json"]["event_type"] == detail_type
 
-    def test_post_event_timeout(self, stub_flow):
+    def test_post_event_timeout(self, stub_flow, mock_session):
         # Setup
         event = EventBridgeEvent(
             {
@@ -290,12 +290,6 @@ class TestWebhooks():
         )
         item = Webhookpost(url="https://example.com/webhook", events=[])
 
-        # Execute and Verify
-        with patch('webhooks.app.Session') as mock_session_class:
-            session_instance = Mock()
-            session_instance.post.side_effect = TimeoutError(
-                "Request timed out")
-            mock_session_class.return_value = session_instance
-
-            with pytest.raises(TimeoutError):
+        mock_session.post.side_effect = TimeoutError("Request timed out")
+        with pytest.raises(TimeoutError):
                 app.post_event(event, item, None)
