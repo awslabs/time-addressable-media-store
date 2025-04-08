@@ -260,7 +260,6 @@ class TestWebhooks():
                 "time": "2023-01-01T00:00:00Z",
                 "detail-type": detail_type,
                 "detail": {
-                    # "source": stub_source,
                     detail_key: {
                         "id": stub_source["id"],
                         "format": stub_source["format"]
