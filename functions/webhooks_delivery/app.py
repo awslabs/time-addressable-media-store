@@ -68,5 +68,4 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
         ) as metric:
             metric.add_dimension(name="url", value=webhook.url)
             metric.add_dimension(name="event_type", value=event.detail_type)
-        logger.info(f"Status Code: {response.status_code}")
-        logger.info(response.text)
+        logger.info(f"Status Code: {response.status_code}", response_text=response.text)
