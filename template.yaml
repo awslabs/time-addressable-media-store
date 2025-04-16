@@ -1534,6 +1534,8 @@ Resources:
             Queue: !GetAtt WebhooksDeliveryQueue.Arn
             BatchSize: 10
             Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
     Condition: SupportWebhooks
 
   SqsDeleteRequestsFunction:
@@ -1595,6 +1597,8 @@ Resources:
             Queue: !GetAtt DeleteRequestQueue.Arn
             BatchSize: 10
             Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
   SqsObjectCleanupFunction:
     Type: AWS::Serverless::Function
@@ -1639,6 +1643,8 @@ Resources:
             Queue: !GetAtt CleanupS3Queue.Arn
             BatchSize: 10
             Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
   UserPool:
     Type: AWS::Cognito::UserPool
