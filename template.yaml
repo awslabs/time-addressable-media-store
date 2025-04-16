@@ -318,6 +318,24 @@ Resources:
       MessageRetentionPeriod: 86400
     Condition: SupportWebhooks
 
+  WebhooksDeliveryQueueDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: TAMS Webhooks DLQ Queue has visible messages
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Statistic: Average
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt WebhooksDeliveryQueueDLQ.QueueName
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: missing
+    Condition: SupportWebhooks
+
   EventBus:
     Type: AWS::Events::EventBus
     Properties:
