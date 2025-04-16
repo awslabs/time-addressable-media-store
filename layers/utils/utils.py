@@ -106,6 +106,7 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
 
 
 @tracer.capture_method(capture_response=False)
+@lru_cache()
 def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
     service_dict = parameters.get_parameter(info_param_name, transform="json")
@@ -259,11 +260,11 @@ def deserialise_neptune_obj(obj: dict) -> dict:
 
 
 @tracer.capture_method(capture_response=False)
-def parse_parameters(parameters: dict) -> tuple[defaultdict, list]:
+def parse_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     """Parses API Gateway parameters into the structure used by OpenCypher query"""
     where_literals = []
     return_dict = defaultdict(dict)
-    for key, value in parameters.items():
+    for key, value in query_parameters.items():
         if value:
             if key in essence_params:
                 if essence_params[key] == "int":
