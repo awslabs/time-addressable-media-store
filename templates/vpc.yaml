@@ -116,11 +116,9 @@ Resources:
       VpcId: !Ref Vpc
       GroupDescription: Endpoints
       SecurityGroupEgress:
-        - CidrIp: 0.0.0.0/32
+        - CidrIp: 127.0.0.1/32
           Description: Disallow all traffic
-          IpProtocol: icmp
-          FromPort: 1
-          ToPort: 1
+          IpProtocol: "-1"
       SecurityGroupIngress:
         - CidrIp: !FindInMap [SubnetConfig,  VPC, CIDR]
           Description: https only inbound
