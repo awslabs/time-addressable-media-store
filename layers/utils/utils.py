@@ -14,6 +14,7 @@ import boto3
 import constants
 from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.utilities import parameters
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import (
     APIGatewayEventRequestContext,
@@ -105,11 +106,9 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
 
 
 @tracer.capture_method(capture_response=False)
-@lru_cache()
 def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
-    get_parameter = ssm.get_parameter(Name=info_param_name)
-    service_dict = json.loads(get_parameter["Parameter"]["Value"])
+    service_dict = parameters.get_parameter(info_param_name, transform="json")
     if service_dict.get("name") is None:
         return "tams"
     return service_dict["name"]
