@@ -52,12 +52,15 @@ from utils import (
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
-metrics = Metrics(namespace="Powertools")
+app = APIGatewayRestResolver(
+    enable_validation=True, cors=CORSConfig(expose_headers=["*"])
+)
+metrics = Metrics()
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
+store_name = get_store_name()
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 
@@ -87,9 +90,8 @@ def get_flow_segments_by_id(
     items = query["Items"]
     custom_headers = {}
     while "LastEvaluatedKey" in query and len(items) < args["Limit"]:
-        query = segments_table.query(
-            **args, ExclusiveStartKey=query["LastEvaluatedKey"]
-        )
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**args)
         items.extend(query["Items"])
     match len(items):
         case 0:
@@ -273,9 +275,8 @@ def check_overlapping_segments(flow_id, segment_timerange):
     query = segments_table.query(**args)
     items = query["Items"]
     while "LastEvaluatedKey" in query:
-        query = segments_table.query(
-            **args, ExclusiveStartKey=query["LastEvaluatedKey"]
-        )
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**args)
         items.extend(query["Items"])
     return len(items) > 0
 
@@ -289,7 +290,7 @@ def get_presigned_url(key):
 @tracer.capture_method(capture_response=False)
 def get_nonsigned_url(key):
     return GetUrl(
-        label=f"aws.{bucket_region}:s3:{get_store_name()}",
+        label=f"aws.{bucket_region}:s3:{store_name}",
         url=f"https://{bucket}.s3.{bucket_region}.amazonaws.com/{key}",
     )
 
@@ -328,7 +329,7 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
             )
             if item.object_id in presigned_urls:
                 presigned_get_url = GetUrl(
-                    label=f"aws.{bucket_region}:s3.presigned:{get_store_name()}",
+                    label=f"aws.{bucket_region}:s3.presigned:{store_name}",
                     url=presigned_urls[item.object_id],
                 )
                 item.get_urls.append(presigned_get_url)

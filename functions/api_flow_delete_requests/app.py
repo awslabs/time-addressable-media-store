@@ -11,8 +11,10 @@ from utils import model_dump
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
-metrics = Metrics(namespace="Powertools")
+app = APIGatewayRestResolver(
+    enable_validation=True, cors=CORSConfig(expose_headers=["*"])
+)
+metrics = Metrics()
 record_type = "delete_request"
 
 

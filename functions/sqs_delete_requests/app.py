@@ -16,7 +16,7 @@ from utils import publish_event
 
 tracer = Tracer()
 logger = Logger()
-metrics = Metrics(namespace="Powertools")
+metrics = Metrics()
 
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
