@@ -14,7 +14,7 @@ from utils import model_dump
 
 tracer = Tracer()
 logger = Logger()
-metrics = Metrics(namespace="Powertools")
+metrics = Metrics()
 
 
 @logger.inject_lambda_context(log_event=True)
@@ -61,7 +61,6 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
             timeout=30,
         )
         with single_metric(
-            namespace="Powertools",
             name=f"StatusCode-{response.status_code}",
             unit=MetricUnit.Count,
             value=1,
