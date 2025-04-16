@@ -55,7 +55,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
-metrics = Metrics(namespace="Powertools")
+metrics = Metrics()
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]

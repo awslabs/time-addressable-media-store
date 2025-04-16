@@ -14,7 +14,7 @@ from utils import generate_presigned_url, get_store_name, model_dump, put_messag
 
 tracer = Tracer()
 logger = Logger()
-metrics = Metrics(namespace="Powertools")
+metrics = Metrics()
 
 dynamodb = boto3.resource("dynamodb")
 webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])

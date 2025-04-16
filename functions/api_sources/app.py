@@ -41,7 +41,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
-metrics = Metrics(namespace="Powertools")
+metrics = Metrics()
 
 record_type = "source"
 event_bus = os.environ["EVENT_BUS"]

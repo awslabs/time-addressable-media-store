@@ -376,6 +376,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-service
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
@@ -461,6 +462,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-sources
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
@@ -613,6 +615,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-flows
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
@@ -885,6 +888,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-segments
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
@@ -982,6 +986,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-deletion
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
       Policies:
         - Version: "2012-10-17"
@@ -1033,6 +1038,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-webhooks
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           WEBHOOKS_TABLE: !Ref WebhooksTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
@@ -1090,7 +1096,8 @@ Resources:
       Environment:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
-          POWERTOOLS_SERVICE_NAME: tams-webhooks
+          POWERTOOLS_SERVICE_NAME: tams-webhooks-delivery
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
       Events:
         SQSEvent:
           Type: SQS
@@ -1119,6 +1126,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-sqs-delete-requests
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
@@ -1178,6 +1186,7 @@ Resources:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-cleanup
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           BUCKET: !Ref MediaStorageBucket

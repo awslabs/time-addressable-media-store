@@ -17,7 +17,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
-metrics = Metrics(namespace="Powertools")
+metrics = Metrics()
 
 dynamodb = boto3.resource("dynamodb")
 table_name = os.environ.get("WEBHOOKS_TABLE", None)
