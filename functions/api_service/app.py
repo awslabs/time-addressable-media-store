@@ -14,8 +14,10 @@ from utils import filter_dict, info_param_name, model_dump, ssm
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
-metrics = Metrics(namespace="Powertools")
+app = APIGatewayRestResolver(
+    enable_validation=True, cors=CORSConfig(expose_headers=["*"])
+)
+metrics = Metrics()
 
 dynamodb = boto3.resource("dynamodb")
 table_name = os.environ.get("WEBHOOKS_TABLE", None)

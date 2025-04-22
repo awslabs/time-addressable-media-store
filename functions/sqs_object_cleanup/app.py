@@ -11,7 +11,7 @@ from dynamodb import segments_table
 
 tracer = Tracer()
 logger = Logger()
-metrics = Metrics(namespace="Powertools")
+metrics = Metrics()
 
 s3 = boto3.client("s3")
 bucket = os.environ["BUCKET"]

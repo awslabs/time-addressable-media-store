@@ -38,8 +38,10 @@ from utils import (
 
 tracer = Tracer()
 logger = Logger()
-app = APIGatewayRestResolver(enable_validation=True, cors=CORSConfig())
-metrics = Metrics(namespace="Powertools")
+app = APIGatewayRestResolver(
+    enable_validation=True, cors=CORSConfig(expose_headers=["*"])
+)
+metrics = Metrics()
 
 record_type = "source"
 event_bus = os.environ["EVENT_BUS"]
