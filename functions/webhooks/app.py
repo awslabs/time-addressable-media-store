@@ -34,7 +34,6 @@ attribute_mappings = {
 
 @tracer.capture_method(capture_response=False)
 def get_matching_webhooks(event):
-    # print(event)
     expressions = defaultdict(list)
     for resource in event.resources:
         _, resource_type, resource_id = resource.split(":")
@@ -49,7 +48,6 @@ def get_matching_webhooks(event):
     args = {"KeyConditionExpression": Key("event").eq(event.detail_type)}
     if len(filter_expressions) > 0:
         args["FilterExpression"] = reduce(And, filter_expressions)
-    # print(args)
     query = webhooks_table.query(**args)
     items = query["Items"]
     while "LastEvaluatedKey" in query:

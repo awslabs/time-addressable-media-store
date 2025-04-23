@@ -107,7 +107,6 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
 def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
     get_parameter = ssm.get_parameter(Name=info_param_name)
-    print(get_parameter)
     service_dict = json.loads(get_parameter["Parameter"]["Value"])
     if service_dict.get("name") is None:
         return "tams"
@@ -313,7 +312,6 @@ def publish_event(detail_type: str, details: dict, resources) -> None:
 @tracer.capture_method(capture_response=False)
 def put_message(queue: str, item: dict) -> None:
     """Publishs a message to SQS"""
-    print("cde")
     sqs.send_message(
         QueueUrl=queue,
         MessageBody=json.dumps(item),
