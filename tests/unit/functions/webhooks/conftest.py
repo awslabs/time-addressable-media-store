@@ -19,6 +19,19 @@ def mock_lambda_context():
 @pytest.fixture
 def stub_source():
     return {
+        "id": "2aa143ac-0ab7-4d75-bc32-5c00c13d186f",
+        "format": "urn:x-nmos:format:video",
+        "label": "bbb",
+        "description": "Big Buck Bunny video",
+        "created_by": "tams-dev",
+        "updated_by": "tams-dev",
+        "created": "2008-05-27T18:51:00Z",
+        "updated": "2008-05-27T18:51:00Z",
+        "collected_by": [
+            "86761f3a-5998-4cfe-9a89-8459bcb8ea52"
+        ]
+}
+    return {
         "id": "5da9130f-883b-4da4-8ad2-adb54b925e9f",
         "label": "Studio Camera 1",
         "description": "Primary studio camera",
