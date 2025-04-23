@@ -189,11 +189,14 @@ class TestWebhooks():
     @patch('webhooks.app.post_event')
     def test_handler_posts_for_each_webhook(self, post_event, webhook_count, mock_lambda_context):
         detail_type = "flow.created"
-        event = {
-            "time": "2023-01-01T00:00:00Z",
-            "detail-type": detail_type,
-            "resources": ["arn:flow:123"]
-        }
+
+        event = EventBridgeEvent(
+            {
+                "time": "2023-01-01T00:00:00Z",
+                "detail-type": detail_type,
+                "resources": ["arn:flow:123"]
+            }
+        )
 
         return_items = []
         for i in range(webhook_count):
