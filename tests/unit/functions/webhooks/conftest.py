@@ -1,31 +1,20 @@
 import logging
 from unittest.mock import Mock, MagicMock, patch
 from requests import Response
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
 import pytest
 
 logger = logging.getLogger(__name__)
 
-
 @pytest.fixture
-def mock_webhooks_table():
-    return Mock()
-
-
-@pytest.fixture
-def mock_response_ok():
-    response = Mock(spec=Response)
-    response.status_code = 200
-    return response
-
-
-@pytest.fixture
-def mock_session():
-    with patch('webhooks.app.Session') as mock:
-        session_instance = Mock()
-        mock.return_value = session_instance
-        yield session_instance
-
+def mock_lambda_context():
+    context = LambdaContext()
+    context._function_name = "test"
+    context._memory_limit_in_mb = 128
+    context._invoked_function_arn = "XXXXXXXXXXXXXXXXX"
+    context._aws_request_id = "XXXXXXXXXXXXXXXXX"
+    return context
 
 @pytest.fixture
 def stub_source():

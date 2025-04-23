@@ -34,6 +34,7 @@ attribute_mappings = {
 
 @tracer.capture_method(capture_response=False)
 def get_matching_webhooks(event):
+    # print(event)
     expressions = defaultdict(list)
     for resource in event.resources:
         _, resource_type, resource_id = resource.split(":")
@@ -48,6 +49,7 @@ def get_matching_webhooks(event):
     args = {"KeyConditionExpression": Key("event").eq(event.detail_type)}
     if len(filter_expressions) > 0:
         args["FilterExpression"] = reduce(And, filter_expressions)
+    # print(args)
     query = webhooks_table.query(**args)
     items = query["Items"]
     while "LastEvaluatedKey" in query:
@@ -71,16 +73,6 @@ def post_event(event, item, get_urls=None):
 # pylint: disable=unused-argument
 def lambda_handler(event: dict, context: LambdaContext):
     event: EventBridgeEvent = EventBridgeEvent(event)
-    query = webhooks_table.query(
-        KeyConditionExpression=Key("event").eq(event.detail_type),
-    )
-    items = query["Items"]
-    while "LastEvaluatedKey" in query:
-        query = webhooks_table.query(
-            KeyConditionExpression=Key("event").eq(event.detail_type),
-            ExclusiveStartKey=query["LastEvaluatedKey"],
-        )
-        items.extend(query["Items"])
     schema_items = get_matching_webhooks(event)
     if event.detail_type == "flows/segments_added":
         need_presigned_urls = any(
