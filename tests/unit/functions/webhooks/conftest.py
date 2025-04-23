@@ -88,6 +88,22 @@ def stub_flow():
 @pytest.fixture
 def stub_flowsegment():
     return {
+        "flow_id": "550e8400-e29b-41d4-a716-446655440001",
+        "segments": [
+            {
+                "object_id": "550e8400-e29b-41d4-a716-446655440002",
+                "timerange": "[0:0_6:0)",
+                "last_duration": "string",
+                "get_urls": [
+                    {
+                        "label": "aws.eu-west-2:s3:Example TAMS",
+                        "url": "https://BUCKET.s3.REGION.amazonaws.com/550e8400-e29b-41d4-a716-446655440002"
+                    }
+                ]
+            }
+        ]
+    }
+    return {
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "flow_id": "550e8400-e29b-41d4-a716-446655440001",
         "object_id": "550e8400-e29b-41d4-a716-446655440002",
