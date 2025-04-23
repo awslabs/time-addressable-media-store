@@ -7,6 +7,7 @@ import pytest
 
 logger = logging.getLogger(__name__)
 
+
 @pytest.fixture
 def mock_lambda_context():
     context = LambdaContext()
@@ -15,6 +16,7 @@ def mock_lambda_context():
     context._invoked_function_arn = "XXXXXXXXXXXXXXXXX"
     context._aws_request_id = "XXXXXXXXXXXXXXXXX"
     return context
+
 
 @pytest.fixture
 def stub_source():
@@ -30,44 +32,6 @@ def stub_source():
         "collected_by": [
             "86761f3a-5998-4cfe-9a89-8459bcb8ea52"
         ]
-}
-    return {
-        "id": "5da9130f-883b-4da4-8ad2-adb54b925e9f",
-        "label": "Studio Camera 1",
-        "description": "Primary studio camera",
-        "format": "urn:x-nmos:format:video",
-        "caps": {
-            "media_types": ["video/h264", "video/raw"],
-            "frame_rates": [
-                {
-                    "numerator": 30,
-                    "denominator": 1
-                },
-                {
-                    "numerator": 60,
-                    "denominator": 1
-                }
-            ],
-            "frame_widths": [1920, 3840],
-            "frame_heights": [1080, 2160],
-            "interlace_modes": ["progressive"],
-            "colorspaces": ["BT709"],
-            "bit_depths": [8, 10],
-            "sample_rates": None,
-            "channels": None
-        },
-        "tags": {
-            "location": "Studio A",
-            "manufacturer": "Sony",
-            "model": "HDC-3500"
-        },
-        "device_id": "550e8400-e29b-41d4-a716-446655440001",
-        "parents": [],
-        "clock_name": "clk0",
-        "created": "2024-01-23T10:00:00Z",
-        "updated": "2024-01-23T10:00:00Z",
-        "created_by": "system_user",
-        "updated_by": "system_user"
     }
 
 
@@ -115,41 +79,4 @@ def stub_flowsegment():
                 ]
             }
         ]
-    }
-    return {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "flow_id": "550e8400-e29b-41d4-a716-446655440001",
-        "object_id": "550e8400-e29b-41d4-a716-446655440002",
-        "timerange": "0:0",
-        "duration": 300000000,
-        "format": "urn:x-nmos:format:video",
-        "storage": {
-            "type": "s3",
-            "bucket": "XXXXXXXXXXXX",
-            "key": "videos/550e8400-e29b-41d4-a716-446655440000.mp4",
-            "size": 15728640
-        },
-        "essence_parameters": {
-            "frame_width": 1920,
-            "frame_height": 1080,
-            "frame_rate": {
-                "numerator": 30,
-                "denominator": 1
-            },
-            "bit_depth": 10,
-            "colorspace": "BT709",
-            "interlace_mode": "progressive"
-        },
-        "codec": "video/h264",
-        "container": "video/mp4",
-        "avg_bit_rate": 8000000,
-        "max_bit_rate": 12000000,
-        "created": "2024-01-23T10:00:00Z",
-        "updated": "2024-01-23T10:00:00Z",
-        "created_by": "system_user",
-        "updated_by": "system_user",
-        "tags": {
-            "scene": "interview",
-            "take": "1"
-        }
     }
