@@ -81,22 +81,6 @@ Globals:
       SecurityGroupIds:
         - !Ref LambdaSecurityGroup
 
-  Api:
-    OpenApiVersion: 3.0.1
-    EndpointConfiguration:
-      Type: REGIONAL
-    TracingEnabled: True
-    MethodSettings:
-      - ResourcePath: /*
-        HttpMethod: '*'
-        DataTraceEnabled: True
-        LoggingLevel: INFO
-        MetricsEnabled: True
-    Cors:
-      AllowMethods: '''*'''
-      AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
-      AllowOrigin: '''*'''
-
 Resources:
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
@@ -140,8 +124,30 @@ Resources:
   Api:
     Type: AWS::Serverless::Api
     Properties:
+      Name: Time-addressable Media Store
+      Description: |
+        The Time-addressable Media Store (TAMS) is used for storing segmented media flows.
+        The TAMS consists of a media store for the media flow segment objects and a service providing
+        a database index of the flow segments. This document is a specification of the service API.
+
+        See the [bbc/tams](https://github.com/bbc/tams) repository for more background on TAMS.
+
+        **Note**: the examples provided in this specification are for a system which uses a media
+        store that provides HTTP URLs for uploading and downloading media objects in buckets. This
+        could for example be implemented using an AWS S3 compatible store using presigned URLs or by
+        a simple file system storage with an HTTP frontend. Clients should parse the /service endpoint
+        and handle the media store type in use appropriately.
+      OpenApiVersion: 3.0.1
+      EndpointConfiguration:
+        Type: REGIONAL
+      TracingEnabled: True
+      MethodSettings:
+        - ResourcePath: /*
+          HttpMethod: '*'
+          DataTraceEnabled: True
+          LoggingLevel: INFO
+          MetricsEnabled: True
       StageName: Prod
-      Mode: overwrite
       Auth:
         AddDefaultAuthorizerToCorsPreflight: False
         DefaultAuthorizer: Authorizor
@@ -150,11 +156,6 @@ Resources:
             UserPoolArn: !GetAtt UserPool.Arn
             Identity:
               Header: Authorization
-      DefinitionBody:
-        Fn::Transform:
-          Name: AWS::Include
-          Parameters:
-            Location: api/openapi.yaml
 
   ServiceInformationParameter:
     Type: AWS::SSM::Parameter
@@ -413,36 +414,124 @@ Resources:
               Resource:
                 - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
       Events:
+        headRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+        getRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
+        headService:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getService:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /service
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         postService:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /service
-            Method: post
+            Method: Post
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Post]
         headServiceWebhooks:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /service/webhooks
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getServiceWebhooks:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /service/webhooks
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         postServiceWebhooks:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /service/webhooks
-            Method: post
+            Method: Post
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Post]
+        anyRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /
+            Method: Any
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+                - !FindInMap [OAuth, Scopes, Get]
+                - !FindInMap [OAuth, Scopes, Put]
+                - !FindInMap [OAuth, Scopes, Post]
+                - !FindInMap [OAuth, Scopes, Delete]
+        proxyPath:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /{proxy+}
+            Method: Any
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+                - !FindInMap [OAuth, Scopes, Get]
+                - !FindInMap [OAuth, Scopes, Put]
+                - !FindInMap [OAuth, Scopes, Post]
+                - !FindInMap [OAuth, Scopes, Delete]
 
   ServiceFunctionRoleWebhooksPolicy:
     Type: AWS::IAM::RolePolicy
@@ -510,109 +599,199 @@ Resources:
           Properties:
             RestApiId: !Ref Api
             Path: /sources
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getSources:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         headSourcesSourceid:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getSourcesSourceid:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         headSourcesSourceidTags:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/tags
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getSourcesSourceidTags:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/tags
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         headSourcesSourceidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/tags/{name}
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getSourcesSourceidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/tags/{name}
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putSourcesSourceidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/tags/{name}
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteSourcesSourceidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/tags/{name}
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headSourcesSourceidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/description
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getSourcesSourceidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/description
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putSourcesSourceidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/description
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteSourcesSourceidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/description
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headSourcesSourceidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/label
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getSourcesSourceidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/label
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putSourcesSourceidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/label
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteSourcesSourceidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /sources/{sourceId}/label
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
 
   FlowsFunction:
     Type: AWS::Serverless::Function
@@ -681,211 +860,397 @@ Resources:
           Properties:
             RestApiId: !Ref Api
             Path: /flows
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlows:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         headFlowsFlowid:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowid:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowid:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteFlowsFlowid:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
+        headFlowsFlowidTags:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/tags
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidTags:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/tags
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         headFlowsFlowidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/tags/{name}
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/tags/{name}
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/tags/{name}
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteFlowsFlowidTagsName:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/tags/{name}
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headFlowsFlowidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/description
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/description
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/description
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteFlowsFlowidDescription:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/description
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headFlowsFlowidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteFlowsFlowidLabel:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/label
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headFlowsFlowidFlowCollection:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/flow_collection
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidFlowCollection:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/flow_collection
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowidFlowCollection:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/flow_collection
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteFlowsFlowidFlowCollection:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/flow_collection
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headFlowsFlowidMaxBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/max_bit_rate
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidMaxBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/max_bit_rate
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowidMaxBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/max_bit_rate
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteFlowsFlowidMaxBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/max_bit_rate
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headFlowsFlowidAvgBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/avg_bit_rate
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidAvgBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/avg_bit_rate
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowidAvgBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/avg_bit_rate
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         deleteFlowsFlowidAvgBitRate:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/avg_bit_rate
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headFlowsFlowidReadonly:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/read_only
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidReadonly:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/read_only
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         putFlowsFlowidReadonly:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/read_only
-            Method: put
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
         postFlowsFlowidStorage:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/storage
-            Method: post
+            Method: Post
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Post]
 
   FlowSegmentsFunction:
     Type: AWS::Serverless::Function
@@ -966,25 +1331,45 @@ Resources:
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/segments
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowsFlowidSegments:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/segments
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         postFlowsFlowidSegments:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/segments
-            Method: post
+            Method: Post
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Post]
         deleteFlowsFlowidSegments:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/segments
-            Method: delete
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
 
   FlowDeleteRequestsFunction:
     Type: AWS::Serverless::Function
@@ -1019,24 +1404,50 @@ Resources:
                 StringEquals:
                   neptune-db:QueryLanguage: OpenCypher
       Events:
+        headFlowDeleteRequests:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flow-delete-requests
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowDeleteRequests:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flow-delete-requests
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         headFlowDeleteRequestsRequestId:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flow-delete-requests/{request-id}
-            Method: head
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
         getFlowDeleteRequestsRequestId:
           Type: Api
           Properties:
             RestApiId: !Ref Api
             Path: /flow-delete-requests/{request-id}
-            Method: get
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
 
   WebhooksFunction:
     Type: AWS::Serverless::Function
@@ -1123,6 +1534,8 @@ Resources:
             Queue: !GetAtt WebhooksDeliveryQueue.Arn
             BatchSize: 10
             Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
     Condition: SupportWebhooks
 
   SqsDeleteRequestsFunction:
@@ -1184,6 +1597,8 @@ Resources:
             Queue: !GetAtt DeleteRequestQueue.Arn
             BatchSize: 10
             Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
   SqsObjectCleanupFunction:
     Type: AWS::Serverless::Function
@@ -1228,6 +1643,8 @@ Resources:
             Queue: !GetAtt CleanupS3Queue.Arn
             BatchSize: 10
             Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
   UserPool:
     Type: AWS::Cognito::UserPool

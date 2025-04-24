@@ -1,6 +1,6 @@
-import json
 import os
 from http import HTTPStatus
+from typing import Optional
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -13,7 +13,10 @@ from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     NotFoundError,
 )
-from aws_lambda_powertools.event_handler.openapi.params import Path
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
+)
+from aws_lambda_powertools.event_handler.openapi.params import Body, Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from neptune import (
@@ -25,15 +28,15 @@ from neptune import (
     query_sources,
     set_node_property,
 )
-from schema import Source, Tags, Uuid
+from schema import Contentformat, Source, Tags, Uuid
 from typing_extensions import Annotated
 from utils import (
     generate_link_url,
     get_username,
     model_dump,
     parse_claims,
+    parse_tag_parameters,
     publish_event,
-    validate_query_string,
 )
 
 tracer = Tracer()
@@ -52,14 +55,28 @@ UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 @app.head("/sources")
 @app.get("/sources")
 @tracer.capture_method(capture_response=False)
-def list_sources():
-    parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
+def list_sources(
+    param_label: Annotated[Optional[str], Query(alias="label")] = None,
+    param_format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
+    param_page: Annotated[Optional[str], Query(alias="page")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
+):
+    param_tag_values, param_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters
+    )
     custom_headers = {}
-    if parameters and "limit" in parameters:
-        custom_headers["X-Paging-Limit"] = parameters["limit"]
-    items, next_page = query_sources(parameters)
+    if param_limit:
+        custom_headers["X-Paging-Limit"] = str(param_limit)
+    items, next_page = query_sources(
+        {
+            "label": param_label,
+            "tag_values": param_tag_values,
+            "tag_exists": param_tag_exists,
+            "format": param_format.value if param_format else None,
+            "page": param_page,
+            "limit": param_limit,
+        }
+    )
     if next_page:
         custom_headers["X-Paging-NextKey"] = str(next_page)
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
@@ -81,9 +98,11 @@ def list_sources():
 @app.head("/sources/<sourceId>")
 @app.get("/sources/<sourceId>")
 @tracer.capture_method(capture_response=False)
-def get_source_details(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_source_details(
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, sourceId)
+        item = query_node(record_type, source_id)
     except ValueError as e:
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -94,9 +113,11 @@ def get_source_details(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 @app.head("/sources/<sourceId>/tags")
 @app.get("/sources/<sourceId>/tags")
 @tracer.capture_method(capture_response=False)
-def get_source_tags(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_source_tags(
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
     try:
-        tags = query_node_tags(record_type, sourceId)
+        tags = query_node_tags(record_type, source_id)
     except ValueError as e:
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -108,36 +129,35 @@ def get_source_tags(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 @app.get("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def get_source_tag_value(
-    sourceId: Annotated[str, Path(pattern=UUID_PATTERN)], name: str
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+    tag_name: Annotated[str, Path(alias="name")],
 ):
     try:
-        tags = query_node_tags(record_type, sourceId)
+        tags = query_node_tags(record_type, source_id)
     except ValueError as e:
         raise NotFoundError("The requested Source or tag does not exist.") from e  # 404
-    if name not in tags:
+    if tag_name not in tags:
         raise NotFoundError("The requested Source or tag does not exist.")  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return tags[name], HTTPStatus.OK.value  # 200
+    return tags[tag_name], HTTPStatus.OK.value  # 200
 
 
 @app.put("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def put_source_tag_value(
-    sourceId: Annotated[str, Path(pattern=UUID_PATTERN)], name: str
+    tag_value: Annotated[str, Body()],
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+    tag_name: Annotated[str, Path(alias="name")],
 ):
-    if not check_node_exists(record_type, sourceId):
+    if not check_node_exists(record_type, source_id):
         raise NotFoundError(
             "The requested Source does not exist, or the tag name in the path is invalid."
         )  # 404
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, str):
-        raise BadRequestError("Bad request. Invalid Source tag value.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": body})
+    item_dict = set_node_property(
+        record_type, source_id, username, {f"t.{tag_name}": tag_value}
+    )
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -148,19 +168,24 @@ def put_source_tag_value(
 
 @app.delete("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def delete_source_tag(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)], name: str):
+def delete_source_tag(
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+    tag_name: Annotated[str, Path(alias="name")],
+):
     try:
-        item = query_node(record_type, sourceId)
+        item = query_node(record_type, source_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested Source ID or tag in the path is invalid."
         ) from e  # 404
-    if name not in item["tags"]:
+    if tag_name not in item["tags"]:
         raise NotFoundError(
             "The requested Source ID or tag in the path is invalid."
         )  # 404
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_node_property(record_type, sourceId, username, {f"t.{name}": None})
+    item_dict = set_node_property(
+        record_type, source_id, username, {f"t.{tag_name}": None}
+    )
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -172,9 +197,11 @@ def delete_source_tag(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)], name
 @app.head("/sources/<sourceId>/description")
 @app.get("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def get_source_description(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_source_description(
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
     try:
-        description = query_node_property(record_type, sourceId, "description")
+        description = query_node_property(record_type, source_id, "description")
     except ValueError as e:
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -184,18 +211,15 @@ def get_source_description(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)])
 
 @app.put("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def put_source_description(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    if not check_node_exists(record_type, sourceId):
+def put_source_description(
+    description: Annotated[str, Body()],
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
+    if not check_node_exists(record_type, source_id):
         raise NotFoundError("The requested Source does not exist.")  # 404
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, str):
-        raise BadRequestError("Bad request. Invalid Source description.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, sourceId, username, {"source.description": body}
+        record_type, source_id, username, {"source.description": description}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -207,12 +231,14 @@ def put_source_description(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)])
 
 @app.delete("/sources/<sourceId>/description")
 @tracer.capture_method(capture_response=False)
-def delete_source_description(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    if not check_node_exists(record_type, sourceId):
+def delete_source_description(
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
+    if not check_node_exists(record_type, source_id):
         raise NotFoundError("The Source ID in the path is invalid.")  # 404
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, sourceId, username, {"source.description": None}
+        record_type, source_id, username, {"source.description": None}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -225,9 +251,11 @@ def delete_source_description(sourceId: Annotated[str, Path(pattern=UUID_PATTERN
 @app.head("/sources/<sourceId>/label")
 @app.get("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def get_source_label(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_source_label(
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
     try:
-        label = query_node_property(record_type, sourceId, "label")
+        label = query_node_property(record_type, source_id, "label")
     except ValueError as e:
         raise NotFoundError(
             "The requested Source does not exist, or does not have a label set."
@@ -239,18 +267,15 @@ def get_source_label(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.put("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def put_source_label(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    if not check_node_exists(record_type, sourceId):
+def put_source_label(
+    label: Annotated[str, Body()],
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
+    if not check_node_exists(record_type, source_id):
         raise NotFoundError("The requested Source does not exist.")  # 404
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, str):
-        raise BadRequestError("Bad request. Invalid Source label.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, sourceId, username, {"source.label": body}
+        record_type, source_id, username, {"source.label": label}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -262,12 +287,14 @@ def put_source_label(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.delete("/sources/<sourceId>/label")
 @tracer.capture_method(capture_response=False)
-def delete_source_label(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    if not check_node_exists(record_type, sourceId):
+def delete_source_label(
+    source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
+):
+    if not check_node_exists(record_type, source_id):
         raise NotFoundError("The requested Source ID in the path is invalid.")  # 404
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, sourceId, username, {"source.label": None}
+        record_type, source_id, username, {"source.label": None}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -284,6 +311,11 @@ def delete_source_label(sourceId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(ex: RequestValidationError):
+    raise BadRequestError(ex.errors())  # 400
 
 
 @tracer.capture_method(capture_response=False)

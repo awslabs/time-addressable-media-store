@@ -126,21 +126,17 @@ def get_timerange_expression(
 
 
 @tracer.capture_method(capture_response=False)
-def get_key_and_args(flow_id: str, parameters: None | dict) -> dict | bool:
+def get_key_and_args(flow_id: str, parameters: dict) -> dict:
     """Generate key expression and args for a dynamodb query operation"""
     args = {
         "KeyConditionExpression": Key("flow_id").eq(flow_id),
-        "ScanIndexForward": True,
+        "ScanIndexForward": not parameters.get("reverse_order", False),
         "Limit": constants.DEFAULT_PAGE_LIMIT,
     }
-    if parameters is None:
-        return args
-    reverse_order = parameters.get("reverse_order", "false").lower() == "true"
-    args["ScanIndexForward"] = not reverse_order
     # Pagination query string parameters
-    if "limit" in parameters:
-        args["Limit"] = min(int(parameters["limit"]), constants.MAX_PAGE_LIMIT)
-    if "page" in parameters:
+    if parameters.get("limit"):
+        args["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
+    if parameters.get("page"):
         args["ExclusiveStartKey"] = {
             "flow_id": flow_id,
             "timerange_end": int(parameters["page"]),
@@ -148,14 +144,14 @@ def get_key_and_args(flow_id: str, parameters: None | dict) -> dict | bool:
     # Parse timerange filter out of parameters
     timerange_filter = (
         TimeRange.from_str(parameters["timerange"])
-        if "timerange" in parameters
+        if parameters.get("timerange")
         else None
     )
     # Ignore timerange filter if it is eternity
     if timerange_filter == TimeRange.eternity():
         timerange_filter = None
     # Update Key Expression
-    if "object_id" in parameters:
+    if parameters.get("object_id"):
         args["IndexName"] = "object-id-index"
         args["KeyConditionExpression"] = And(
             args["KeyConditionExpression"],
@@ -178,7 +174,7 @@ def get_key_and_args(flow_id: str, parameters: None | dict) -> dict | bool:
             )
     # Build Filter expression
     if timerange_filter:
-        if timerange_filter.start and "object_id" in parameters:
+        if timerange_filter.start and parameters.get("object_id"):
             args["FilterExpression"] = get_timerange_expression(
                 Attr, TimeRangeBoundary.END, timerange_filter
             )

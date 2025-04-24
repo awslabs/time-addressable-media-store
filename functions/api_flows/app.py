@@ -1,8 +1,8 @@
-import json
 import os
 import uuid
 from datetime import datetime
 from http import HTTPStatus
+from typing import Optional
 
 # pylint: disable=no-member
 import constants
@@ -18,7 +18,10 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
     ServiceError,
 )
-from aws_lambda_powertools.event_handler.openapi.params import Path
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
+)
+from aws_lambda_powertools.event_handler.openapi.params import Body, Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import get_flow_timerange
@@ -41,6 +44,7 @@ from neptune import (
 )
 from schema import (
     Collectionitem,
+    Contentformat,
     Deletionrequest,
     Flow,
     Flowcollection,
@@ -48,7 +52,9 @@ from schema import (
     Flowstoragepost,
     Httprequest,
     MediaObject,
+    Mimetype,
     Tags,
+    Timerange,
     Uuid,
 )
 from typing_extensions import Annotated
@@ -59,9 +65,9 @@ from utils import (
     get_username,
     model_dump,
     parse_claims,
+    parse_tag_parameters,
     publish_event,
     put_message,
-    validate_query_string,
 )
 
 tracer = Tracer()
@@ -76,21 +82,53 @@ bucket = os.environ["BUCKET"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
+TIMERANGE_PATTERN = Timerange.model_fields["root"].metadata[0].pattern
+MIMETYPE_PATTERN = Mimetype.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/flows")
 @app.get("/flows")
 @tracer.capture_method(capture_response=False)
-def get_flows():
-    parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
+def get_flows(
+    param_source_id: Annotated[
+        Optional[str], Query(alias="source_id", pattern=UUID_PATTERN)
+    ] = None,
+    param_timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+    param_format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
+    param_codec: Annotated[
+        Optional[str], Query(alias="codec", pattern=MIMETYPE_PATTERN)
+    ] = None,
+    param_label: Annotated[Optional[str], Query(alias="label")] = None,
+    param_frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
+    param_frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
+    param_page: Annotated[Optional[str], Query(alias="page")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
+):
+    param_tag_values, param_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters
+    )
     custom_headers = {}
-    if parameters and "limit" in parameters:
-        custom_headers["X-Paging-Limit"] = parameters["limit"]
-    items, next_page = query_flows(parameters)
-    if parameters and "timerange" in parameters:
-        timerange_filter = TimeRange.from_str(parameters["timerange"])
+    if param_limit:
+        custom_headers["X-Paging-Limit"] = str(param_limit)
+    items, next_page = query_flows(
+        {
+            "source_id": param_source_id,
+            "timerange": param_timerange,
+            "format": param_format.value if param_format else None,
+            "codec": param_codec,
+            "label": param_label,
+            "tag_values": param_tag_values,
+            "tag_exists": param_tag_exists,
+            "frame_width": param_frame_width,
+            "frame_height": param_frame_height,
+            "page": param_page,
+            "limit": param_limit,
+        }
+    )
+    if param_timerange:
+        timerange_filter = TimeRange.from_str(param_timerange)
         if timerange_filter.is_empty():
             items = [
                 item
@@ -125,19 +163,24 @@ def get_flows():
 @app.head("/flows/<flowId>")
 @app.get("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
-def get_flow_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
+def get_flow_by_id(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+    param_include_timerange: Annotated[
+        Optional[bool], Query(alias="include_timerange")
+    ] = None,
+    param_timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
-    if parameters and "include_timerange" in parameters:
-        item["timerange"] = get_flow_timerange(flowId)
+    if param_include_timerange:
+        item["timerange"] = get_flow_timerange(flow_id)
     # Update timerange if timerange parameter supplied
-    if parameters and "timerange" in parameters and "include_timerange" in parameters:
-        timerange_filter = TimeRange.from_str(parameters["timerange"])
+    if param_timerange and param_include_timerange:
+        timerange_filter = TimeRange.from_str(param_timerange)
         item["timerange"] = str(
             timerange_filter.intersect_with(TimeRange.from_str(item["timerange"]))
         )
@@ -148,11 +191,14 @@ def get_flow_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.put("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
-def put_flow_by_id(flow: Flow, flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    if flow.root.id != flowId:
+def put_flow_by_id(
+    flow: Annotated[Flow, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
+    if flow.root.id != flow_id:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
     try:
-        existing_item = query_node(record_type, flowId)
+        existing_item = query_node(record_type, flow_id)
         if existing_item.get("read_only"):
             raise ServiceError(
                 403,
@@ -160,7 +206,7 @@ def put_flow_by_id(flow: Flow, flowId: Annotated[str, Path(pattern=UUID_PATTERN)
             )  # 403
     except ValueError:
         existing_item = {}
-    if not validate_flow_collection(flowId, flow.root.flow_collection):
+    if not validate_flow_collection(flow_id, flow.root.flow_collection):
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
     # API spec states these fields should be ignored if given in a PUT request.
     for field in constants.FLOW_PUT_IGNORE_FIELDS:
@@ -190,9 +236,11 @@ def put_flow_by_id(flow: Flow, flowId: Annotated[str, Path(pattern=UUID_PATTERN)
 
 @app.delete("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
-def delete_flow_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def delete_flow_by_id(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested Flow ID in the path is invalid."
@@ -203,13 +251,13 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
     # Get flow timerange, if timerange is empty delete flow sync, otherwise return a delete request
-    flow_timerange = TimeRange.from_str(get_flow_timerange(flowId))
+    flow_timerange = TimeRange.from_str(get_flow_timerange(flow_id))
     if flow_timerange.is_empty():
-        source_id = delete_flow(flowId)
+        source_id = delete_flow(flow_id)
         if source_id:
             publish_event(
                 f"{record_type}s/deleted",
-                {f"{record_type}_id": flowId},
+                {f"{record_type}_id": flow_id},
                 get_event_resources(item),
             )
         # Delete source if no longer referenced by any other flows
@@ -222,7 +270,7 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request
     item_dict = {
-        **base_delete_request_dict(flowId, app.current_event.request_context),
+        **base_delete_request_dict(flow_id, app.current_event.request_context),
         "delete_flow": True,
         "timerange_to_delete": str(flow_timerange),
         "timerange_remaining": str(flow_timerange),
@@ -242,9 +290,9 @@ def delete_flow_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 @app.head("/flows/<flowId>/tags")
 @app.get("/flows/<flowId>/tags")
 @tracer.capture_method(capture_response=False)
-def get_flow_tags(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_flow_tags(flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)]):
     try:
-        tags = query_node_tags(record_type, flowId)
+        tags = query_node_tags(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -255,23 +303,30 @@ def get_flow_tags(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 @app.head("/flows/<flowId>/tags/<name>")
 @app.get("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def get_flow_tag_value(flowId: Annotated[str, Path(pattern=UUID_PATTERN)], name: str):
+def get_flow_tag_value(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+    tag_name: Annotated[str, Path(alias="name")],
+):
     try:
-        tags = query_node_tags(record_type, flowId)
+        tags = query_node_tags(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested flow or tag does not exist.") from e  # 404
-    if name not in tags:
+    if tag_name not in tags:
         raise NotFoundError("The requested flow or tag does not exist.")  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return tags[name], HTTPStatus.OK.value  # 200
+    return tags[tag_name], HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
-def put_flow_tag_value(flowId: Annotated[str, Path(pattern=UUID_PATTERN)], name: str):
+def put_flow_tag_value(
+    tag_value: Annotated[str, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+    tag_name: Annotated[str, Path(alias="name")],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -279,14 +334,10 @@ def put_flow_tag_value(flowId: Annotated[str, Path(pattern=UUID_PATTERN)], name:
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, str):
-        raise BadRequestError("Bad request. Invalid flow tag value.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": body})
+    item_dict = set_node_property(
+        record_type, flow_id, username, {f"t.{tag_name}": tag_value}
+    )
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -298,10 +349,11 @@ def put_flow_tag_value(flowId: Annotated[str, Path(pattern=UUID_PATTERN)], name:
 @app.delete("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def delete_flow_tag_value(
-    flowId: Annotated[str, Path(pattern=UUID_PATTERN)], name: str
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+    tag_name: Annotated[str, Path(alias="name")],
 ):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
@@ -311,10 +363,12 @@ def delete_flow_tag_value(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    if name not in item["tags"]:
+    if tag_name not in item["tags"]:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_node_property(record_type, flowId, username, {f"t.{name}": None})
+    item_dict = set_node_property(
+        record_type, flow_id, username, {f"t.{tag_name}": None}
+    )
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -326,9 +380,11 @@ def delete_flow_tag_value(
 @app.head("/flows/<flowId>/description")
 @app.get("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
-def get_flow_description(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_flow_description(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        description = query_node_property(record_type, flowId, "description")
+        description = query_node_property(record_type, flow_id, "description")
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -338,9 +394,12 @@ def get_flow_description(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.put("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
-def put_flow_description(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def put_flow_description(
+    description: Annotated[str, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -348,15 +407,9 @@ def put_flow_description(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, str):
-        raise BadRequestError("Bad request. Invalid flow description.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flowId, username, {"flow.description": body}
+        record_type, flow_id, username, {"flow.description": description}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -368,9 +421,11 @@ def put_flow_description(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.delete("/flows/<flowId>/description")
 @tracer.capture_method(capture_response=False)
-def delete_flow_description(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def delete_flow_description(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
@@ -382,7 +437,7 @@ def delete_flow_description(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
         )  # 403
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flowId, username, {"flow.description": None}
+        record_type, flow_id, username, {"flow.description": None}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -409,9 +464,12 @@ def get_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.put("/flows/<flowId>/label")
 @tracer.capture_method(capture_response=False)
-def put_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def put_flow_label(
+    label: Annotated[str, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -419,14 +477,8 @@ def put_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, str):
-        raise BadRequestError("Bad request. Invalid flow label.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_node_property(record_type, flowId, username, {"flow.label": body})
+    item_dict = set_node_property(record_type, flow_id, username, {"flow.label": label})
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -437,9 +489,11 @@ def put_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.delete("/flows/<flowId>/label")
 @tracer.capture_method(capture_response=False)
-def delete_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def delete_flow_label(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
@@ -450,7 +504,7 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_node_property(record_type, flowId, username, {"flow.label": None})
+    item_dict = set_node_property(record_type, flow_id, username, {"flow.label": None})
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -462,9 +516,11 @@ def delete_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 @app.head("/flows/<flowId>/flow_collection")
 @app.get("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
-def get_flow_flow_collection(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_flow_flow_collection(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        flow_collection = query_flow_collection(flowId)
+        flow_collection = query_flow_collection(flow_id)
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -481,10 +537,10 @@ def get_flow_flow_collection(flowId: Annotated[str, Path(pattern=UUID_PATTERN)])
 @tracer.capture_method(capture_response=False)
 def put_flow_flow_collection(
     flow_collection: Flowcollection,
-    flowId: Annotated[str, Path(pattern=UUID_PATTERN)],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -492,10 +548,10 @@ def put_flow_flow_collection(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    if not validate_flow_collection(flowId, flow_collection):
+    if not validate_flow_collection(flow_id, flow_collection):
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_flow_collection(flowId, username, model_dump(flow_collection))
+    item_dict = set_flow_collection(flow_id, username, model_dump(flow_collection))
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -506,9 +562,11 @@ def put_flow_flow_collection(
 
 @app.delete("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
-def delete_flow_flow_collection(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def delete_flow_flow_collection(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
@@ -519,7 +577,7 @@ def delete_flow_flow_collection(flowId: Annotated[str, Path(pattern=UUID_PATTERN
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
     username = get_username(parse_claims(app.current_event.request_context))
-    item_dict = set_flow_collection(flowId, username, [])
+    item_dict = set_flow_collection(flow_id, username, [])
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
@@ -531,9 +589,11 @@ def delete_flow_flow_collection(flowId: Annotated[str, Path(pattern=UUID_PATTERN
 @app.head("/flows/<flowId>/max_bit_rate")
 @app.get("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
-def get_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_flow_max_bit_rate(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        max_bit_rate = query_node_property(record_type, flowId, "max_bit_rate")
+        max_bit_rate = query_node_property(record_type, flow_id, "max_bit_rate")
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -543,9 +603,12 @@ def get_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.put("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
-def put_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def put_flow_max_bit_rate(
+    max_bit_rate: Annotated[int, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -553,15 +616,9 @@ def put_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, int):
-        raise BadRequestError("Bad request. Invalid flow max bit rate.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flowId, username, {"flow.max_bit_rate": body}
+        record_type, flow_id, username, {"flow.max_bit_rate": max_bit_rate}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -573,9 +630,11 @@ def put_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.delete("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
-def delete_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def delete_flow_max_bit_rate(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
@@ -587,7 +646,7 @@ def delete_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)])
         )  # 403
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flowId, username, {"flow.max_bit_rate": None}
+        record_type, flow_id, username, {"flow.max_bit_rate": None}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -600,9 +659,11 @@ def delete_flow_max_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)])
 @app.head("/flows/<flowId>/avg_bit_rate")
 @app.get("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
-def get_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_flow_avg_bit_rate(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        avg_bit_rate = query_node_property(record_type, flowId, "avg_bit_rate")
+        avg_bit_rate = query_node_property(record_type, flow_id, "avg_bit_rate")
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -612,9 +673,12 @@ def get_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.put("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
-def put_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def put_flow_avg_bit_rate(
+    avg_bit_rate: Annotated[int, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -622,15 +686,9 @@ def put_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, int):
-        raise BadRequestError("Bad request. Invalid flow avg bit rate.")  # 400
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flowId, username, {"flow.avg_bit_rate": body}
+        record_type, flow_id, username, {"flow.avg_bit_rate": avg_bit_rate}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -642,9 +700,11 @@ def put_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.delete("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
-def delete_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def delete_flow_avg_bit_rate(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
@@ -656,7 +716,7 @@ def delete_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)])
         )  # 403
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flowId, username, {"flow.avg_bit_rate": None}
+        record_type, flow_id, username, {"flow.avg_bit_rate": None}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -669,9 +729,11 @@ def delete_flow_avg_bit_rate(flowId: Annotated[str, Path(pattern=UUID_PATTERN)])
 @app.head("/flows/<flowId>/read_only")
 @app.get("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
-def get_flow_read_only(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+def get_flow_read_only(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
     try:
-        read_only = query_node_property(record_type, flowId, "read_only")
+        read_only = query_node_property(record_type, flow_id, "read_only")
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
@@ -681,20 +743,15 @@ def get_flow_read_only(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 
 @app.put("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
-def put_flow_read_only(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    if not check_node_exists(record_type, flowId):
+def put_flow_read_only(
+    read_only: Annotated[bool, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
+    if not check_node_exists(record_type, flow_id):
         raise NotFoundError("The requested flow does not exist.")  # 404
-    try:
-        body = json.loads(app.current_event.body)
-    except json.decoder.JSONDecodeError:
-        body = None
-    if not isinstance(body, bool):
-        raise BadRequestError(
-            "Bad request. Invalid flow read_only value. Value must be boolean."
-        )  # 400
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flowId, username, {"flow.read_only": body}
+        record_type, flow_id, username, {"flow.read_only": read_only}
     )
     publish_event(
         f"{record_type}s/updated",
@@ -708,12 +765,12 @@ def put_flow_read_only(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
 @tracer.capture_method(capture_response=False)
 def post_flow_storage_by_id(
     flow_storage_post: Flowstoragepost,
-    flowId: Annotated[str, Path(pattern=UUID_PATTERN)],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     if flow_storage_post.limit is None:
         flow_storage_post.limit = constants.DEFAULT_PUT_LIMIT
     try:
-        item = query_node(record_type, flowId)
+        item = query_node(record_type, flow_id)
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -742,6 +799,11 @@ def post_flow_storage_by_id(
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(ex: RequestValidationError):
+    raise BadRequestError(ex.errors())  # 400
 
 
 @tracer.capture_method(capture_response=False)

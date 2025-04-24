@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Time-addressable Media Store
   description: |
@@ -14,6 +14,26 @@ info:
     a simple file system storage with an HTTP frontend. Clients should parse the /service endpoint
     and handle the media store type in use appropriately.
   version: '6.0'
+  contact:
+    name: BBC R&D - Cloud-Fit Production Team
+    email: cloudfit-opensource@rd.bbc.co.uk
+    url: https://github.com/bbc/tams
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+- url: http://localhost:4010
+  description: Local mock of API
+- url: https://example.com/tams/{version}
+  description: Example TAMS service
+  variables:
+    version:
+      description: API version
+      default: v6.0
+security:
+- {}
+- basic_auth: []
+- bearer_token_auth: []
 paths:
   /:
     head:
@@ -25,26 +45,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/trait_resource_listing_head_200'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 200}'
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: {}
-        passthroughBehavior: when_no_templates
     get:
       summary: List Root Endpoints
       description: List of paths available from this API.
@@ -62,75 +62,6 @@ paths:
                 - flows
                 - sources
                 - flow-delete-requests
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: |
-            {
-              "statusCode": 200
-            }
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: |
-                [
-                  "service",
-                  "flows",
-                  "sources",
-                  "flow-delete-requests"
-                ]
-        passthroughBehavior: when_no_templates
-    x-amazon-apigateway-any-method:
-      responses:
-        '404':
-          description: The specified path or method does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 404}'
-        responses:
-          default:
-            statusCode: '404'
-            responseTemplates:
-              application/json: {}
-        passthroughBehavior: when_no_templates
   /service:
     head:
       summary: Service Information
@@ -141,26 +72,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/trait_resource_listing_head_200'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 200}'
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: {}
-        passthroughBehavior: when_no_templates
     get:
       summary: Service Information
       description: Provide information about the service, including the media store in use.
@@ -174,22 +85,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/service'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
+              example:
+                $ref: examples/service-get-200.json
     post:
       summary: Update Service Information
       description: Update the service info.
@@ -199,6 +96,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              $ref: examples/service-post.json
             schema:
               $ref: '#/components/schemas/servicepost'
         required: true
@@ -207,23 +106,6 @@ paths:
           description: Success. The service info has been updated.
         '400':
           description: Bad request. Invalid service JSON.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-      x-amazon-apigateway-request-validator: body-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /service/webhooks:
     head:
       summary: List Webhook URLs
@@ -236,22 +118,6 @@ paths:
           $ref: '#/components/responses/trait_resource_listing_head_200'
         '404':
           description: Webhooks are not supported by this API implementation
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: List Webhook URLs
       description: |
@@ -267,28 +133,19 @@ paths:
           description: Return the list of known webhook URLs. Note that the `api_key_value` will be omitted.
           content:
             application/json:
+              example:
+              - url: https://hook.example.com
+                api_key_name: Authorization
+                events:
+                - flows/created
+                - flows/updated
+                - flows/deleted
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/webhook'
         '404':
           description: Webhooks are not supported by this API implementation
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     post:
       summary: Register Webhook URL
       description: |
@@ -314,6 +171,13 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              url: https://hook.example.com
+              api_key_name: Authorization
+              api_key_value: Bearer 21238dksdjqwpqscj9
+              events:
+              - flows/created
+              - flows/updated
             schema:
               $ref: '#/components/schemas/webhookpost'
         required: true
@@ -326,23 +190,6 @@ paths:
           description: Bad request. Invalid parameters or unsupported event filtering or transformation.
         '404':
           description: Webhooks are not supported by this API implementation
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-      x-amazon-apigateway-request-validator: body-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /sources:
     head:
       summary: List Sources
@@ -356,7 +203,7 @@ paths:
         description: Filter on Sources that have the given label.
         schema:
           type: string
-      - name: tag.name #{name}
+      - name: tag.{name}
         in: query
         description: |
           Filter on Sources that have a tag named {name} and with the given value.
@@ -364,7 +211,7 @@ paths:
           URL.
         schema:
           type: string
-      - name: tag_exists.name #{name}
+      - name: tag_exists.{name}
         in: query
         description: |
           Filter on Sources that have a tag named {name} regardless of value. The
@@ -403,23 +250,6 @@ paths:
                 type: string
         '400':
           $ref: '#/components/responses/trait_resource_info_head_400'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: List Sources
       description: List the Sources registered in the store and their details.
@@ -432,7 +262,7 @@ paths:
         description: Filter on Sources that have the given label.
         schema:
           type: string
-      - name: tag.name #{name}
+      - name: tag.{name}
         in: query
         description: |
           Filter on Sources that have a tag named {name} and with the given value.
@@ -440,7 +270,7 @@ paths:
           URL.
         schema:
           type: string
-      - name: tag_exists.name #{name}
+      - name: tag_exists.{name}
         in: query
         description: |
           Filter on Sources that have a tag named {name} regardless of value. The
@@ -475,29 +305,14 @@ paths:
                 type: string
           content:
             application/json:
+              example:
+                $ref: examples/sources-get-200.json
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/source'
         '400':
           description: Bad request. Invalid query options.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /sources/{sourceId}:
     parameters:
     - name: sourceId
@@ -517,23 +332,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Source Details
       description: Returns Source metadata.
@@ -547,25 +345,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/source'
+              examples:
+                basic:
+                  summary: Source containing elemental video
+                  value:
+                    $ref: examples/source-get-200-basic.json
+                multi:
+                  summary: Multi-essence Source
+                  description: Multi-essence Sources collect multiple Sources of different formats under one Source ID.
+                  value:
+                    $ref: examples/source-get-200-multi.json
         '404':
           description: The requested Source does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /sources/{sourceId}/tags:
     parameters:
     - name: sourceId
@@ -585,23 +376,6 @@ paths:
           $ref: '#/components/responses/trait_resource_listing_head_200'
         '404':
           description: The requested Source does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: List Source Tags
       description: Returns the Source tags.
@@ -613,27 +387,12 @@ paths:
           description: ''
           content:
             application/json:
+              example:
+                ingested_by: ingest_service_api
               schema:
                 $ref: '#/components/schemas/tags'
         '404':
           description: The requested Source does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /sources/{sourceId}/tags/{name}:
     parameters:
     - name: name
@@ -659,23 +418,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           description: The requested Source or tag does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Source Tag Value
       description: Return the tag value associated with the tag name.
@@ -687,27 +429,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: |
+                "ingest_service_api"
               schema:
                 type: string
         '404':
           description: The requested Source or tag does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Source Tag
       description: Create or update the Source tag
@@ -717,6 +444,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example: |
+              "new_value"
             schema:
               type: string
         required: true
@@ -727,23 +456,6 @@ paths:
           description: Bad request. Invalid Source tag value.
         '404':
           description: The requested Source does not exist, or the tag name in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Source Tag
       description: Delete a specific tag on a Source
@@ -755,23 +467,6 @@ paths:
           description: No content. The Source tag has been deleted.
         '404':
           description: The requested Source ID or tag in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /sources/{sourceId}/description:
     parameters:
     - name: sourceId
@@ -791,23 +486,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Source Description
       description: Returns the Source description property.
@@ -819,27 +497,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: |
+                "Big Buck Bunny"
               schema:
                 type: string
         '404':
           description: The requested Source does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Source Description
       description: Create or update the description property.
@@ -849,6 +512,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example: |
+              "Big Buck Bunny Movie"
             schema:
               type: string
         required: true
@@ -859,23 +524,6 @@ paths:
           description: Bad request. Invalid Source description.
         '404':
           description: The requested Source does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Source Description
       description: Delete the description property.
@@ -887,23 +535,6 @@ paths:
           description: No content. The Source description property has been deleted.
         '404':
           description: The Source ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /sources/{sourceId}/label:
     parameters:
     - name: sourceId
@@ -923,23 +554,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           description: The requested Source does not exist, or does not have a label set.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Source Label
       description: Returns the Source label property.
@@ -951,27 +565,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: |
+                "Big Buck Bunny"
               schema:
                 type: string
         '404':
           description: The requested Source does not exist, or does not have a label set.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Source Label
       description: Create or update the label property.
@@ -981,6 +580,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example: |
+              "Big Buck Bunny Movie"
             schema:
               type: string
         required: true
@@ -991,23 +592,6 @@ paths:
           description: Bad request. Invalid Source label.
         '404':
           description: The requested Source does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Source Label
       description: Delete the label property.
@@ -1019,23 +603,6 @@ paths:
           description: No content. The Source label property has been deleted.
         '404':
           description: The requested Source ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SourcesFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows:
     head:
       summary: List Flows
@@ -1070,7 +637,7 @@ paths:
         description: Filter on flows that have the given label.
         schema:
           type: string
-      - name: tag.name #{name}
+      - name: tag.{name}
         in: query
         description: |
           Filter on flows that have a tag named {name} and with the given value.
@@ -1078,7 +645,7 @@ paths:
           URL.
         schema:
           type: string
-      - name: tag_exists.name #{name}
+      - name: tag_exists.{name}
         in: query
         description: |
           Filter on flows that have a tag named {name} regardless of value. The
@@ -1122,23 +689,6 @@ paths:
                 type: string
         '400':
           description: Bad request. Invalid query options.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: List Flows
       description: List the flows registered in the store.
@@ -1172,7 +722,7 @@ paths:
         description: Filter on flows that have the given label.
         schema:
           type: string
-      - name: tag.name #{name}
+      - name: tag.{name}
         in: query
         description: |
           Filter on flows that have a tag named {name} and with the given value.
@@ -1180,7 +730,7 @@ paths:
           URL.
         schema:
           type: string
-      - name: tag_exists.name #{name}
+      - name: tag_exists.{name}
         in: query
         description: |
           Filter on flows that have a tag named {name} regardless of value. The
@@ -1220,29 +770,14 @@ paths:
                 type: string
           content:
             application/json:
+              example:
+                $ref: examples/flows-get-200.json
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/flow'
         '400':
           description: Bad request. Invalid query options.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}:
     parameters:
     - name: flowId
@@ -1277,23 +812,6 @@ paths:
           description: Bad request. Invalid query options.
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Details
       description: Returns flow metadata.
@@ -1320,27 +838,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/flow'
+              examples:
+                video:
+                  summary: Video Flow - H.264 Codec
+                  value:
+                    $ref: examples/flow-get-200-video-h264.json
+                audio:
+                  summary: Audio Flow - AAC Codec
+                  value:
+                    $ref: examples/flow-get-200-audio-aac.json
+                rawvideo:
+                  summary: Video Flow - Uncompressed (Quicktime)
+                  value:
+                    $ref: examples/flow-get-200-video-raw.json
+                ttml:
+                  summary: Data Flow - TTML
+                  description: TAMS can also be used for storing non-AV content such as subtitles or event data
+                  value:
+                    $ref: examples/flow-get-200-data-ttml.json
+                multi:
+                  summary: Multi-essence Flow
+                  description: Multi-essence Flows are used to collect multiple Flows of different formats under one Flow ID
+                  value:
+                    $ref: examples/flow-get-200-multi.json
+                multi-container-map:
+                  summary: Multi-essence Flow with a container map
+                  description: |
+                    Multi-essence Flows are used to collect multiple Flows of different formats under one Flow ID.
+                    The collection has container maps for the audio Flows as there are 2 audio tracks in the container.
+                  value:
+                    $ref: examples/flow-get-200-multi-container-map.json
+                audio-multi:
+                  summary: Audio Flow in a multi-essence Flow
+                  description: |
+                    The audio Flow does not have a container property as the media is accessed via the multi-essence Flow
+                  value:
+                    $ref: examples/flow-get-200-audio-aac-multi.json
         '404':
           description: The requested flow does not exist.
         '400':
           description: Bad request. Invalid query options.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Replace Flow
       description: Create or replace the flow metadata.
@@ -1350,6 +887,15 @@ paths:
       requestBody:
         content:
           application/json:
+            examples:
+              audio:
+                summary: Stereo audio Flow
+                value:
+                  $ref: examples/flow-put.json
+              multi:
+                summary: Multi-essence Flow
+                value:
+                  $ref: examples/flow-put-multi.json
             schema:
               $ref: '#/components/schemas/flow'
         required: true
@@ -1358,6 +904,8 @@ paths:
           description: The flow has been created.
           content:
             application/json:
+              example:
+                $ref: examples/flow-put-201.json
               schema:
                 $ref: '#/components/schemas/flow'
         '204':
@@ -1368,23 +916,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested Flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow
       description: |
@@ -1406,29 +937,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/deletionrequest'
+              example:
+                $ref: examples/deletion-request-get-200.json
         '204':
           description: No content. The flow has been deleted and the flow segments have been or will be deleted.
         '403':
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested Flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/tags:
     parameters:
     - name: flowId
@@ -1448,23 +964,6 @@ paths:
           $ref: '#/components/responses/trait_resource_listing_head_200'
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: List Flow Tags
       description: Returns the flow tags.
@@ -1476,27 +975,12 @@ paths:
           description: ''
           content:
             application/json:
+              example:
+                $ref: examples/flow-tags-get-200.json
               schema:
                 $ref: '#/components/schemas/tags'
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/tags/{name}:
     parameters:
     - name: name
@@ -1522,23 +1006,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           description: The requested flow or tag does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Tag Value
       description: Return the tag value associated with the tag name.
@@ -1550,27 +1017,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: |
+                "full"
               schema:
                 type: string
         '404':
           description: The requested flow or tag does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Flow Tag
       description: Create or update the tag.
@@ -1580,6 +1032,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example: |
+              "proxy"
             schema:
               type: string
         required: true
@@ -1592,23 +1046,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow Tag
       description: Delete the tag.
@@ -1622,23 +1059,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/description:
     parameters:
     - name: flowId
@@ -1658,23 +1078,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Description
       description: Returns the flow description property.
@@ -1686,27 +1089,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: |
+                "video capture"
               schema:
                 type: string
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Flow Description
       description: Create or update the description property.
@@ -1716,6 +1104,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example: |
+              "Big Buck Bunny video-only capture"
             schema:
               type: string
         required: true
@@ -1728,23 +1118,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow Description
       description: Delete the description property.
@@ -1758,23 +1131,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/label:
     parameters:
     - name: flowId
@@ -1794,23 +1150,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           description: The requested Flow does not exist, or does not have a label set.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Label
       description: Returns the Flow label property.
@@ -1822,27 +1161,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: |
+                "Big Buck Bunny"
               schema:
                 type: string
         '404':
           description: The requested Flow does not exist, or does not have a label set.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Flow Label
       description: Create or update the label property.
@@ -1852,6 +1176,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example: |
+              "Big Buck Bunny Movie"
             schema:
               type: string
         required: true
@@ -1864,23 +1190,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested Flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow Label
       description: Delete the label property.
@@ -1892,23 +1201,6 @@ paths:
           description: No content. The Flow label property has been deleted.
         '404':
           description: The requested Flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/read_only:
     parameters:
     - name: flowId
@@ -1928,23 +1220,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Read-Only
       description: Returns the flow read_only property.
@@ -1956,27 +1231,11 @@ paths:
           description: ''
           content:
             application/json:
+              example: true
               schema:
                 type: boolean
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Set Flow Read-Only
       description: Set the read-only property.
@@ -1986,6 +1245,7 @@ paths:
       requestBody:
         content:
           application/json:
+            example: true
             schema:
               type: boolean
         required: true
@@ -1996,23 +1256,6 @@ paths:
           description: Bad request. Invalid flow read_only value. Value must be boolean.
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/flow_collection:
     parameters:
     - name: flowId
@@ -2032,23 +1275,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Collection
       description: Returns the flow collection property.
@@ -2060,27 +1286,12 @@ paths:
           description: ''
           content:
             application/json:
+              example:
+                $ref: examples/flow-collection-get-200.json
               schema:
                 $ref: '#/components/schemas/flowcollection'
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Flow Collection
       description: Create or update the flow collection property.
@@ -2090,6 +1301,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              $ref: examples/flow-collection-put.json
             schema:
               $ref: '#/components/schemas/flowcollection'
         required: true
@@ -2102,23 +1315,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow Collection
       description: Delete the flow collection property.
@@ -2132,23 +1328,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/max_bit_rate:
     parameters:
     - name: flowId
@@ -2168,23 +1347,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Maximum Bit Rate
       description: Returns the flow max bit rate property.
@@ -2196,28 +1358,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: 5000
               schema:
                 type: integer
                 minimum: 0
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Flow Maximum Bit Rate
       description: Create or update the max bit rate property.
@@ -2227,6 +1373,7 @@ paths:
       requestBody:
         content:
           application/json:
+            example: 5000
             schema:
               type: integer
               minimum: 0
@@ -2240,23 +1387,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow Maximum Bit Rate
       description: Delete the flow max bit rate property.
@@ -2270,23 +1400,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/avg_bit_rate:
     parameters:
     - name: flowId
@@ -2306,23 +1419,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Average Bit Rate
       description: Returns the flow average bit rate property.
@@ -2334,28 +1430,12 @@ paths:
           description: ''
           content:
             application/json:
+              example: 3246
               schema:
                 type: integer
                 minimum: 0
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     put:
       summary: Create or Update Flow Average Bit Rate
       description: Create or update the average bit rate property.
@@ -2365,6 +1445,7 @@ paths:
       requestBody:
         content:
           application/json:
+            example: 3246
             schema:
               type: integer
               minimum: 0
@@ -2378,23 +1459,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow Average Bit Rate
       description: Delete the flow average bit rate property.
@@ -2408,23 +1472,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/segments:
     parameters:
     - name: flowId
@@ -2506,23 +1553,6 @@ paths:
           description: Bad request. Invalid query options.
         '404':
           description: The flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowSegmentsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: List Flow Segments
       description: |
@@ -2623,27 +1653,30 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/flowsegment'
+              examples:
+                basic:
+                  summary: Basic Example
+                  value:
+                    $ref: examples/flow-segments-get-200.json
+                sample_count:
+                  summary: Partial Segment
+                  description: |
+                    This example takes part of an existing segment, offsets it with `ts_offset` and then selects a
+                    subset of the samples within using `ts_offset` for the second segment in the sequence.
+                  value:
+                    $ref: examples/flow-segments-get-200-sample-offset.json
+                multiple_urls:
+                  summary: Multiple URLs
+                  description: |
+                    This example shows how the media object for a Flow Segment could be accessed using multiple URLs.
+                    Clients are free to choose any of the URLs given (which return identical media objects), however the server has
+                    expressed a preference for the "pipeline-a" URLs by putting them first in the list.
+                  value:
+                    $ref: examples/flow-segments-get-200-multiple-urls.json
         '400':
           description: Bad request. Invalid query options.
         '404':
           description: The flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowSegmentsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     post:
       summary: Create Flow Segment
       description: |
@@ -2682,6 +1715,8 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              $ref: examples/flow-segment-post.json
             schema:
               $ref: '#/components/schemas/flowsegment'
         required: true
@@ -2694,23 +1729,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowSegmentsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     delete:
       summary: Delete Flow Segment
       description: |
@@ -2743,6 +1761,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/deletionrequest'
+              example:
+                $ref: examples/deletion-request-get-200.json
         '204':
           description: No content. The flow segments have been or will be deleted.
         '400':
@@ -2751,23 +1771,6 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow ID in the path is invalid.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowSegmentsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flows/{flowId}/storage:
     parameters:
     - name: flowId
@@ -2807,6 +1810,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/flowstoragepost'
+            example:
+              $ref: examples/flow-storage-post.json
       responses:
         '201':
           description: Storage locations for writing media objects.
@@ -2814,29 +1819,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/flowstorage'
+              example:
+                $ref: examples/flow-storage-post-201.json
         '400':
           description: Bad request. Invalid flow storage request JSON or the flow 'container' is not set.
         '403':
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow does not exist.
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-      x-amazon-apigateway-request-validator: parameters-and-body
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
   /flow-delete-requests:
     head:
       summary: List Flow Delete Requests
@@ -2847,26 +1837,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/trait_resource_listing_head_200'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 200}'
-        responses:
-          default:
-            statusCode: '200'
-            responseTemplates:
-              application/json: {}
-        passthroughBehavior: when_no_templates
     get:
       summary: List Flow Delete Requests
       description: |
@@ -2885,22 +1855,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/deletionrequestslist'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowDeleteRequestsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
+              example:
+                $ref: examples/deletion-requests-get-200.json
   /flow-delete-requests/{request-id}:
     parameters:
     - name: request-id
@@ -2919,23 +1875,6 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_200'
         '404':
           $ref: '#/components/responses/trait_resource_info_head_404'
-      security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowDeleteRequestsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
     get:
       summary: Flow Delete Request Details
       description: |
@@ -2953,72 +1892,254 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/deletionrequest'
+              example:
+                $ref: examples/deletion-request-get-200.json
         '404':
           description: The requested flow delete request does not exist.
+webhooks:
+  flows/created:
+    post:
       security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-      x-amazon-apigateway-request-validator: parameters-only
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FlowDeleteRequestsFunction.Arn}/invocations
-        passthroughBehavior: when_no_templates
-  /{proxy+}:
-    x-amazon-apigateway-any-method:
-      parameters:
-      - name: proxy
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '404':
-          description: The specified path or method does not exist.
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Flow Created Notification
+              description: Information about a Flow which has been newly created in this store instance
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the new Flow was created
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: flows/created
+                event:
+                  type: object
+                  required:
+                  - flow
+                  properties:
+                    flow:
+                      $ref: '#/components/schemas/flow'
+  flows/updated:
+    post:
       security:
-      - Authorizor:
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - CognitoAdmin
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Head
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Get
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Put
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Post
-        - Fn::FindInMap:
-          - OAuth
-          - Scopes
-          - Delete
-      x-amazon-apigateway-integration:
-        type: mock
-        requestTemplates:
-          application/json: '{"statusCode": 404}'
-        responses:
-          default:
-            statusCode: '404'
-            responseTemplates:
-              application/json: {}
-        passthroughBehavior: when_no_templates
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Flow Updated Notification
+              description: Information about a Flow for which the metadata has been modified.
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the Flow was modified
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: flows/updated
+                event:
+                  type: object
+                  required:
+                  - flow
+                  properties:
+                    flow:
+                      $ref: '#/components/schemas/flow'
+  flows/deleted:
+    post:
+      security:
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Flow Deleted Notification
+              description: Notification that a Flow has been deleted (or scheduled for deletion).
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the Flow was modified
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: flows/deleted
+                event:
+                  type: object
+                  required:
+                  - flow_id
+                  properties:
+                    flow_id:
+                      $ref: '#/components/schemas/uuid'
+  flows/segments_added:
+    post:
+      security:
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Flow Segments Added
+              description: |
+                Notification that new segments have been added to a Flow.
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the most recent segment in the timerange was added (and the message generated)
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: flows/segments_added
+                event:
+                  type: object
+                  required:
+                  - flow_id
+                  - segments
+                  properties:
+                    flow_id:
+                      $ref: '#/components/schemas/uuid'
+                    segments:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/flowsegment'
+  flows/segments_deleted:
+    post:
+      security:
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Flow Segments Deleted
+              description: |
+                Notification that segments have been deleted from a Flow.
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the most recent segment in the timerange was added (and the message generated)
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: flows/segments_added
+                event:
+                  type: object
+                  required:
+                  - flow_id
+                  - timerange
+                  properties:
+                    flow_id:
+                      $ref: '#/components/schemas/uuid'
+                    timerange:
+                      description: The timerange of segments that have been deleted. The timerange MUST intersect with a segment which has been deleted at both start and end (e.g. it cannot start or end in empty space).
+                      $ref: '#/components/schemas/timerange'
+  sources/created:
+    post:
+      security:
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Source Created Notification
+              description: Information about a Source which has been newly created in this store instance
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the new Source was created
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: sources/created
+                event:
+                  type: object
+                  required:
+                  - source
+                  properties:
+                    source:
+                      $ref: '#/components/schemas/source'
+  sources/updated:
+    post:
+      security:
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Source Updated Notification
+              description: Information about a Source for which the metadata has been modified.
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the Source was modified
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: sources/updated
+                event:
+                  type: object
+                  required:
+                  - source
+                  properties:
+                    source:
+                      $ref: '#/components/schemas/source'
+  sources/deleted:
+    post:
+      security:
+      - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: Source Deleted Notification
+              description: Notification that a Source has been deleted.
+              required:
+              - event_timestamp
+              - event_type
+              - event
+              properties:
+                event_timestamp:
+                  description: Timestamp at which the Source was modified
+                  type: string
+                  format: date-time
+                event_type:
+                  type: string
+                  const: sources/deleted
+                event:
+                  type: object
+                  required:
+                  - source_id
+                  properties:
+                    source_id:
+                      $ref: '#/components/schemas/uuid'
 components:
   schemas:
     uuid:
@@ -3979,15 +3100,14 @@ components:
       schema:
         type: string
   securitySchemes:
-    Authorizor:
-      in: header
-      name: Authorization
-      type: apiKey
-      x-amazon-apigateway-authorizer:
-        providerARNs:
-        - Fn::Sub: arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}
-        type: cognito_user_pools
-      x-amazon-apigateway-authtype: cognito_user_pools
+    basic_auth:
+      type: http
+      scheme: basic
+      description: HTTP basic authentication
+    bearer_token_auth:
+      type: http
+      scheme: bearer
+      description: HTTP bearer token authentication
 tags:
 - name: Service
   description: The service root and documentation about the service itself
@@ -4010,13 +3130,3 @@ tags:
   description: Resource for monitoring long running deletion of flows and flow segments.
 - name: Webhooks
   description: Configures webhooks to deliver notifications externally. Optional, and may not be implemented
-x-amazon-apigateway-request-validators:
-  parameters-only:
-    validateRequestBody: false
-    validateRequestParameters: true
-  body-only:
-    validateRequestBody: true
-    validateRequestParameters: false
-  parameters-and-body:
-    validateRequestParameters: true
-    validateRequestBody: true

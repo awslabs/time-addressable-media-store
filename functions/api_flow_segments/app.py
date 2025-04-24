@@ -2,6 +2,7 @@ import concurrent.futures
 import json
 import os
 from http import HTTPStatus
+from typing import Optional
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -15,7 +16,10 @@ from aws_lambda_powertools.event_handler.exceptions import (
     NotFoundError,
     ServiceError,
 )
-from aws_lambda_powertools.event_handler.openapi.params import Path
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
+)
+from aws_lambda_powertools.event_handler.openapi.params import Body, Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
@@ -36,7 +40,7 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, GetUrl, Uuid
+from schema import Deletionrequest, Flowsegment, GetUrl, Timerange, Uuid
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
@@ -47,7 +51,6 @@ from utils import (
     model_dump,
     publish_event,
     put_message,
-    validate_query_string,
 )
 
 tracer = Tracer()
@@ -63,28 +66,47 @@ del_queue = os.environ["DELETE_QUEUE_URL"]
 store_name = get_store_name()
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
+TIMERANGE_PATTERN = Timerange.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/flows/<flowId>/segments")
 @app.get("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def get_flow_segments_by_id(
-    flowId: str,
-):  # There is a special case here where 404 is defined for an invalid (bad format) flowId
-    parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
+    flow_id: Annotated[
+        str, Path(alias="flowId")
+    ],  # There is a special case here where 404 is defined for an invalid (bad format) flowId
+    param_object_id: Annotated[Optional[str], Query(alias="object_id")] = None,
+    param_timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    param_accept_get_urls: Annotated[
+        Optional[str], Query(alias="accept_get_urls", pattern=r"^([^,]+(,[^,]+)*)?$")
+    ] = None,
+    param_page: Annotated[Optional[str], Query(alias="page")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
+):
     try:
-        Uuid(root=flowId)
+        Uuid(root=flow_id)
     except ValidationError as ex:
         raise NotFoundError("The flow ID in the path is invalid.") from ex  # 404
-    if not check_node_exists("flow", flowId):
+    if not check_node_exists("flow", flow_id):
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
             content_type=content_types.APPLICATION_JSON,
             body=json.dumps([]),
         )
-    args = get_key_and_args(flowId, parameters)
+    args = get_key_and_args(
+        flow_id,
+        {
+            "reverse_order": param_reverse_order,
+            "limit": param_limit,
+            "page": param_page,
+            "timerange": param_timerange,
+            "object_id": param_object_id,
+        },
+    )
     reverse_order = not args["ScanIndexForward"]
     query = segments_table.query(**args)
     items = query["Items"]
@@ -112,11 +134,7 @@ def get_flow_segments_by_id(
             app.current_event, str(query["LastEvaluatedKey"]["timerange_end"])
         )
     # Set Paging Limit header if paging limit being used is not the one specified
-    if (
-        parameters
-        and "limit" in parameters
-        and parameters["limit"] != str(args["Limit"])
-    ):
+    if param_limit != args["Limit"]:
         custom_headers["X-Paging-Limit"] = str(args["Limit"])
     custom_headers["X-Paging-Count"] = str(len(items))
     custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
@@ -128,8 +146,7 @@ def get_flow_segments_by_id(
             headers=custom_headers,
         )
     schema_items = [Flowsegment(**item) for item in items]
-    accept_get_urls = parameters.get("accept_get_urls", None)
-    filter_object_urls(schema_items, accept_get_urls)
+    filter_object_urls(schema_items, param_accept_get_urls)
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
@@ -141,11 +158,11 @@ def get_flow_segments_by_id(
 @app.post("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(
-    flow_segment: Flowsegment,
-    flowId: Annotated[str, Path(pattern=UUID_PATTERN)],
+    flow_segment: Annotated[Flowsegment, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
-        item = query_node("flow", flowId)
+        item = query_node("flow", flow_id)
     except ValueError as e:
         raise NotFoundError("The flow does not exist.") from e  # 404
     if item.get("read_only"):
@@ -163,7 +180,7 @@ def post_flow_segments_by_id(
         )  # 400
     item_dict = model_dump(flow_segment)
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
-    if check_overlapping_segments(flowId, segment_timerange):
+    if check_overlapping_segments(flow_id, segment_timerange):
         raise BadRequestError(
             "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow."
         )  # 400
@@ -174,9 +191,9 @@ def post_flow_segments_by_id(
         0 if segment_timerange.includes_end() else 1
     )
     segments_table.put_item(
-        Item={**item_dict, "flow_id": flowId}, ReturnValues="ALL_OLD"
+        Item={**item_dict, "flow_id": flow_id}, ReturnValues="ALL_OLD"
     )
-    update_flow_segments_updated(flowId)
+    update_flow_segments_updated(flow_id)
     schema_item = Flowsegment(**item_dict)
     get_url = get_nonsigned_url(schema_item.object_id)
     schema_item.get_urls = (
@@ -184,10 +201,10 @@ def post_flow_segments_by_id(
     )
     publish_event(
         "flows/segments_added",
-        {"flow_id": flowId, "segments": [model_dump(schema_item)]},
+        {"flow_id": flow_id, "segments": [model_dump(schema_item)]},
         enhance_resources(
             [
-                f"tams:flow:{flowId}",
+                f"tams:flow:{flow_id}",
                 f'tams:source:{item["source_id"]}',
                 *set(
                     f"tams:flow-collected-by:{c_id}"
@@ -201,12 +218,15 @@ def post_flow_segments_by_id(
 
 @app.delete("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
-def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
-    parameters = app.current_event.query_string_parameters
-    if not validate_query_string(parameters, app.current_event.request_context):
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
+def delete_flow_segments_by_id(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+    param_timerange: Annotated[
+        Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
+    ] = None,
+    param_object_id: Annotated[Optional[str], Query(alias="object_id")] = None,
+):
     try:
-        item = query_node("flow", flowId)
+        item = query_node("flow", flow_id)
     except ValueError as e:
         raise NotFoundError(
             "The requested flow ID in the path is invalid."
@@ -216,15 +236,18 @@ def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    timerange_to_delete = TimeRange.from_str(get_flow_timerange(flowId))
-    if parameters and "timerange" in parameters:
-        timerange_to_delete = TimeRange.from_str(parameters["timerange"])
+    timerange_to_delete = TimeRange.from_str(get_flow_timerange(flow_id))
+    if param_timerange:
+        timerange_to_delete = TimeRange.from_str(param_timerange)
     deletion_request_dict = None
-    if parameters and "object_id" in parameters:
+    if param_object_id:
         # Not able to handle return of Delete Request as delete requests do not support "object_id" query parameter
         delete_flow_segments(
-            flowId,
-            parameters,
+            flow_id,
+            {
+                "timerange": param_timerange,
+                "object_id": param_object_id,
+            },
             timerange_to_delete,
             app.lambda_context,
             s3_queue,
@@ -233,7 +256,7 @@ def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)
         )
         return None, HTTPStatus.NO_CONTENT.value  # 204
     deletion_request_dict = {
-        **base_delete_request_dict(flowId, app.current_event.request_context),
+        **base_delete_request_dict(flow_id, app.current_event.request_context),
         "delete_flow": False,
         "timerange_to_delete": str(timerange_to_delete),
         "timerange_remaining": str(timerange_to_delete),
@@ -259,6 +282,11 @@ def delete_flow_segments_by_id(flowId: Annotated[str, Path(pattern=UUID_PATTERN)
 @metrics.log_metrics(capture_cold_start_metric=True)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:
     return app.resolve(event, context)
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(ex: RequestValidationError):
+    raise BadRequestError(ex.errors())  # 400
 
 
 @tracer.capture_method(capture_response=False)

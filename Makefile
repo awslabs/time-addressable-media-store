@@ -21,4 +21,4 @@ build-api-spec-tag:
 
 build-api-schema:
 	python ./api/build/generate_spec.py
-	datamodel-codegen --input ./api/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel --target-python-version 3.13 --use-schema-description --use-double-quotes
+	datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel --target-python-version 3.13 --use-schema-description --use-double-quotes

@@ -325,7 +325,28 @@ def query_flow_collection(flow_id: str) -> list:
 @tracer.capture_method(capture_response=False)
 def query_sources(parameters: dict) -> tuple[list, int]:
     """Returns a list of the TAMS Sources from the Neptune Database"""
-    page, limit, props, where_literals = parse_parameters(parameters)
+    props, where_literals = parse_parameters(
+        {
+            k: v
+            for k, v in parameters.items()
+            if k
+            in [
+                "format",
+                "label",
+                "tag_values",
+                "tag_exists",
+            ]
+        }
+    )
+    page = int(parameters["page"]) if parameters.get("page") else 0
+    limit = min(
+        (
+            parameters["limit"]
+            if parameters.get("limit")
+            else constants.DEFAULT_PAGE_LIMIT
+        ),
+        constants.MAX_PAGE_LIMIT,
+    )
     query = generate_source_query(
         {
             "source": props["properties"],
@@ -351,7 +372,33 @@ def query_sources(parameters: dict) -> tuple[list, int]:
 @tracer.capture_method(capture_response=False)
 def query_flows(parameters: dict) -> tuple[list, int]:
     """Returns a list of the TAMS Flows from the Neptune Database"""
-    page, limit, props, where_literals = parse_parameters(parameters)
+    props, where_literals = parse_parameters(
+        {
+            k: v
+            for k, v in parameters.items()
+            if k
+            in [
+                "format",
+                "codec",
+                "label",
+                "tag_values",
+                "tag_exists",
+                "frame_width",
+                "frame_height",
+            ]
+        }
+    )
+    if parameters.get("source_id"):
+        props["source_properties"]["id"] = parameters["source_id"]
+    page = int(parameters.get("page", 0))
+    limit = min(
+        (
+            parameters["limit"]
+            if parameters.get("limit")
+            else constants.DEFAULT_PAGE_LIMIT
+        ),
+        constants.MAX_PAGE_LIMIT,
+    )
     query = generate_flow_query(
         {
             "flow": props["properties"],
