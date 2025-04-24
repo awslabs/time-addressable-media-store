@@ -221,11 +221,6 @@ paths:
           is performed.
         schema:
           type: boolean
-      - name: format
-        in: query
-        description: Filter on source format.
-        schema:
-          $ref: '#/components/schemas/contentformat'
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -2151,6 +2146,8 @@ components:
       description: Identifies the content format for a flow or source using a URN string.
       enum:
       - urn:x-nmos:format:video
+      - urn:x-nmos:format:image
+      - urn:x-nmos:format:image
       - urn:x-nmos:format:audio
       - urn:x-nmos:format:data
       - urn:x-nmos:format:multi
@@ -2345,6 +2342,8 @@ components:
       title: Flow
       oneOf:
       - $ref: '#/components/schemas/flowvideo'
+      - $ref: '#/components/schemas/flowimage'
+      - $ref: '#/components/schemas/flowimage'
       - $ref: '#/components/schemas/flowaudio'
       - $ref: '#/components/schemas/flowdata'
       - $ref: '#/components/schemas/flowmulti'
@@ -2420,6 +2419,8 @@ components:
           type: string
           enum:
           - urn:x-nmos:format:video
+          - urn:x-nmos:format:image
+          - urn:x-nmos:format:image
           - urn:x-nmos:format:audio
           - urn:x-nmos:format:data
           - urn:x-nmos:format:multi
@@ -2705,6 +2706,40 @@ components:
               data_type:
                 description: The type of information encoded in the flow, identified using a URN. e.g. The data_type may be urn:x-tams:data:bounding-box, and the codec `application/json`.
                 type: string
+    flowimage:
+      type: object
+      description: Describes an image Flow
+      title: Image Flow
+      allOf:
+      - $ref: '#/components/schemas/flowcore'
+      - type: object
+        required:
+        - format
+        - essence_parameters
+        - codec
+        properties:
+          format:
+            description: The primary content type URN for the flow.
+            type: string
+            enum:
+            - urn:x-nmos:format:image
+          essence_parameters:
+            type: object
+            description: Describes the parameters of the essence inside this image Flow
+            title: Image Flow Essence Parameters
+            required:
+            - frame_width
+            - frame_height
+            additionalProperties: false
+            properties:
+              frame_width:
+                description: The width of the picture in pixels.
+                type: integer
+                exclusiveMinimum: 0
+              frame_height:
+                description: The height of the picture in pixels.
+                type: integer
+                exclusiveMinimum: 0
     flowmulti:
       type: object
       description: Describes a multi-essence Flow

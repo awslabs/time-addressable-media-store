@@ -109,7 +109,60 @@ def parse_essence_parameters(spec):
     return essence_params
 
 
+def add_image_format_support():
+    # Add additional format option to enum in OpenApi spec.
+    with open(
+        f"{sys.path[0]}/tams/api/TimeAddressableMediaStore.yaml", "r", encoding="utf-8"
+    ) as sf:
+        raw_content = sf.read()
+        raw_content = raw_content.replace(
+            "- urn:x-nmos:format:video",
+            "- urn:x-nmos:format:video\n        - urn:x-nmos:format:image",
+        )
+    with open(
+        f"{sys.path[0]}/tams/api/TimeAddressableMediaStore.yaml", "w", encoding="utf-8"
+    ) as sf:
+        sf.write(raw_content)
+
+    # Add additional flow type to flow schema.
+    with open(f"{sys.path[0]}/tams/api/schemas/flow.json", "r", encoding="utf-8") as sf:
+        raw_content = sf.read()
+        raw_content = raw_content.replace(
+            '{ "$ref": "flow-video.json" }',
+            '{ "$ref": "flow-video.json" },\n    { "$ref": "flow-image.json" }',
+        )
+    with open(f"{sys.path[0]}/tams/api/schemas/flow.json", "w", encoding="utf-8") as sf:
+        sf.write(raw_content)
+
+    # Add additional format option to source schema enum.
+    with open(
+        f"{sys.path[0]}/tams/api/schemas/source.json", "r", encoding="utf-8"
+    ) as sf:
+        raw_content = sf.read()
+        raw_content = raw_content.replace(
+            '"urn:x-nmos:format:video"',
+            '"urn:x-nmos:format:video",\n                "urn:x-nmos:format:image"',
+        )
+    with open(
+        f"{sys.path[0]}/tams/api/schemas/source.json", "w", encoding="utf-8"
+    ) as sf:
+        sf.write(raw_content)
+
+    # Create flow-image schema file.
+    with open(f"{sys.path[0]}/flow-image.json", "r", encoding="utf-8") as sf:
+        raw_content = sf.read()
+    with open(
+        f"{sys.path[0]}/tams/api/schemas/flow-image.json", "w", encoding="utf-8"
+    ) as sf:
+        sf.write(raw_content)
+
+
 def main():
+    #####################################################################################
+    # Alter files to support image format. TEMPORARY until spec officially adds support #
+    #####################################################################################
+    add_image_format_support()
+    #####################################################################################
     # Read the spec from YAML file into OrderedDict to preserve easy to read structure when written back.
     with open(
         f"{sys.path[0]}/tams/api/TimeAddressableMediaStore.yaml", "r", encoding="utf-8"
