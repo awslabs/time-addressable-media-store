@@ -52,7 +52,7 @@ def stub_flow():
             "frame_width": 1920,
             "frame_height": 1080,
             "frame_rate": {
-                "numerator": 30,
+                "numerator": 300,
                 "denominator": 1
             },
             "colorspace": "BT709",
