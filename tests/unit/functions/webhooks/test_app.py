@@ -58,7 +58,7 @@ class TestWebhooks():
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
-                "detail-type": "flow.created",
+                "detail-type": "flows/created",
                 "resources": resources
             }
         )
@@ -90,7 +90,7 @@ class TestWebhooks():
 
     @patch('webhooks.app.webhooks_table')
     def test_get_webhooks_key_condition(self, webhooks_table):
-        detail_type = "flow.created"
+        detail_type = "flows/created"
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
@@ -113,17 +113,17 @@ class TestWebhooks():
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
-                "detail-type": "flow.created",
+                "detail-type": "flows/created",
                 "resources": ["arn:flow:123"]
             }
         )
 
         first_response = {
-            "Items": [{"event": "video.created", "video_ids": ["123"], "url": "https://example.com"}],
+            "Items": [{"event": "flows/created", "flow_ids": ["7622bd94-f80d-49fc-a1b0-66a38c929f3e"], "url": "https://example.com"}],
             "LastEvaluatedKey": "next-page"
         }
         second_response = {
-            "Items": [{"event": "video.created", "video_ids": ["123"], "url": "https://example.com"}]
+            "Items": [{"event": "flows/created", "flow_ids": ["7622bd94-f80d-49fc-a1b0-66a38c929f3e"], "url": "https://example.com"}]
         }
 
         webhooks_table.query.side_effect = [
@@ -142,7 +142,7 @@ class TestWebhooks():
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
-                "detail-type": "video.created",
+                "detail-type": "flows/created",
                 "resources": ["arn:flow:123"]
             }
         )
@@ -163,7 +163,7 @@ class TestWebhooks():
         event = EventBridgeEvent(
             {
                 "time": "2023-01-01T00:00:00Z",
-                "detail-type": "flow.created",
+                "detail-type": "flows/created",
                 "resources": ["arn:flow:123"]
             }
         )
@@ -188,7 +188,7 @@ class TestWebhooks():
     @pytest.mark.parametrize("webhook_count", [1, 2, 3, 4, 5])
     @patch('webhooks.app.post_event')
     def test_handler_posts_for_each_webhook(self, post_event, webhook_count, mock_lambda_context):
-        detail_type = "flow.created"
+        detail_type = "flows/created"
 
         event = EventBridgeEvent(
             {
