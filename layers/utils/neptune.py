@@ -390,7 +390,7 @@ def query_flows(parameters: dict) -> tuple[list, int]:
     )
     if parameters.get("source_id"):
         props["source_properties"]["id"] = parameters["source_id"]
-    page = int(parameters.get("page", 0))
+    page = int(parameters.get("page") or 0)
     limit = min(
         (
             parameters["limit"]
