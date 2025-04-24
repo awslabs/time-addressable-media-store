@@ -38,7 +38,6 @@ class Contentformat(Enum):
 
     urn_x_nmos_format_video = "urn:x-nmos:format:video"
     urn_x_nmos_format_image = "urn:x-nmos:format:image"
-    urn_x_nmos_format_image_1 = "urn:x-nmos:format:image"
     urn_x_nmos_format_audio = "urn:x-nmos:format:audio"
     urn_x_nmos_format_data = "urn:x-nmos:format:data"
     urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
@@ -144,7 +143,6 @@ class Format(Enum):
 
     urn_x_nmos_format_video = "urn:x-nmos:format:video"
     urn_x_nmos_format_image = "urn:x-nmos:format:image"
-    urn_x_nmos_format_image_1 = "urn:x-nmos:format:image"
     urn_x_nmos_format_audio = "urn:x-nmos:format:audio"
     urn_x_nmos_format_data = "urn:x-nmos:format:data"
     urn_x_nmos_format_multi = "urn:x-nmos:format:multi"

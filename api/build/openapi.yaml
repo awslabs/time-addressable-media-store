@@ -2147,7 +2147,6 @@ components:
       enum:
       - urn:x-nmos:format:video
       - urn:x-nmos:format:image
-      - urn:x-nmos:format:image
       - urn:x-nmos:format:audio
       - urn:x-nmos:format:data
       - urn:x-nmos:format:multi
@@ -2343,7 +2342,6 @@ components:
       oneOf:
       - $ref: '#/components/schemas/flowvideo'
       - $ref: '#/components/schemas/flowimage'
-      - $ref: '#/components/schemas/flowimage'
       - $ref: '#/components/schemas/flowaudio'
       - $ref: '#/components/schemas/flowdata'
       - $ref: '#/components/schemas/flowmulti'
@@ -2419,7 +2417,6 @@ components:
           type: string
           enum:
           - urn:x-nmos:format:video
-          - urn:x-nmos:format:image
           - urn:x-nmos:format:image
           - urn:x-nmos:format:audio
           - urn:x-nmos:format:data
