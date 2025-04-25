@@ -109,7 +109,6 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
 @lru_cache()
 def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
-    print('here')
     service_dict = parameters.get_parameter(info_param_name, transform="json")
     if service_dict.get("name") is None:
         return "tams"
