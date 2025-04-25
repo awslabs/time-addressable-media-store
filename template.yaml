@@ -148,6 +148,10 @@ Resources:
           LoggingLevel: INFO
           MetricsEnabled: True
       StageName: Prod
+      Cors:
+        AllowMethods: '''*'''
+        AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+        AllowOrigin: '''*'''
       Auth:
         AddDefaultAuthorizerToCorsPreflight: False
         DefaultAuthorizer: Authorizor
