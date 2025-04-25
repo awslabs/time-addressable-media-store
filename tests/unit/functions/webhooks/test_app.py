@@ -16,24 +16,12 @@ os.environ["BUCKET_REGION"] = 'eu-west-1'
 os.environ["WEBHOOKS_QUEUE_URL"] = 'TEST_QUEUE'
 
 
-def mock_client(*args, **kwargs):
-    client = MagicMock()
-
-    if args[0] == 'ssm':
-        client.get_parameter.return_value = {
-            'Parameter': {
-                'Value': json.dumps({'name': 'tams'})
-            }
-        }
-
-    return client
-
-
 builder = ConditionExpressionBuilder()
 
-with patch('boto3.client', mock_client):
-    with patch('boto3.resource') as mock_resource:
-        from webhooks import app
+with patch('boto3.client'):
+    with patch('boto3.resource'):
+        with patch('utils.get_store_name', lambda: 'tams'):
+            from webhooks import app
 
 
 class TestWebhooks():
