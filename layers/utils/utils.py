@@ -260,12 +260,12 @@ def deserialise_neptune_obj(obj: dict) -> dict:
 
 
 @tracer.capture_method(capture_response=False)
-def parse_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
+def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     """Parses API Gateway parameters into the structure used by OpenCypher query"""
     where_literals = []
     return_dict = defaultdict(dict)
     for key, value in query_parameters.items():
-        if value:
+        if value is not None:
             if key in essence_params:
                 if essence_params[key] == "int":
                     return_dict["essence_properties"][key] = int(value)

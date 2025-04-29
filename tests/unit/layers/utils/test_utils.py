@@ -6,10 +6,13 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, Mock, patch
 from botocore.exceptions import ClientError
 from mediatimestamp.immutable import TimeRange, Timestamp
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 
+from params import essence_params
 with patch('boto3.client'):
     with patch('boto3.resource'):
         import utils
+        import constants
 
 
 class TestUtils():
@@ -174,3 +177,154 @@ class TestUtils():
         result = utils.pop_outliers(time_range_one_day, items)
         assert len(result) == 1
         assert result == items[1:]
+
+    @pytest.mark.parametrize("exists", [
+        True,
+        False,
+    ])
+    def test_parse_tag_parameters(self, exists):
+        expected_values = {'abc': '123'}
+        expected_exists = {'xyz': exists}
+
+        params = {
+            f'tag.{k}': v
+            for k, v in expected_values.items()
+        }
+
+        for k, v in expected_exists.items():
+            params[f'tag_exists.{k}'] = str(v).lower()
+
+        values, exists = utils.parse_tag_parameters(params)
+        assert values == expected_values
+        assert exists == expected_exists
+
+    def test_parse_tag_parameters_throws_on_bad_bool(self):
+        params = {
+            'tag_exists.xyz': 'notabool'
+        }
+
+        with pytest.raises(BadRequestError):
+            utils.parse_tag_parameters(params)
+
+    def test_json_number_returns_float(self):
+        input_float = '1.23'
+        result = utils.json_number(input_float)
+
+        assert isinstance(result, float)
+        assert result == float(input_float)
+
+    def test_json_number_returns_int(self):
+        input_int = '1'
+        result = utils.json_number(input_int)
+
+        assert isinstance(result, int)
+        assert result == int(input_int)
+
+    def test_serialise_neptune_obj(self):
+        child_key = 'child'
+        serialised_key = f'{constants.SERIALISE_PREFIX}{child_key}'
+        input_dict = {
+            'id': '123',
+            child_key: {
+                'hello': 'world'
+            }
+        }
+
+        result = utils.serialise_neptune_obj(input_dict)
+
+        assert isinstance(result, dict)
+        assert result['id'] == input_dict['id']
+        assert isinstance(result[serialised_key], str)
+        assert json.loads(result[serialised_key]) == input_dict[child_key]
+
+    def test_deserialise_neptune_obj(self):
+        child_dict = {
+            'hello': 'world'
+        }
+
+        child_key = 'child'
+        serialised_key = f'{constants.SERIALISE_PREFIX}{child_key}'
+        input_dict = {
+            'id': '123',
+            serialised_key: json.dumps(child_dict)
+        }
+
+        result = utils.deserialise_neptune_obj(input_dict)
+
+        assert isinstance(result, dict)
+        assert result['id'] == input_dict['id']
+        assert result[child_key] == child_dict
+
+    def test_parse_api_gw_parameters(self):
+        essence_param_key = "sample_rate"
+        essence_param_value = '0'
+        query_parameters = {
+            essence_param_key: essence_param_value,
+            'tag_values': {
+                'a': '1',
+                'b': '2'
+            },
+            'tag_exists': {
+                'y': True,
+                'z': False
+            },
+            'misc': '123'
+        }
+
+        return_dict, where_literals = utils.parse_api_gw_parameters(
+            query_parameters)
+
+        # Ensure essence prop is structured and processed
+        assert return_dict['essence_properties'][essence_param_key] == int(
+            essence_param_value)
+
+        # Ensure tag values are structurd appropriately
+        for k, v in query_parameters['tag_values'].items():
+            assert return_dict['tag_properties'][k] == v
+
+        # Ensure tag_exists values are reflected in where literals
+        assert where_literals == [f't.y IS NOT NULL', f't.z IS NULL']
+
+        # Ensure misc properties are included appropriately
+        assert return_dict['properties']['misc'] == query_parameters['misc']
+
+    def test_filter_dict_removes_keys(self):
+        input_dict = {
+            'a': 1,
+            'b': 2,
+            'c': 3
+        }
+
+        keys_to_remove = ['a', 'c']
+        result = utils.filter_dict(input_dict, keys_to_remove)
+
+        assert result == {'b': 2}
+
+    @patch('utils.s3')
+    def test_check_object_exists(self, mock_s3):
+        mock_s3.head_object.return_value = {}
+        result = utils.check_object_exists('bucket', 'key')
+
+        assert mock_s3.head_object.call_count == 1
+        assert result == True
+
+    @patch('utils.s3')
+    def test_check_object_does_not_exist(self, mock_s3):
+        mock_s3.head_object.side_effect = ClientError(
+            {'Error': {'Code': '404'}}, 'head_object')
+        result = utils.check_object_exists('bucket', 'key1')
+
+        assert mock_s3.head_object.call_count == 1
+        assert result == False
+
+    @patch('utils.s3')
+    def test_get_presigned_url(self, mock_s3):
+        expected = 'https://example.com'
+        mock_s3.generate_presigned_url.return_value = expected
+        result = utils.generate_presigned_url('method', 'bucket', 'key')
+
+        kw_args = mock_s3.generate_presigned_url.call_args[1]
+
+        assert mock_s3.generate_presigned_url.call_count == 1
+        assert result == expected
+        assert kw_args["ExpiresIn"] == 3600
