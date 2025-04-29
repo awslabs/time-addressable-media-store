@@ -1,11 +1,29 @@
+import os
+import pytest
 import logging
 from unittest.mock import Mock, MagicMock, patch
 from requests import Response
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from mediatimestamp.immutable import TimeRange, Timestamp
+from datetime import datetime, timedelta
 
-import pytest
+os.environ["WEBHOOKS_TABLE"] = 'TEST_TABLE'
+os.environ["BUCKET"] = 'TEST_BUCKET'
+os.environ["BUCKET_REGION"] = 'eu-west-1'
+os.environ["WEBHOOKS_QUEUE_URL"] = 'TEST_QUEUE'
+os.environ["USER_POOL_ID"] = '123'
+os.environ["COGNITO_LAMBDA_NAME"] = 'USERNAME_LAMBDA'
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def time_range_one_day():
+    now = datetime.now()
+    start = Timestamp.from_datetime(now)
+    end = Timestamp.from_datetime(now + timedelta(hours=24))
+    timerange = TimeRange(start, end)
+    return timerange
 
 
 @pytest.fixture

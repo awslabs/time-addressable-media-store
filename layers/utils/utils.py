@@ -105,8 +105,8 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
     )
 
 
-@tracer.capture_method(capture_response=False)
 @lru_cache()
+@tracer.capture_method(capture_response=False)
 def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
     service_dict = parameters.get_parameter(info_param_name, transform="json")
@@ -115,15 +115,15 @@ def get_store_name() -> str:
     return service_dict["name"]
 
 
-@tracer.capture_method(capture_response=False)
 @lru_cache()
+@tracer.capture_method(capture_response=False)
 def get_user_pool() -> dict:
     """Retrieve the user pool details"""
     return idp.describe_user_pool(UserPoolId=user_pool_id)["UserPool"]
 
 
-@tracer.capture_method(capture_response=False)
 @lru_cache()
+@tracer.capture_method(capture_response=False)
 def get_username(claims_tuple: tuple[str, str]) -> str:
     """Dervive a suitable username from the API Gateway request details"""
     invoke = lmda.invoke(

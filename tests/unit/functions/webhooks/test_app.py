@@ -10,12 +10,6 @@ from undecorated import undecorated
 import json
 from boto3.dynamodb.conditions import ConditionExpressionBuilder
 
-os.environ["WEBHOOKS_TABLE"] = 'TEST_TABLE'
-os.environ["BUCKET"] = 'TEST_BUCKET'
-os.environ["BUCKET_REGION"] = 'eu-west-1'
-os.environ["WEBHOOKS_QUEUE_URL"] = 'TEST_QUEUE'
-
-
 builder = ConditionExpressionBuilder()
 
 with patch('boto3.client'):
