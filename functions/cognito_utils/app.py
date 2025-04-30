@@ -25,10 +25,7 @@ def lambda_handler(event, context):
             user_attributes = {a["Name"]: a["Value"] for a in user_attributes}
             # Check attributes in order of preference
             for attr in ("email", "phone_number"):
-                if (
-                    user_pool["UsernameAttributes"].get(attr)
-                    and attr in user_attributes
-                ):
+                if attr in user_pool["UsernameAttributes"] and attr in user_attributes:
                     return user_attributes[attr]
         return event["username"]
     if event.get("client_id"):
