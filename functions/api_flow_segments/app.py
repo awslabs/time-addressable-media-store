@@ -97,16 +97,27 @@ def get_flow_segments_by_id(
             content_type=content_types.APPLICATION_JSON,
             body=json.dumps([]),
         )
-    args = get_key_and_args(
-        flow_id,
-        {
-            "reverse_order": param_reverse_order,
-            "limit": param_limit,
-            "page": param_page,
-            "timerange": param_timerange,
-            "object_id": param_object_id,
-        },
-    )
+    if param_timerange=="_":  # "eternity" special case - return all segments without time filtering
+        args = get_key_and_args(
+            flow_id,
+            {
+                "reverse_order": param_reverse_order,
+                "limit": param_limit,
+                "page": param_page,
+                "object_id": param_object_id,
+            },
+        )
+    else:
+        args = get_key_and_args(
+            flow_id,
+            {
+                "reverse_order": param_reverse_order,
+                "limit": param_limit,
+                "page": param_page,
+                "timerange": param_timerange,
+                "object_id": param_object_id,
+            },
+        )
     reverse_order = not args["ScanIndexForward"]
     query = segments_table.query(**args)
     items = query["Items"]
@@ -237,23 +248,36 @@ def delete_flow_segments_by_id(
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
     timerange_to_delete = TimeRange.from_str(get_flow_timerange(flow_id))
-    if param_timerange:
+    if param_timerange and param_timerange!="_":
         timerange_to_delete = TimeRange.from_str(param_timerange)
     deletion_request_dict = None
     if param_object_id:
         # Not able to handle return of Delete Request as delete requests do not support "object_id" query parameter
-        delete_flow_segments(
-            flow_id,
-            {
-                "timerange": param_timerange,
-                "object_id": param_object_id,
-            },
-            timerange_to_delete,
-            app.lambda_context,
-            s3_queue,
-            del_queue,
-            None,
-        )
+        if param_timerange == "_":  # "eternity" special case - return all segments without time filtering
+            delete_flow_segments(
+                flow_id,
+                {
+                    "object_id": param_object_id,
+                },
+                timerange_to_delete,
+                app.lambda_context,
+                s3_queue,
+                del_queue,
+                None,
+            )
+        else:
+            delete_flow_segments(
+                flow_id,
+                {
+                    "timerange": param_timerange,
+                    "object_id": param_object_id,
+                },
+                timerange_to_delete,
+                app.lambda_context,
+                s3_queue,
+                del_queue,
+                None,
+            )
         return None, HTTPStatus.NO_CONTENT.value  # 204
     deletion_request_dict = {
         **base_delete_request_dict(flow_id, app.current_event.request_context),
