@@ -1,22 +1,37 @@
+import os
+import pytest
 import logging
 from unittest.mock import Mock, MagicMock, patch
 from requests import Response
 from aws_lambda_powertools.utilities.typing import LambdaContext
+from mediatimestamp.immutable import TimeRange, Timestamp
+from datetime import datetime, timedelta
+from boto3.dynamodb.conditions import ConditionExpressionBuilder
 
-import pytest
+os.environ["WEBHOOKS_TABLE"] = 'TEST_TABLE'
+os.environ["BUCKET"] = 'TEST_BUCKET'
+os.environ["BUCKET_REGION"] = 'eu-west-1'
+os.environ["WEBHOOKS_QUEUE_URL"] = 'TEST_QUEUE'
+os.environ["USER_POOL_ID"] = '123'
+os.environ["COGNITO_LAMBDA_NAME"] = 'USERNAME_LAMBDA'
+os.environ["AWS_REGION"] = 'eu-west-1'
 
 logger = logging.getLogger(__name__)
+builder = ConditionExpressionBuilder()
+
+
+def parse_dynamo_expression(expression):
+    parsed = builder.build_expression(expression)
+    return parsed.condition_expression, parsed.attribute_name_placeholders, parsed.attribute_value_placeholders
 
 
 @pytest.fixture
-def mock_lambda_context():
-    context = LambdaContext()
-    context._function_name = "test"
-    context._memory_limit_in_mb = 128
-    context._invoked_function_arn = "XXXXXXXXXXXXXXXXX"
-    context._aws_request_id = "XXXXXXXXXXXXXXXXX"
-    return context
-
+def time_range_one_day():
+    now = datetime.now()
+    start = Timestamp.from_datetime(now)
+    end = Timestamp.from_datetime(now + timedelta(hours=24))
+    timerange = TimeRange(start, end)
+    return timerange
 
 @pytest.fixture
 def stub_source():

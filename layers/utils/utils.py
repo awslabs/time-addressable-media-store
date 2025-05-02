@@ -32,7 +32,8 @@ sqs = boto3.client("sqs")
 lmda = boto3.client("lambda")
 s3 = boto3.client(
     "s3", config=Config(s3={"addressing_style": "virtual"})
-)  # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
+    # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
+)
 idp = boto3.client("cognito-idp")
 ssm = boto3.client("ssm")
 user_pool_id = os.environ.get("USER_POOL_ID", "")
@@ -105,8 +106,8 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
     )
 
 
-@tracer.capture_method(capture_response=False)
 @lru_cache()
+@tracer.capture_method(capture_response=False)
 def get_store_name() -> str:
     """Parse store name from SSM parameter value or return default if not found"""
     service_dict = parameters.get_parameter(info_param_name, transform="json")
@@ -115,15 +116,15 @@ def get_store_name() -> str:
     return service_dict["name"]
 
 
-@tracer.capture_method(capture_response=False)
 @lru_cache()
+@tracer.capture_method(capture_response=False)
 def get_user_pool() -> dict:
     """Retrieve the user pool details"""
     return idp.describe_user_pool(UserPoolId=user_pool_id)["UserPool"]
 
 
-@tracer.capture_method(capture_response=False)
 @lru_cache()
+@tracer.capture_method(capture_response=False)
 def get_username(claims_tuple: tuple[str, str]) -> str:
     """Dervive a suitable username from the API Gateway request details"""
     invoke = lmda.invoke(
@@ -139,7 +140,7 @@ def get_username(claims_tuple: tuple[str, str]) -> str:
     )
     if invoke["StatusCode"] != 200:
         raise ClientError(
-            operation_name="LambdaInvoke", error_response=invoke["FunctionError"]
+            operation_name="LambdaInvoke", error_response={'Error': {'Message': invoke["FunctionError"], 'Code': invoke['StatusCode']}}
         )
     return json.loads(invoke["Payload"].read().decode("utf-8"))
 
@@ -152,7 +153,8 @@ def model_dump(
     if isinstance(model, list):
         model_dict = [model_dump(m, **kwargs) for m in model]
     else:
-        args = {"by_alias": True, "exclude_unset": True, "exclude_none": True, **kwargs}
+        args = {"by_alias": True, "exclude_unset": True,
+                "exclude_none": True, **kwargs}
         model_dict = model.model_dump(mode="json", **args)
         remove_null(model_dict)
     return model_dict
@@ -202,10 +204,10 @@ def parse_tag_parameters(params: None) -> tuple[dict, dict]:
         return (values, exists)
     for key, value in params.items():
         if key.startswith("tag."):
-            values[key[len("tag.") :]] = value
+            values[key[len("tag."):]] = value
         if key.startswith("tag_exists."):
             if value.lower() in ["true", "false"]:
-                exists[key[len("tag_exists.") :]] = value.lower() == "true"
+                exists[key[len("tag_exists."):]] = value.lower() == "true"
             else:
                 raise BadRequestError(
                     [
@@ -250,7 +252,7 @@ def deserialise_neptune_obj(obj: dict) -> dict:
     deserialised = {}
     for prop_name, prop_value in obj.items():
         if prop_name.startswith(constants.SERIALISE_PREFIX):
-            actual_name = prop_name[len(constants.SERIALISE_PREFIX) :]
+            actual_name = prop_name[len(constants.SERIALISE_PREFIX):]
             deserialised[actual_name] = json.loads(prop_value)
         elif isinstance(prop_value, dict):
             deserialised[prop_name] = deserialise_neptune_obj(prop_value)
@@ -260,19 +262,20 @@ def deserialise_neptune_obj(obj: dict) -> dict:
 
 
 @tracer.capture_method(capture_response=False)
-def parse_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
+def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     """Parses API Gateway parameters into the structure used by OpenCypher query"""
     where_literals = []
     return_dict = defaultdict(dict)
     for key, value in query_parameters.items():
-        if value:
+        if value is not None:
             if key in essence_params:
                 if essence_params[key] == "int":
                     return_dict["essence_properties"][key] = int(value)
                 elif essence_params[key] == "float":
                     return_dict["essence_properties"][key] = float(value)
                 elif essence_params[key] == "bool":
-                    return_dict["essence_properties"][key] = value.lower() == "true"
+                    return_dict["essence_properties"][key] = value.lower(
+                    ) == "true"
             elif key == "tag_values":
                 for tag_name, tag_value in value.items():
                     return_dict["tag_properties"][tag_name] = tag_value

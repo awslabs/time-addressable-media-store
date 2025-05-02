@@ -9,12 +9,7 @@ from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
 from undecorated import undecorated
 import json
 from boto3.dynamodb.conditions import ConditionExpressionBuilder
-
-os.environ["WEBHOOKS_TABLE"] = 'TEST_TABLE'
-os.environ["BUCKET"] = 'TEST_BUCKET'
-os.environ["BUCKET_REGION"] = 'eu-west-1'
-os.environ["WEBHOOKS_QUEUE_URL"] = 'TEST_QUEUE'
-
+from conftest import parse_dynamo_expression
 
 builder = ConditionExpressionBuilder()
 
@@ -54,10 +49,9 @@ class TestWebhooks():
         app.get_matching_webhooks(event)
 
         kw_args = webhooks_table.query.call_args[1]
-        expression = builder.build_expression(kw_args['FilterExpression'])
-        expression_string = expression.condition_expression
-        expression_attribute_names = expression.attribute_name_placeholders
-        expression_attribute_values = expression.attribute_value_placeholders
+
+        expression_string, expression_attribute_names, expression_attribute_values = parse_dynamo_expression(
+            kw_args['FilterExpression'])
 
         # Ensure the expression uses contains once per id
         contains_count = expression_string.count('contains')
@@ -175,7 +169,7 @@ class TestWebhooks():
 
     @pytest.mark.parametrize("webhook_count", [1, 2, 3, 4, 5])
     @patch('webhooks.app.post_event')
-    def test_handler_posts_for_each_webhook(self, post_event, webhook_count, mock_lambda_context):
+    def test_handler_posts_for_each_webhook(self, post_event, webhook_count):
         detail_type = "flows/created"
 
         event = EventBridgeEvent(
@@ -197,6 +191,6 @@ class TestWebhooks():
         unwrapped_handler = undecorated(app.lambda_handler)
 
         with patch('webhooks.app.get_matching_webhooks', return_value=return_items):
-            unwrapped_handler(event, mock_lambda_context)
+            unwrapped_handler(event, MagicMock())
 
         assert post_event.call_count == len(return_items)
