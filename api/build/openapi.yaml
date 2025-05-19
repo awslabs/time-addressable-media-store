@@ -851,6 +851,10 @@ paths:
                   summary: Video Flow - Uncompressed (Quicktime)
                   value:
                     $ref: examples/flow-get-200-video-raw.json
+                jpegimage:
+                  summary: Image Flow - JPEG Codec
+                  value:
+                    $ref: examples/flow-get-200-image-jpeg.json
                 ttml:
                   summary: Data Flow - TTML
                   description: TAMS can also be used for storing non-AV content such as subtitles or event data
@@ -1678,37 +1682,11 @@ paths:
         '404':
           description: The flow ID in the path is invalid.
     post:
-      summary: Create Flow Segment
-      description: |
-        Register a new flow segment, attaching the object id given to a point in the flow timeline.
-
-        The segment may use a newly-written object, or re-use an existing object from another flow.
-
-        For newly-written objects, the client is responsible for ensuring that the segment written to the store obeys the following restrictions:
-        - The object id provided for a segment MUST be one which was received in a POST from /storage for this flow.
-        - All samples in the object SHOULD be used by the segment.
-        - The timestamps of each sample in the media object MUST equal its position on the Flow timeline, OR `ts_offset` MUST
-          be set such that `media_object_ts + ts_offset = segment_ts`
-        - The timerange of the segment MUST NOT overlap any other segment in the same Flow. The behaviour is
-          undefined if there is an overlap with existing segments and a store may return a 400 error response.
-        - The `sample_offset` SHOULD be zero.
-
-        If a client needs to modify a Flow segment, e.g. to correct metadata such as the `key_frame_count` or add additional
-        URLs to `get_urls`, then the client SHOULD first delete the existing segment and then write a new one. The behaviour is
-        undefined if the segment exists and a store may return a 400 error response.
-
-        Clients are expected to decide how to break content into media objects, however those objects SHOULD be large
-        enough to avoid excessive round trip overheads in the underlying store (_e.g._ of the order of several megabytes)
-        and where codecs with temporal re-ordering are used, object SHOULD contain complete GOPs or decodable units.
-
-        For objects that have been re-used from other flows, the `sample_offset` and `sample_count` MAY be used to
-        specify part of the object to use:
-        - The `timerange` field indicates the new segment's position in the flow
-        - The sample associated with the start of the `timerange` MUST be the one selected by `sample_offset`
-        - Likewise, the sample associated with the end of the `timerange` MUST be the one selected by
-          `sample_offset + sample_count - 1`, unless `timerange` has an exclusive end, in which case it will be
-          `sample_offset + sample_count`.
-        - The timerange of the segment MUST NOT overlap any other segment in the same Flow.
+      summary: Create Flow Segments
+      description: "Register either a single new flow segment or an array of segments, attaching the object id given to a point in the flow timeline.\n\nThe segment may use a newly-written object, or re-use an existing object from another flow.\n\nFor newly-written objects, the client is responsible for ensuring that the segment written to the store obeys the following restrictions:\n- All samples in the object SHOULD be used by the segment.\n- The timestamps of each sample in the media object MUST equal its position on the Flow timeline, OR `ts_offset` MUST\n  be set such that `media_object_ts + ts_offset = segment_ts`\n- The timerange of the segment MUST NOT overlap any other segment in the same Flow. The behaviour is\n  undefined if there is an overlap with existing segments and a store may return a 400 error response.\n- The `sample_offset` SHOULD be zero.\n\nA TAMS SHOULD reject registrations of Flow Segments with a 400 error response if it references a newly created media object\n\
+        in the local TAMS storage that was not intended to be used for the Flow. A TAMS SHOULD accept Flow Segments that reference an\nexisting media object in the local TAMS storage that was originally created for another Flow.\n\nA TAMS MAY support media objects that are held in external storage in another TAMS or other media storage system. The Flow Segment\nmay in that case require the `get_urls` property to provide the information needed by clients to access the media object.\n\nIf a client needs to modify a Flow segment, e.g. to correct metadata such as the `key_frame_count` or add additional\nURLs to `get_urls`, then the client SHOULD first delete the existing segment and then write a new one. The behaviour is\nundefined if the segment exists and a store may return a 400 error response.\n\nFor successful creation of all segments in the request a 201 response should be provided.  If an error is detected when processing\na list of segments then processing should continue to try and\
+        \ process the remaining segments.  A 200 response should be returned \nlisting the failed segments.\n\nClients are expected to decide how to break content into media objects, however those objects SHOULD be large\nenough to avoid excessive round trip overheads in the underlying store (_e.g._ of the order of several megabytes)\nand where codecs with temporal re-ordering are used, object SHOULD contain complete GOPs or decodable units.\n\nFor objects that have been re-used from other flows, the `sample_offset` and `sample_count` MAY be used to\nspecify part of the object to use:\n- The `timerange` field indicates the new segment's position in the flow\n- The sample associated with the start of the `timerange` MUST be the one selected by `sample_offset`\n- Likewise, the sample associated with the end of the `timerange` MUST be the one selected by\n  `sample_offset + sample_count - 1`, unless `timerange` has an exclusive end, in which case it will be\n  `sample_offset + sample_count`.\n\
+        - The timerange of the segment MUST NOT overlap any other segment in the same Flow.\n"
       operationId: POST_flows-flowId-segments
       tags:
       - FlowSegments
@@ -1718,11 +1696,23 @@ paths:
             example:
               $ref: examples/flow-segment-post.json
             schema:
-              $ref: '#/components/schemas/flowsegment'
+              oneOf:
+              - $ref: '#/components/schemas/flowsegment'
+              - type: array
+                items:
+                  $ref: '#/components/schemas/flowsegment'
         required: true
       responses:
+        '200':
+          description: Partial success creating segments returning list of failed segments.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/flowsegmentbulkfailure'
+              example:
+                $ref: examples/flow-segment-partial-failure.json
         '201':
-          description: created. The flow segment has been created.
+          description: created. The flow segment or list of segments has been created.
         '400':
           description: Bad request. Invalid flow segment JSON or the flow 'container' is not set.
         '403':
@@ -1827,6 +1817,92 @@ paths:
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
           description: The requested flow does not exist.
+  /objects/{objectId}:
+    head:
+      summary: Media Object Information
+      description: Return flow references and other information about media objects.
+      operationId: HEAD_objects
+      tags:
+      - Objects
+      parameters:
+      - name: objectId
+        in: path
+        description: The media object identifier.
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
+      responses:
+        '200':
+          description: ''
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' and a link to the next page is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the implementation
+              schema:
+                type: integer
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/trait_resource_info_head_400'
+        '404':
+          description: The requested media object does not exist.
+    get:
+      summary: Media Object Information
+      description: |
+        Contains flows that references the media object and other information.
+
+        The paging query parameters and headers are required for the list of flow references in the media object.
+        API implementations should return a complete list of flow references within reason and API clients should expect
+        paging to happen in some rare cases where a media object is used in many flows.
+      operationId: GET_objects
+      tags:
+      - Objects
+      parameters:
+      - name: objectId
+        in: path
+        description: The media object identifier.
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
+      responses:
+        '200':
+          description: ''
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' and a link to the next page is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the implementation
+              schema:
+                type: integer
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
+          content:
+            application/json:
+              example:
+                $ref: examples/objects-get-200.json
+              schema:
+                $ref: '#/components/schemas/object'
+        '400':
+          description: Bad request. Invalid query options.
+        '404':
+          description: The requested media object does not exist.
   /flow-delete-requests:
     head:
       summary: List Flow Delete Requests
@@ -2151,6 +2227,7 @@ components:
       description: Identifies the content format for a flow or source using a URN string.
       enum:
       - urn:x-nmos:format:video
+      - urn:x-tam:format:image
       - urn:x-nmos:format:audio
       - urn:x-nmos:format:data
       - urn:x-nmos:format:multi
@@ -2212,28 +2289,8 @@ components:
           - done
           - error
         error:
-          description: Provides more information for the error status.
-          type: object
-          required:
-          - type
-          - summary
-          - time
-          properties:
-            type:
-              description: The error type name.
-              type: string
-            summary:
-              description: Summary description of the error and causes.
-              type: string
-            traceback:
-              description: Stack trace leading to error (as a list of strings)
-              type: array
-              items:
-                type: string
-            time:
-              description: Time at which the error ocurred, to aid in log correlation
-              type: string
-              format: date-time
+          description: Provides more information for the error status, as described by the [Error](../schemas/error#top) type
+          $ref: '#/components/schemas/error'
     deletionrequestslist:
       title: Deletion Requests List
       type: array
@@ -2244,6 +2301,31 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/collectionitem'
+    flowsegmentbulkfailure:
+      title: Failed segments
+      description: List of segments that have failed to register
+      type: object
+      required:
+      - failed_segments
+      properties:
+        failed_segments:
+          description: The list of segments which have failed to register with the TAMS API
+          type: array
+          items:
+            type: object
+            description: Failed segment details
+            required:
+            - object_id
+            properties:
+              object_id:
+                description: The object ID of the segment which has failed to register with the TAMS API
+                type: string
+              timerange:
+                description: The timerange of segment that has failed, as described by the [TimeRange](../schemas/timerange#top) type
+                $ref: '#/components/schemas/timerange'
+              error:
+                description: Provides more information for the error status, as described by the [Error](../schemas/error#top) type
+                $ref: '#/components/schemas/error'
     flowsegment:
       type: object
       description: Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
@@ -2346,8 +2428,30 @@ components:
       oneOf:
       - $ref: '#/components/schemas/flowvideo'
       - $ref: '#/components/schemas/flowaudio'
+      - $ref: '#/components/schemas/flowimage'
       - $ref: '#/components/schemas/flowdata'
       - $ref: '#/components/schemas/flowmulti'
+    object:
+      type: object
+      description: Describes a media object in the store.
+      title: Object
+      required:
+      - object_id
+      - referenced_by_flows
+      properties:
+        object_id:
+          description: The media object identifier.
+          type: string
+        referenced_by_flows:
+          type: array
+          description: List of Flows that reference this media object via Flow Segments in this store.
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        first_referenced_by_flow:
+          description: The first Flow that had a Flow Segment reference the media object in this store. This Flow is also present in 'referenced_by_flows' if it is still referenced by the Flow. This property is optional and may in some implementations become unset if the Flow no longer references the media object, e.g. because it was deleted.
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
     servicepost:
       title: Update Service Info
       description: Post update to the service info
@@ -2420,6 +2524,7 @@ components:
           type: string
           enum:
           - urn:x-nmos:format:video
+          - urn:x-tam:format:image
           - urn:x-nmos:format:audio
           - urn:x-nmos:format:data
           - urn:x-nmos:format:multi
@@ -2480,7 +2585,7 @@ components:
 
         Details of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.
       type: string
-      pattern: ^(\[|\()?(-?\d+:\d+)?(_(-?\d+:\d+)?)?(\]|\))?$
+      pattern: ^(\[|\()?(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?(_(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?)?(\]|\))?$
     webhookpost:
       title: Register Webhook
       description: Register to receive updates via webhook
@@ -2601,6 +2706,29 @@ components:
         container_mapping:
           description: Describes the mapping of the Flow essence from this Flow collection's container
           $ref: '#/components/schemas/containermapping'
+    error:
+      description: Provides more information for the error status.
+      type: object
+      required:
+      - type
+      - summary
+      - time
+      properties:
+        type:
+          description: The error type name.
+          type: string
+        summary:
+          description: Summary description of the error and causes.
+          type: string
+        traceback:
+          description: Stack trace leading to error (as a list of strings)
+          type: array
+          items:
+            type: string
+        time:
+          description: Time at which the error ocurred, to aid in log correlation
+          type: string
+          format: date-time
     eventstreamcommon:
       type: object
       description: Describes an event stream mechanism available in this implementation of TAMS
@@ -2705,6 +2833,55 @@ components:
               data_type:
                 description: The type of information encoded in the flow, identified using a URN. e.g. The data_type may be urn:x-tams:data:bounding-box, and the codec `application/json`.
                 type: string
+    flowimage:
+      type: object
+      description: Describes an still image Flow
+      title: Image Flow
+      allOf:
+      - $ref: '#/components/schemas/flowcore'
+      - type: object
+        required:
+        - format
+        - essence_parameters
+        - codec
+        properties:
+          format:
+            description: The primary content type URN for the flow.
+            type: string
+            enum:
+            - urn:x-tam:format:image
+          essence_parameters:
+            type: object
+            description: Describes the parameters of the essence inside this image Flow
+            title: Image Flow Essence Parameters
+            required:
+            - frame_width
+            - frame_height
+            additionalProperties: false
+            properties:
+              frame_width:
+                description: The width of the picture in pixels.
+                type: integer
+                exclusiveMinimum: 0
+              frame_height:
+                description: The height of the picture in pixels.
+                type: integer
+                exclusiveMinimum: 0
+              aspect_ratio:
+                description: The display aspect ratio. i.e. display_width / display_height
+                type: object
+                required:
+                - numerator
+                - denominator
+                properties:
+                  numerator:
+                    description: numerator
+                    type: integer
+                    exclusiveMinimum: 0
+                  denominator:
+                    description: denominator
+                    type: integer
+                    exclusiveMinimum: 0
     flowmulti:
       type: object
       description: Describes a multi-essence Flow
@@ -2917,7 +3094,7 @@ components:
 
         Details of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.
       type: string
-      pattern: ^-?\d+:\d+$
+      pattern: ^-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8})$
     containermapping:
       type: object
       description: Defines the location of Flow essence data in a container track
@@ -3124,6 +3301,8 @@ tags:
 - name: FlowSegments
   description: |
     A timerange segment of a Flow that references a media object in the object store.
+- name: Objects
+  description: The object in the object store that contains the media essence.
 - name: MediaStorage
   description: The system that stores the media objects referenced by flow segments.
 - name: FlowDeleteRequests
