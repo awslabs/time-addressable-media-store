@@ -35,6 +35,22 @@ VIDEO_FLOW = {
     },
 }
 
+IMAGE_FLOW = {
+    "id": "10000000-0000-1000-8000-000000000004",
+    "source_id": "00000000-0000-1000-8000-000000000004",
+    "format": "urn:x-tam:format:image",
+    "generation": 0,
+    "label": "pytest - image",
+    "description": "pytest - image",
+    "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+    "codec": "video/jpeg",
+    "container": "video/jpeg",
+    "essence_parameters": {
+        "frame_width": 320,
+        "frame_height": 180,
+    },
+}
+
 AUDIO_FLOW = {
     "id": "10000000-0000-1000-8000-000000000001",
     "source_id": "00000000-0000-1000-8000-000000000001",
@@ -84,6 +100,7 @@ MULTI_FLOW = {
         {"id": "10000000-0000-1000-8000-000000000000", "role": "video"},
         {"id": "10000000-0000-1000-8000-000000000001", "role": "audio"},
         {"id": "10000000-0000-1000-8000-000000000002", "role": "data"},
+        {"id": "10000000-0000-1000-8000-000000000004", "role": "image"},
     ],
 }
 

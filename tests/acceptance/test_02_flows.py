@@ -8,6 +8,7 @@ from constants import (
     DATA_FLOW,
     DYNAMIC_PROPS,
     ID_404,
+    IMAGE_FLOW,
     MULTI_FLOW,
     VIDEO_FLOW,
 )
@@ -137,6 +138,27 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito):
         assert prop in response_json
         del response_json[prop]
     assert DATA_FLOW == response_json
+
+
+def test_Create_or_Replace_Flow_PUT_201_IMAGE(api_client_cognito):
+    # Arrange
+    path = f'/flows/{IMAGE_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=IMAGE_FLOW,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 201 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    for prop in ["created_by", "created"]:
+        assert prop in response_json
+        del response_json[prop]
+    assert IMAGE_FLOW == response_json
 
 
 def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito):
@@ -597,7 +619,7 @@ def test_List_Flows_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert 5 == len(response.json())
     for prop in DYNAMIC_PROPS:
         for record in response_json:
             if prop in record:
@@ -605,6 +627,7 @@ def test_List_Flows_GET_200(api_client_cognito):
     assert {**VIDEO_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
     assert {**AUDIO_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
     assert {**DATA_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
+    assert {**IMAGE_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
     assert MULTI_FLOW in response_json
 
 
@@ -743,7 +766,7 @@ def test_List_Flows_GET_200_page(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Flows_GET_200_source_id(api_client_cognito):
@@ -806,7 +829,7 @@ def test_List_Flows_GET_200_tag_exists_name(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Flows_GET_200_timerange(api_client_cognito):
@@ -820,7 +843,7 @@ def test_List_Flows_GET_200_timerange(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert 5 == len(response.json())
 
 
 def test_List_Flows_GET_400(api_client_cognito):

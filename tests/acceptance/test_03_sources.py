@@ -8,6 +8,7 @@ from constants import (
     DATA_FLOW,
     DYNAMIC_PROPS,
     ID_404,
+    IMAGE_FLOW,
     MULTI_FLOW,
     VIDEO_FLOW,
     get_source,
@@ -20,6 +21,7 @@ pytestmark = [
 VIDEO_SOURCE = get_source(VIDEO_FLOW)
 AUDIO_SOURCE = get_source(AUDIO_FLOW)
 DATA_SOURCE = get_source(DATA_FLOW)
+IMAGE_SOURCE = get_source(IMAGE_FLOW)
 MULTI_SOURCE = get_source(MULTI_FLOW)
 
 
@@ -285,7 +287,7 @@ def test_List_Sources_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert 5 == len(response.json())
     for prop in DYNAMIC_PROPS:
         for record in response_json:
             if prop in record:
@@ -293,6 +295,7 @@ def test_List_Sources_GET_200(api_client_cognito):
     assert {**VIDEO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
     assert {**AUDIO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
     assert {**DATA_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
+    assert {**IMAGE_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
     assert MULTI_SOURCE in response_json
 
 
@@ -385,7 +388,7 @@ def test_List_Sources_GET_200_page(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Sources_GET_200_tag_name(api_client_cognito):
@@ -432,7 +435,7 @@ def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Sources_GET_400(api_client_cognito):

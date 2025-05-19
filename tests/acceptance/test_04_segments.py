@@ -8,6 +8,7 @@ from constants import (
     DATA_FLOW,
     DYNAMIC_PROPS,
     ID_404,
+    IMAGE_FLOW,
     MULTI_FLOW,
     VIDEO_FLOW,
 )
@@ -717,7 +718,7 @@ def test_List_Flows_GET_200_timerange_never(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 2 == len(response.json())
+    assert 3 == len(response.json())
 
 
 @pytest.mark.segments
@@ -1221,10 +1222,7 @@ def test_Create_Flow_Segment_POST_400_container(api_client_cognito):
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
-        == response.json()["message"]
-    )
+    assert "Bad request. The flow 'container' is not set." == response.json()["message"]
 
 
 @pytest.mark.segments
@@ -1670,9 +1668,27 @@ def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito):
 
 @pytest.mark.flows
 def test_Delete_Flow_DELETE_204_DATA(api_client_cognito):
-    """204 returned as AUDIO_FLOW has no segments"""
+    """204 returned as DATA_FLOW has no segments"""
     # Arrange
     path = f'/flows/{DATA_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+@pytest.mark.flows
+def test_Delete_Flow_DELETE_204_IMAGE(api_client_cognito):
+    """204 returned as IMAGE_FLOW has no segments"""
+    # Arrange
+    path = f'/flows/{IMAGE_FLOW["id"]}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
