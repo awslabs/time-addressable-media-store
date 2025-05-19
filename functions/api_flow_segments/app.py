@@ -1,8 +1,9 @@
 import concurrent.futures
 import json
 import os
+from datetime import datetime
 from http import HTTPStatus
-from typing import Optional
+from typing import List, Optional, Union
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -40,7 +41,7 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, GetUrl, Timerange, Uuid
+from schema import Deletionrequest, FailedSegment, Flowsegment, GetUrl, Timerange, Uuid
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
@@ -158,7 +159,7 @@ def get_flow_segments_by_id(
 @app.post("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(
-    flow_segment: Annotated[Flowsegment, Body()],
+    flow_segment: Annotated[Union[Flowsegment, List[Flowsegment]], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -171,49 +172,24 @@ def post_flow_segments_by_id(
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
     if not item.get("container"):
-        raise BadRequestError(
-            "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
-        )  # 400
-    if not check_object_exists(bucket, flow_segment.object_id):
-        raise BadRequestError(
-            "Bad request. The object id provided for a segment MUST exist."
-        )  # 400
-    item_dict = model_dump(flow_segment)
-    segment_timerange = TimeRange.from_str(item_dict["timerange"])
-    if check_overlapping_segments(flow_id, segment_timerange):
-        raise BadRequestError(
-            "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow."
-        )  # 400
-    item_dict["timerange_start"] = segment_timerange.start.to_nanosec() + (
-        0 if segment_timerange.includes_start() else 1
-    )
-    item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
-        0 if segment_timerange.includes_end() else 1
-    )
-    segments_table.put_item(
-        Item={**item_dict, "flow_id": flow_id}, ReturnValues="ALL_OLD"
-    )
-    update_flow_segments_updated(flow_id)
-    schema_item = Flowsegment(**item_dict)
-    get_url = get_nonsigned_url(schema_item.object_id)
-    schema_item.get_urls = (
-        schema_item.get_urls.append(get_url) if schema_item.get_urls else [get_url]
-    )
-    publish_event(
-        "flows/segments_added",
-        {"flow_id": flow_id, "segments": [model_dump(schema_item)]},
-        enhance_resources(
-            [
-                f"tams:flow:{flow_id}",
-                f'tams:source:{item["source_id"]}',
-                *set(
-                    f"tams:flow-collected-by:{c_id}"
-                    for c_id in item.get("collected_by", [])
-                ),
-            ]
-        ),
-    )
-    return model_dump(flow_segment), HTTPStatus.CREATED.value  # 201
+        raise BadRequestError("Bad request. The flow 'container' is not set.")  # 400
+    if isinstance(flow_segment, List):
+        failed_segments = []
+        for segment in flow_segment:
+            segment_result = process_single_segment(item, segment)
+            if segment_result:
+                failed_segments.append(segment_result)
+        if len(failed_segments) == 0:
+            return None, HTTPStatus.CREATED.value  # 201
+        else:
+            return model_dump(failed_segments), HTTPStatus.OK.value  # 200
+    # Handle single segment requests separately to retain backwards compatibility with previous version of API where list of segments not available.
+    else:
+        segment_result = process_single_segment(item, flow_segment)
+        if segment_result:
+            raise BadRequestError(segment_result.error.summary)  # 400
+        else:
+            return None, HTTPStatus.CREATED.value  # 201
 
 
 @app.delete("/flows/<flowId>/segments")
@@ -338,6 +314,7 @@ def generate_urls_parallel(keys):
     return urls
 
 
+@tracer.capture_method(capture_response=False)
 def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
     """Filter the object urls in the schema items based on the accept_get_urls parameter."""
     presigned_urls = {}
@@ -368,3 +345,62 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
             item.get_urls = [
                 get_url for get_url in item.get_urls if get_url.label in get_url_labels
             ]
+
+
+@tracer.capture_method(capture_response=False)
+def process_single_segment(flow, flow_segment):
+    item_dict = model_dump(flow_segment)
+    if not check_object_exists(bucket, flow_segment.object_id):
+        return FailedSegment(
+            **{
+                "object_id": flow_segment.object_id,
+                "timerange": item_dict["timerange"],
+                "error": {
+                    "type": "BadRequestError",
+                    "summary": "Bad request. The object id provided for a segment MUST exist.",
+                    "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+            }
+        )
+    segment_timerange = TimeRange.from_str(item_dict["timerange"])
+    if check_overlapping_segments(flow["id"], segment_timerange):
+        return FailedSegment(
+            **{
+                "object_id": flow_segment.object_id,
+                "timerange": item_dict["timerange"],
+                "error": {
+                    "type": "BadRequestError",
+                    "summary": "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow.",
+                    "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+            }
+        )
+    item_dict["timerange_start"] = segment_timerange.start.to_nanosec() + (
+        0 if segment_timerange.includes_start() else 1
+    )
+    item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
+        0 if segment_timerange.includes_end() else 1
+    )
+    segments_table.put_item(
+        Item={**item_dict, "flow_id": flow["id"]}, ReturnValues="ALL_OLD"
+    )
+    update_flow_segments_updated(flow["id"])
+    schema_item = Flowsegment(**item_dict)
+    get_url = get_nonsigned_url(schema_item.object_id)
+    schema_item.get_urls = (
+        schema_item.get_urls.append(get_url) if schema_item.get_urls else [get_url]
+    )
+    publish_event(
+        "flows/segments_added",
+        {"flow_id": flow["id"], "segments": [model_dump(schema_item)]},
+        enhance_resources(
+            [
+                f'tams:flow:{flow["id"]}',
+                f'tams:source:{flow["source_id"]}',
+                *set(
+                    f"tams:flow-collected-by:{c_id}"
+                    for c_id in flow.get("collected_by", [])
+                ),
+            ]
+        ),
+    )
