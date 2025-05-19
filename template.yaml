@@ -1375,6 +1375,66 @@ Resources:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Delete]
 
+  ObjectsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W76
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/api_objects/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_SERVICE_NAME: tams-segments
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+          SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          BUCKET: !Ref MediaStorageBucket
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
+      Events:
+        headMediaObjectInformation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /objects/{objectId}
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+        getMediaObjectInformation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /objects/{objectId}
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
+
   FlowDeleteRequestsFunction:
     Type: AWS::Serverless::Function
     Metadata:
