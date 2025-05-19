@@ -239,6 +239,80 @@ def test_Create_Flow_Segment_POST_201_negative(api_client_cognito):
 
 
 @pytest.mark.segments
+def test_Create_Flow_Segment_POST_201_list_ok(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json=[
+            {
+                "object_id": "20000000-0000-1000-8000-000000000006",
+                "timerange": "[1:0_2:0)",
+            },
+            {
+                "object_id": "20000000-0000-1000-8000-000000000007",
+                "timerange": "[2:0_3:0)",
+            },
+        ],
+    )
+    # Assert
+    assert 201 == response.status_code
+
+
+@pytest.mark.segments
+def test_Create_Flow_Segment_POST_200_list_partial(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json=[
+            {
+                "object_id": "20000000-0000-1000-8000-000000000008",
+                "timerange": "[2:0_3:0)",
+            },
+            {
+                "object_id": "20000000-0000-1000-8000-000000000009",
+                "timerange": "[3:0_4:0)",
+            },
+        ],
+    )
+    response_json = response.json()
+    # Assert
+    assert 1 == len(response_json)
+    assert "BadRequestError" == response_json[0]["error"]["type"]
+    assert 200 == response.status_code
+
+
+@pytest.mark.segments
+def test_Create_Flow_Segment_POST_200_list_failed(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json=[
+            {
+                "object_id": "20000000-0000-1000-8000-000000000008",
+                "timerange": "[2:0_3:0)",
+            },
+            {
+                "object_id": "30000000-0000-1000-8000-000000000009",
+                "timerange": "[4:0_5:0)",
+            },
+        ],
+    )
+    response_json = response.json()
+    # Assert
+    assert 2 == len(response_json)
+    assert 200 == response.status_code
+
+
+@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_200(api_client_cognito):
     # Arrange
     path = f'/flows/{VIDEO_FLOW["id"]}/segments'
