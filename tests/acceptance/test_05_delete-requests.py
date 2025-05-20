@@ -5,7 +5,7 @@ import pytest
 import requests
 
 # pylint: disable=no-name-in-module
-from constants import ID_404
+from constants import AUDIO_FLOW, DATA_FLOW, ID_404, IMAGE_FLOW, MULTI_FLOW, VIDEO_FLOW
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -32,6 +32,394 @@ def test_auth_401(verb, path, api_endpoint):
     )
     # Assert
     assert 401 == response.status_code
+
+
+def test_Delete_Flow_Segment_DELETE_202(
+    api_client_cognito, delete_requests, api_endpoint
+):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    delete_requests.append(response.json()["id"])
+    # Assert
+    assert 202 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "location" in response_headers_lower
+    assert (
+        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
+        == response_headers_lower["location"]
+    )
+    assert "id" in response.json()
+    assert "flow_id" in response.json()
+    assert "timerange_to_delete" in response.json()
+    assert "timerange_remaining" in response.json()
+    assert "delete_flow" in response.json()
+    assert "created" in response.json()
+    assert "created_by" in response.json()
+    assert "updated" in response.json()
+    assert "status" in response.json()
+
+
+@pytest.mark.skip("Delete requests always returned unless object_id used")
+def test_Delete_Flow_Segment_DELETE_204():
+    assert True
+
+
+@pytest.mark.skip("Delete requests always returned unless object_id used")
+def test_Delete_Flow_Segment_DELETE_202_object_id():
+    assert True
+
+
+def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito):
+    """List segments with object_id query specified"""
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={"object_id": "20000000-0000-1000-8000-000000000005"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Delete_Flow_Segment_DELETE_202_timerange(
+    api_client_cognito, delete_requests, api_endpoint
+):
+    """Delete segments with timerange query specified"""
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={"timerange": "[3:5_4:5)"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    delete_requests.append(response.json()["id"])
+    # Assert
+    assert 202 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "location" in response_headers_lower
+    assert (
+        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
+        == response_headers_lower["location"]
+    )
+    assert "id" in response.json()
+    assert "flow_id" in response.json()
+    assert "timerange_to_delete" in response.json()
+    assert "timerange_remaining" in response.json()
+    assert "delete_flow" in response.json()
+    assert "created" in response.json()
+    assert "created_by" in response.json()
+    assert "updated" in response.json()
+    assert "status" in response.json()
+
+
+@pytest.mark.skip("Delete requests always returned unless object_id used")
+def test_Delete_Flow_Segment_DELETE_204_timerange():
+    assert True
+
+
+def test_Delete_Flow_Segment_DELETE_400(api_client_cognito):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={"timerange": "bad"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
+
+
+def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={
+            "object_id": "20000000-0000-1000-8000-000000000005",
+            "timerange": "bad",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert isinstance(response.json()["message"], list)
+    assert 0 < len(response.json()["message"])
+
+
+def test_Delete_Flow_Segment_DELETE_403(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 403 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert (
+        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        == response.json()["message"]
+    )
+
+
+def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={"object_id": "20000000-0000-1000-8000-000000000005"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 403 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert (
+        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        == response.json()["message"]
+    )
+
+
+def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={"timerange": "[3:5_4:5)"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 403 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert (
+        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        == response.json()["message"]
+    )
+
+
+def test_Delete_Flow_Segment_DELETE_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+
+
+def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={"object_id": "20000000-0000-1000-8000-000000000005"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+
+
+def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={"timerange": "[3:5_4:5)"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+
+
+def test_Delete_Flow_DELETE_202_VIDEO(
+    api_client_cognito, delete_requests, api_endpoint
+):
+    # Arrange
+    path = f'/flows/{VIDEO_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    delete_requests.append(response.json()["id"])
+    # Assert
+    assert 202 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "location" in response_headers_lower
+    assert (
+        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
+        == response_headers_lower["location"]
+    )
+    assert "id" in response.json()
+    assert "flow_id" in response.json()
+    assert "timerange_to_delete" in response.json()
+    assert "timerange_remaining" in response.json()
+    assert "delete_flow" in response.json()
+    assert "created" in response.json()
+    assert "created_by" in response.json()
+    assert "updated" in response.json()
+    assert "status" in response.json()
+
+
+def test_Delete_Flow_DELETE_403(api_client_cognito):
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 403 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert (
+        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        == response.json()["message"]
+    )
+
+
+def test_Delete_Flow_DELETE_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested Flow ID in the path is invalid." == response.json()["message"]
+
+
+def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito):
+    """204 returned as AUDIO_FLOW has no segments"""
+    # Need to set read_only to false prior to delete request
+    api_client_cognito.request(
+        "PUT",
+        f'/flows/{AUDIO_FLOW["id"]}/read_only',
+        json=False,
+    )
+    # Arrange
+    path = f'/flows/{AUDIO_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Delete_Flow_DELETE_204_DATA(api_client_cognito):
+    """204 returned as DATA_FLOW has no segments"""
+    # Arrange
+    path = f'/flows/{DATA_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Delete_Flow_DELETE_204_IMAGE(api_client_cognito):
+    """204 returned as IMAGE_FLOW has no segments"""
+    # Arrange
+    path = f'/flows/{IMAGE_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 204 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Delete_Flow_DELETE_204_MULTI(api_client_cognito, delete_requests):
+    # Arrange
+    path = f'/flows/{MULTI_FLOW["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    if response.status_code == 202:
+        delete_requests.append(response.json()["id"])
+    # Assert
+    assert response.status_code in [202, 204]
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
 
 
 def test_Flow_Delete_Request_Details_GET_200(api_client_cognito, delete_requests):
