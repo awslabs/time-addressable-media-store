@@ -15,7 +15,7 @@ from utils import (
     deserialise_neptune_obj,
     filter_dict,
     model_dump,
-    parse_parameters,
+    parse_api_gw_parameters,
     publish_event,
     serialise_neptune_obj,
 )
@@ -325,7 +325,7 @@ def query_flow_collection(flow_id: str) -> list:
 @tracer.capture_method(capture_response=False)
 def query_sources(parameters: dict) -> tuple[list, int]:
     """Returns a list of the TAMS Sources from the Neptune Database"""
-    props, where_literals = parse_parameters(
+    props, where_literals = parse_api_gw_parameters(
         {
             k: v
             for k, v in parameters.items()
@@ -372,7 +372,7 @@ def query_sources(parameters: dict) -> tuple[list, int]:
 @tracer.capture_method(capture_response=False)
 def query_flows(parameters: dict) -> tuple[list, int]:
     """Returns a list of the TAMS Flows from the Neptune Database"""
-    props, where_literals = parse_parameters(
+    props, where_literals = parse_api_gw_parameters(
         {
             k: v
             for k, v in parameters.items()
