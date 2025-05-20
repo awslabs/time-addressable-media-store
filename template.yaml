@@ -1408,7 +1408,7 @@ Resources:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
             - Effect: Allow
               Action:
-                - s3:GetObject
+                - s3:GetObjectTagging
               Resource:
                 - !Sub ${MediaStorageBucket.Arn}/*
       Events:

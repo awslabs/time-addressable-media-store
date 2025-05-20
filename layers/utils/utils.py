@@ -333,6 +333,26 @@ def check_object_exists(bucket, object_id: str) -> bool:
 
 
 @tracer.capture_method(capture_response=False)
+def get_object_tags(bucket, object_id: str) -> dict | None:
+    """Retrieves the S3 object tags for the specified object_id"""
+    try:
+        tagset = s3.get_object_tagging(Bucket=bucket, Key=object_id)["TagSet"]
+        return {t["Key"]: t["Value"] for t in tagset}
+    except ClientError:
+        return None
+
+
+@tracer.capture_method(capture_response=False)
+def set_object_tags(bucket, object_id: str, tags: dict) -> None:
+    """Sets the S3 object tags for the specified object_id"""
+    s3.put_object_tagging(
+        Bucket=bucket,
+        Key=object_id,
+        Tagging={"TagSet": [{"Key": k, "Value": v} for k, v in tags.items()]},
+    )
+
+
+@tracer.capture_method(capture_response=False)
 def generate_presigned_url(
     method: str, bucket: str, key: str, **kwargs: None | dict
 ) -> str:

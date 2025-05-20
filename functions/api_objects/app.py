@@ -25,7 +25,7 @@ from boto3.dynamodb.conditions import Key
 from dynamodb import segments_table
 from schema import Object
 from typing_extensions import Annotated
-from utils import check_object_exists, generate_link_url, model_dump
+from utils import generate_link_url, get_object_tags, model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -44,7 +44,8 @@ def get_objects_by_id(
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
 ):
-    if not check_object_exists(bucket, object_id):
+    object_s3_tags = get_object_tags(bucket, object_id)
+    if object_s3_tags is None:
         raise NotFoundError("The requested media object does not exist.")  # 404
     args = get_query_kwargs(
         object_id,
@@ -79,6 +80,9 @@ def get_objects_by_id(
         **{
             "object_id": object_id,
             "referenced_by_flows": set([item["flow_id"] for item in items]),
+            "first_referenced_by_flow": object_s3_tags.get(
+                "first_referenced_by_flow", None
+            ),
         }
     )
     return Response(
