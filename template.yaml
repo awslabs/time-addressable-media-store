@@ -268,8 +268,6 @@ Resources:
         rules_to_suppress:
           - id: W35
             reason: Access logging not required
-          - id: W41
-            reason: Encryption not required
           - id: W51
             reason: Bucket policy not required
     Properties:
@@ -281,6 +279,11 @@ Resources:
               - GET
             AllowedOrigins:
               - '*'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: False
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
 
   DeleteRequestQueue:
     Type: AWS::SQS::Queue
@@ -1313,6 +1316,8 @@ Resources:
             - Effect: Allow
               Action:
                 - s3:GetObject
+                - s3:GetObjectTagging
+                - s3:PutObjectTagging
               Resource:
                 - !Sub ${MediaStorageBucket.Arn}/*
             - Effect: Allow
