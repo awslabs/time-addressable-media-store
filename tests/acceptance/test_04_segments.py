@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 import base64
-import pickle
+import json
 
 import pytest
 import requests
@@ -1365,13 +1365,13 @@ def test_Get_Media_Object_Information_HEAD_200_page(api_client_cognito):
     # Arrange
     object_id = "20000000-0000-1000-8000-000000000005"
     page = base64.b64encode(
-        pickle.dumps(
+        json.dumps(
             {
                 "flow_id": VIDEO_FLOW["id"],
                 "timerange_end": 5999999999,
                 "object_id": object_id,
             }
-        )
+        ).encode("utf-8")
     ).decode("utf-8")
     path = f"/objects/{object_id}"
     # Act
@@ -1466,13 +1466,13 @@ def test_Get_Media_Object_Information_GET_200_page(api_client_cognito):
     # Arrange
     object_id = "20000000-0000-1000-8000-000000000005"
     page = base64.b64encode(
-        pickle.dumps(
+        json.dumps(
             {
                 "flow_id": VIDEO_FLOW["id"],
                 "timerange_end": 5999999999,
                 "object_id": object_id,
             }
-        )
+        ).encode("utf-8")
     ).decode("utf-8")
     path = f"/objects/{object_id}"
     # Act

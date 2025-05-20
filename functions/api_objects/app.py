@@ -1,3 +1,5 @@
+import base64
+import json
 import os
 from http import HTTPStatus
 from typing import Optional
@@ -62,10 +64,11 @@ def get_objects_by_id(
         query = segments_table.query(**args)
         items.extend(query["Items"])
     if "LastEvaluatedKey" in query:
-        custom_headers["X-Paging-NextKey"] = query["LastEvaluatedKey"]["flow_id"]
-        custom_headers["Link"] = generate_link_url(
-            app.current_event, custom_headers["X-Paging-NextKey"]
-        )
+        next_key = base64.b64encode(
+            json.dumps(query["LastEvaluatedKey"], default=int).encode("utf-8")
+        ).decode("utf-8")
+        custom_headers["X-Paging-NextKey"] = next_key
+        custom_headers["Link"] = generate_link_url(app.current_event, next_key)
     # Set Paging Limit header if paging limit being used is not the one specified
     if param_limit != args["Limit"]:
         custom_headers["X-Paging-Limit"] = str(args["Limit"])
@@ -119,8 +122,5 @@ def get_query_kwargs(object_id: str, parameters: dict) -> dict:
     if parameters.get("limit"):
         kwargs["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
     if parameters.get("page"):
-        kwargs["ExclusiveStartKey"] = {
-            "object_id": object_id,
-            "flow_id": parameters["page"],
-        }
+        kwargs["ExclusiveStartKey"] = json.loads(base64.b64decode(parameters["page"]))
     return kwargs
