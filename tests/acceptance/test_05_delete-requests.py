@@ -8,11 +8,10 @@ import requests
 from constants import ID_404
 
 pytestmark = [
-    pytest.mark.delete,
+    pytest.mark.acceptance,
 ]
 
 
-@pytest.mark.no_auth
 @pytest.mark.parametrize(
     "path, verb",
     [

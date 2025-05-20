@@ -14,11 +14,10 @@ from constants import (
 )
 
 pytestmark = [
-    pytest.mark.flows,
+    pytest.mark.acceptance,
 ]
 
 
-@pytest.mark.no_auth
 @pytest.mark.parametrize(
     "path, verb",
     [

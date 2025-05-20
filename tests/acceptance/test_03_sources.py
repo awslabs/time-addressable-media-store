@@ -15,7 +15,7 @@ from constants import (
 )
 
 pytestmark = [
-    pytest.mark.sources,
+    pytest.mark.acceptance,
 ]
 
 VIDEO_SOURCE = get_source(VIDEO_FLOW)
@@ -25,7 +25,6 @@ IMAGE_SOURCE = get_source(IMAGE_FLOW)
 MULTI_SOURCE = get_source(MULTI_FLOW)
 
 
-@pytest.mark.no_auth
 @pytest.mark.parametrize(
     "path, verb",
     [
