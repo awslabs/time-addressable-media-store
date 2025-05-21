@@ -2,27 +2,9 @@
 import pytest
 import requests
 
-# pylint: disable=no-name-in-module
-from constants import (
-    AUDIO_FLOW,
-    DATA_FLOW,
-    DYNAMIC_PROPS,
-    ID_404,
-    IMAGE_FLOW,
-    MULTI_FLOW,
-    VIDEO_FLOW,
-    get_source,
-)
-
 pytestmark = [
     pytest.mark.acceptance,
 ]
-
-VIDEO_SOURCE = get_source(VIDEO_FLOW)
-AUDIO_SOURCE = get_source(AUDIO_FLOW)
-DATA_SOURCE = get_source(DATA_FLOW)
-IMAGE_SOURCE = get_source(IMAGE_FLOW)
-MULTI_SOURCE = get_source(MULTI_FLOW)
 
 
 @pytest.mark.parametrize(
@@ -267,7 +249,15 @@ def test_List_Sources_HEAD_400_tag_exists_name(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Sources_GET_200(api_client_cognito):
+def test_List_Sources_GET_200(
+    api_client_cognito,
+    dynamic_props,
+    stub_video_source,
+    stub_audio_source,
+    stub_data_source,
+    stub_image_source,
+    stub_multi_source,
+):
     # Arrange
     path = "/sources"
     # Act
@@ -287,18 +277,32 @@ def test_List_Sources_GET_200(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 5 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert {**VIDEO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
-    assert {**AUDIO_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
-    assert {**DATA_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
-    assert {**IMAGE_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} in response_json
-    assert MULTI_SOURCE in response_json
+    assert {
+        **stub_video_source,
+        "collected_by": [stub_multi_source["id"]],
+    } in response_json
+    assert {
+        **stub_audio_source,
+        "collected_by": [stub_multi_source["id"]],
+    } in response_json
+    assert {
+        **stub_data_source,
+        "collected_by": [stub_multi_source["id"]],
+    } in response_json
+    assert {
+        **stub_image_source,
+        "collected_by": [stub_multi_source["id"]],
+    } in response_json
+    assert stub_multi_source in response_json
 
 
-def test_List_Sources_GET_200_format(api_client_cognito):
+def test_List_Sources_GET_200_format(
+    api_client_cognito, dynamic_props, stub_data_source, stub_multi_source
+):
     """List sources with format query specified"""
     # Arrange
     path = "/sources"
@@ -315,14 +319,18 @@ def test_List_Sources_GET_200_format(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [{**DATA_SOURCE, "collected_by": [MULTI_SOURCE["id"]]}] == response_json
+    assert [
+        {**stub_data_source, "collected_by": [stub_multi_source["id"]]}
+    ] == response_json
 
 
-def test_List_Sources_GET_200_label(api_client_cognito):
+def test_List_Sources_GET_200_label(
+    api_client_cognito, dynamic_props, stub_multi_source
+):
     """List sources with label query specified"""
     # Arrange
     path = "/sources"
@@ -344,11 +352,11 @@ def test_List_Sources_GET_200_label(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [MULTI_SOURCE] == response_json
+    assert [stub_multi_source] == response_json
 
 
 def test_List_Sources_GET_200_limit(api_client_cognito):
@@ -390,7 +398,9 @@ def test_List_Sources_GET_200_page(api_client_cognito):
     assert 4 == len(response.json())
 
 
-def test_List_Sources_GET_200_tag_name(api_client_cognito):
+def test_List_Sources_GET_200_tag_name(
+    api_client_cognito, dynamic_props, stub_multi_source
+):
     """List sources with tag.{name} query specified"""
     # Arrange
     path = "/sources"
@@ -412,11 +422,11 @@ def test_List_Sources_GET_200_tag_name(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [MULTI_SOURCE] == response_json
+    assert [stub_multi_source] == response_json
 
 
 def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
@@ -569,9 +579,9 @@ def test_List_Sources_GET_400_tag_exists_name(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Source_Details_HEAD_200(api_client_cognito):
+def test_Source_Details_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}'
+    path = f'/sources/{stub_multi_source["id"]}'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -585,9 +595,9 @@ def test_Source_Details_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Details_HEAD_404(api_client_cognito):
+def test_Source_Details_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}"
+    path = f"/sources/{id_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -601,9 +611,11 @@ def test_Source_Details_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Details_GET_200(api_client_cognito):
+def test_Source_Details_GET_200(
+    api_client_cognito, dynamic_props, stub_data_source, stub_multi_source
+):
     # Arrange
-    path = f'/sources/{DATA_SOURCE["id"]}'
+    path = f'/sources/{stub_data_source["id"]}'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -615,15 +627,18 @@ def test_Source_Details_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
-    assert {**DATA_SOURCE, "collected_by": [MULTI_SOURCE["id"]]} == response_json
+    assert {
+        **stub_data_source,
+        "collected_by": [stub_multi_source["id"]],
+    } == response_json
 
 
-def test_Source_Details_GET_404(api_client_cognito):
+def test_Source_Details_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}"
+    path = f"/sources/{id_404}"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -637,9 +652,9 @@ def test_Source_Details_GET_404(api_client_cognito):
     assert "The requested Source does not exist." == response.json()["message"]
 
 
-def test_List_Source_Tags_HEAD_200(api_client_cognito):
+def test_List_Source_Tags_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags'
+    path = f'/sources/{stub_multi_source["id"]}/tags'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -653,9 +668,9 @@ def test_List_Source_Tags_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Source_Tags_HEAD_404(api_client_cognito):
+def test_List_Source_Tags_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/tags"
+    path = f"/sources/{id_404}/tags"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -669,9 +684,9 @@ def test_List_Source_Tags_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Source_Tags_GET_200(api_client_cognito):
+def test_List_Source_Tags_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags'
+    path = f'/sources/{stub_multi_source["id"]}/tags'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -682,12 +697,12 @@ def test_List_Source_Tags_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_SOURCE["tags"] == response.json()
+    assert stub_multi_source["tags"] == response.json()
 
 
-def test_List_Source_Tags_GET_404(api_client_cognito):
+def test_List_Source_Tags_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/tags"
+    path = f"/sources/{id_404}/tags"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -701,9 +716,9 @@ def test_List_Source_Tags_GET_404(api_client_cognito):
     assert "The requested Source does not exist." == response.json()["message"]
 
 
-def test_Source_Tag_Value_HEAD_200(api_client_cognito):
+def test_Source_Tag_Value_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/flow_status'
+    path = f'/sources/{stub_multi_source["id"]}/tags/flow_status'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -717,9 +732,9 @@ def test_Source_Tag_Value_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Tag_Value_HEAD_404_bad_tag(api_client_cognito):
+def test_Source_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/does_not_exist'
+    path = f'/sources/{stub_multi_source["id"]}/tags/does_not_exist'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -733,9 +748,9 @@ def test_Source_Tag_Value_HEAD_404_bad_tag(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito):
+def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/tags/flow_status"
+    path = f"/sources/{id_404}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -749,9 +764,9 @@ def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Tag_Value_GET_200(api_client_cognito):
+def test_Source_Tag_Value_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/flow_status'
+    path = f'/sources/{stub_multi_source["id"]}/tags/flow_status'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -762,12 +777,12 @@ def test_Source_Tag_Value_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_SOURCE["tags"]["flow_status"] == response.content.decode("utf-8")
+    assert stub_multi_source["tags"]["flow_status"] == response.content.decode("utf-8")
 
 
-def test_Source_Tag_Value_GET_404_bad_tag(api_client_cognito):
+def test_Source_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/does_not_exist'
+    path = f'/sources/{stub_multi_source["id"]}/tags/does_not_exist'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -781,9 +796,9 @@ def test_Source_Tag_Value_GET_404_bad_tag(api_client_cognito):
     assert "The requested Source or tag does not exist." == response.json()["message"]
 
 
-def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito):
+def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/tags/flow_status"
+    path = f"/sources/{id_404}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -797,9 +812,11 @@ def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito):
     assert "The requested Source or tag does not exist." == response.json()["message"]
 
 
-def test_Create_or_Update_Source_Tag_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Source_Tag_PUT_204_create(
+    api_client_cognito, stub_multi_source
+):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/pytest'
+    path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -814,9 +831,11 @@ def test_Create_or_Update_Source_Tag_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Source_Tag_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Source_Tag_PUT_204_update(
+    api_client_cognito, stub_multi_source
+):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/test'
+    path = f'/sources/{stub_multi_source["id"]}/tags/test'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -831,9 +850,9 @@ def test_Create_or_Update_Source_Tag_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito):
+def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/pytest'
+    path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -849,9 +868,9 @@ def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito):
+def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/tags/pytest"
+    path = f"/sources/{id_404}/tags/pytest"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -869,9 +888,9 @@ def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito):
     )
 
 
-def test_Delete_Source_Tag_DELETE_204(api_client_cognito):
+def test_Delete_Source_Tag_DELETE_204(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/tags/pytest'
+    path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -885,9 +904,9 @@ def test_Delete_Source_Tag_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Source_Tag_DELETE_404(api_client_cognito):
+def test_Delete_Source_Tag_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/tags/test"
+    path = f"/sources/{id_404}/tags/test"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -904,9 +923,9 @@ def test_Delete_Source_Tag_DELETE_404(api_client_cognito):
     )
 
 
-def test_Source_Description_HEAD_200(api_client_cognito):
+def test_Source_Description_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/description'
+    path = f'/sources/{stub_multi_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -920,9 +939,9 @@ def test_Source_Description_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Description_HEAD_404(api_client_cognito):
+def test_Source_Description_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/description"
+    path = f"/sources/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -936,9 +955,9 @@ def test_Source_Description_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Description_GET_200(api_client_cognito):
+def test_Source_Description_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/description'
+    path = f'/sources/{stub_multi_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -949,12 +968,12 @@ def test_Source_Description_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_SOURCE["description"] == response.content.decode("utf-8")
+    assert stub_multi_source["description"] == response.content.decode("utf-8")
 
 
-def test_Source_Description_GET_404(api_client_cognito):
+def test_Source_Description_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/description"
+    path = f"/sources/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -968,9 +987,11 @@ def test_Source_Description_GET_404(api_client_cognito):
     assert "The requested Source does not exist." == response.json()["message"]
 
 
-def test_Create_or_Update_Source_Description_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Source_Description_PUT_204_create(
+    api_client_cognito, stub_audio_source
+):
     # Arrange
-    path = f'/sources/{AUDIO_SOURCE["id"]}/description'
+    path = f'/sources/{stub_audio_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -985,9 +1006,11 @@ def test_Create_or_Update_Source_Description_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Source_Description_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Source_Description_PUT_204_update(
+    api_client_cognito, stub_video_source
+):
     # Arrange
-    path = f'/sources/{VIDEO_SOURCE["id"]}/description'
+    path = f'/sources/{stub_video_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1002,9 +1025,11 @@ def test_Create_or_Update_Source_Description_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Source_Description_PUT_400(api_client_cognito):
+def test_Create_or_Update_Source_Description_PUT_400(
+    api_client_cognito, stub_video_source
+):
     # Arrange
-    path = f'/sources/{VIDEO_SOURCE["id"]}/description'
+    path = f'/sources/{stub_video_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1020,9 +1045,9 @@ def test_Create_or_Update_Source_Description_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito):
+def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/description"
+    path = f"/sources/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1037,9 +1062,9 @@ def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito):
     assert "The requested Source does not exist." == response.json()["message"]
 
 
-def test_Delete_Source_Description_DELETE_204(api_client_cognito):
+def test_Delete_Source_Description_DELETE_204(api_client_cognito, stub_audio_source):
     # Arrange
-    path = f'/sources/{AUDIO_SOURCE["id"]}/description'
+    path = f'/sources/{stub_audio_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1053,9 +1078,9 @@ def test_Delete_Source_Description_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Source_Description_DELETE_404(api_client_cognito):
+def test_Delete_Source_Description_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/description"
+    path = f"/sources/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1069,9 +1094,9 @@ def test_Delete_Source_Description_DELETE_404(api_client_cognito):
     assert "The Source ID in the path is invalid." == response.json()["message"]
 
 
-def test_Source_Label_HEAD_200(api_client_cognito):
+def test_Source_Label_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/label'
+    path = f'/sources/{stub_multi_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1085,9 +1110,9 @@ def test_Source_Label_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Label_HEAD_404(api_client_cognito):
+def test_Source_Label_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/label"
+    path = f"/sources/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1101,9 +1126,9 @@ def test_Source_Label_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Source_Label_GET_200(api_client_cognito):
+def test_Source_Label_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{MULTI_SOURCE["id"]}/label'
+    path = f'/sources/{stub_multi_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1114,12 +1139,12 @@ def test_Source_Label_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_SOURCE["label"] == response.content.decode("utf-8")
+    assert stub_multi_source["label"] == response.content.decode("utf-8")
 
 
-def test_Source_Label_GET_404(api_client_cognito):
+def test_Source_Label_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/label"
+    path = f"/sources/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1136,9 +1161,11 @@ def test_Source_Label_GET_404(api_client_cognito):
     )
 
 
-def test_Create_or_Update_Source_Label_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Source_Label_PUT_204_create(
+    api_client_cognito, stub_audio_source
+):
     # Arrange
-    path = f'/sources/{AUDIO_SOURCE["id"]}/label'
+    path = f'/sources/{stub_audio_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1153,9 +1180,11 @@ def test_Create_or_Update_Source_Label_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Source_Label_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Source_Label_PUT_204_update(
+    api_client_cognito, stub_video_source
+):
     # Arrange
-    path = f'/sources/{VIDEO_SOURCE["id"]}/label'
+    path = f'/sources/{stub_video_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1170,9 +1199,9 @@ def test_Create_or_Update_Source_Label_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito):
+def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito, stub_video_source):
     # Arrange
-    path = f'/sources/{VIDEO_SOURCE["id"]}/label'
+    path = f'/sources/{stub_video_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1188,9 +1217,9 @@ def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito):
+def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/label"
+    path = f"/sources/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1205,9 +1234,9 @@ def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito):
     assert "The requested Source does not exist." == response.json()["message"]
 
 
-def test_Delete_Source_Label_DELETE_204(api_client_cognito):
+def test_Delete_Source_Label_DELETE_204(api_client_cognito, stub_audio_source):
     # Arrange
-    path = f'/sources/{AUDIO_SOURCE["id"]}/label'
+    path = f'/sources/{stub_audio_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1221,9 +1250,9 @@ def test_Delete_Source_Label_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Source_Label_DELETE_404(api_client_cognito):
+def test_Delete_Source_Label_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/sources/{ID_404}/label"
+    path = f"/sources/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "DELETE",
