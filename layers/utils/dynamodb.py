@@ -290,18 +290,18 @@ def validate_object_id(object_id: str, flow_id: str) -> bool:
         return False
     object_item = items[0]
     if object_item["flow_id"] == flow_id:
-        if object_item.get("expires_at"):
-            # expires_at exists so this is first time use and needs updating to prevent TTL deletion
+        if object_item.get("expire_at"):
+            # expire_at exists so this is first time use and needs updating to prevent TTL deletion
             storage_table.update_item(
                 Key={
                     "object_id": object_id,
                     "flow_id": flow_id,
                 },
-                AttributeUpdates={"expires_at": {"Action": "DELETE"}},
+                AttributeUpdates={"expire_at": {"Action": "DELETE"}},
             )
         # flow_id matches so is a valida object_id
         return True
-    if object_item.get("expires_at") is None:
+    if object_item.get("expire_at") is None:
         # object_id already used therefore can be re-used by any flow_id
         return True
     # All other options are invalid

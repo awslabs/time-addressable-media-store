@@ -82,7 +82,7 @@ def get_objects_by_id(
         KeyConditionExpression=Key("object_id").eq(object_id)
     )
     valid_object_items = [
-        item for item in object_query["Items"] if item.get("expires_at") is None
+        item for item in object_query["Items"] if item.get("expire_at") is None
     ]
     first_referenced_by_flow = (
         None if len(valid_object_items) == 0 else valid_object_items[0]["flow_id"]
