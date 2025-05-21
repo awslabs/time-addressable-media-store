@@ -174,10 +174,11 @@ def post_flow_segments_by_id(
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
         )  # 400
-    if not check_object_exists(bucket, flow_segment.object_id):
-        raise BadRequestError(
-            "Bad request. The object id provided for a segment MUST exist."
-        )  # 400
+    if not flow_segment.get_urls:
+        if not check_object_exists(bucket, flow_segment.object_id):
+            raise BadRequestError(
+                "Bad request. The object id provided for a segment MUST exist."
+            )  # 400
     item_dict = model_dump(flow_segment)
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow_id, segment_timerange):
@@ -352,9 +353,10 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
             item.get_urls = None
         else:
             get_url = get_nonsigned_url(item.object_id)
-            item.get_urls = (
-                item.get_urls.append(get_url) if item.get_urls else [get_url]
-            )
+            if item.get_urls is None:
+                item.get_urls = [get_url]
+            else:
+                item.get_urls.append(get_url)
             if item.object_id in presigned_urls:
                 presigned_get_url = GetUrl(
                     label=f"aws.{bucket_region}:s3.presigned:{store_name}",
