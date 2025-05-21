@@ -2,22 +2,11 @@
 import pytest
 import requests
 
-# pylint: disable=no-name-in-module
-from constants import (
-    AUDIO_FLOW,
-    DATA_FLOW,
-    DYNAMIC_PROPS,
-    ID_404,
-    MULTI_FLOW,
-    VIDEO_FLOW,
-)
-
 pytestmark = [
-    pytest.mark.flows,
+    pytest.mark.acceptance,
 ]
 
 
-@pytest.mark.no_auth
 @pytest.mark.parametrize(
     "path, verb",
     [
@@ -76,14 +65,14 @@ def test_auth_401(verb, path, api_endpoint):
     assert 401 == response.status_code
 
 
-def test_Create_or_Replace_Flow_PUT_201_VIDEO(api_client_cognito):
+def test_Create_or_Replace_Flow_PUT_201_VIDEO(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}'
+    path = f'/flows/{stub_video_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=VIDEO_FLOW,
+        json=stub_video_flow,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
@@ -94,17 +83,17 @@ def test_Create_or_Replace_Flow_PUT_201_VIDEO(api_client_cognito):
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert VIDEO_FLOW == response_json
+    assert stub_video_flow == response_json
 
 
-def test_Create_or_Replace_Flow_PUT_201_AUDIO(api_client_cognito):
+def test_Create_or_Replace_Flow_PUT_201_AUDIO(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}'
+    path = f'/flows/{stub_audio_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=AUDIO_FLOW,
+        json=stub_audio_flow,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
@@ -115,17 +104,17 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(api_client_cognito):
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert AUDIO_FLOW == response_json
+    assert stub_audio_flow == response_json
 
 
-def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito):
+def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}'
+    path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=DATA_FLOW,
+        json=stub_data_flow,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
@@ -136,17 +125,17 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito):
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert DATA_FLOW == response_json
+    assert stub_data_flow == response_json
 
 
-def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito):
+def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=MULTI_FLOW,
+        json=stub_multi_flow,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
@@ -157,17 +146,17 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito):
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert MULTI_FLOW == response_json
+    assert stub_multi_flow == response_json
 
 
-def test_Create_or_Replace_Flow_PUT_204(api_client_cognito):
+def test_Create_or_Replace_Flow_PUT_204(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=MULTI_FLOW,
+        json=stub_multi_flow,
     )  # Assert
     assert 204 == response.status_code
     assert "" == response.content.decode("utf-8")
@@ -193,15 +182,15 @@ def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Replace_Flow_PUT_403(api_client_cognito):
+def test_Create_or_Replace_Flow_PUT_403(api_client_cognito, stub_data_flow):
     """Attempt to update a flow that is marked as read-only"""
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}'
+    path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=DATA_FLOW,
+        json=stub_data_flow,
     )
     # Assert
     assert 403 == response.status_code
@@ -211,15 +200,15 @@ def test_Create_or_Replace_Flow_PUT_403(api_client_cognito):
     )
 
 
-def test_Create_or_Replace_Flow_PUT_404(api_client_cognito):
+def test_Create_or_Replace_Flow_PUT_404(api_client_cognito, id_404, stub_multi_flow):
     """Flow Id in path does not match Flow Id in body"""
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=MULTI_FLOW,
+        json=stub_multi_flow,
     )
     # Assert
     assert 404 == response.status_code
@@ -338,12 +327,12 @@ def test_List_Flows_HEAD_200_page(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flows_HEAD_200_source_id(api_client_cognito):
+def test_List_Flows_HEAD_200_source_id(api_client_cognito, stub_data_flow):
     # Arrange
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"source_id": DATA_FLOW["source_id"]}
+        "HEAD", path, params={"source_id": stub_data_flow["source_id"]}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -518,12 +507,14 @@ def test_List_Flows_HEAD_400_page(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flows_HEAD_400_source_id(api_client_cognito):
+def test_List_Flows_HEAD_400_source_id(api_client_cognito, stub_data_flow):
     # Arrange
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"source_id": DATA_FLOW["source_id"], "timerange": "bad"}
+        "HEAD",
+        path,
+        params={"source_id": stub_data_flow["source_id"], "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -578,7 +569,14 @@ def test_List_Flows_HEAD_400_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flows_GET_200(api_client_cognito):
+def test_List_Flows_GET_200(
+    api_client_cognito,
+    dynamic_props,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_multi_flow,
+):
     # Arrange
     path = "/flows"
     # Act
@@ -598,17 +596,19 @@ def test_List_Flows_GET_200(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 4 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert {**VIDEO_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
-    assert {**AUDIO_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
-    assert {**DATA_FLOW, "collected_by": [MULTI_FLOW["id"]]} in response_json
-    assert MULTI_FLOW in response_json
+    assert {**stub_video_flow, "collected_by": [stub_multi_flow["id"]]} in response_json
+    assert {**stub_audio_flow, "collected_by": [stub_multi_flow["id"]]} in response_json
+    assert {**stub_data_flow, "collected_by": [stub_multi_flow["id"]]} in response_json
+    assert stub_multi_flow in response_json
 
 
-def test_List_Flows_GET_200_codec(api_client_cognito):
+def test_List_Flows_GET_200_codec(
+    api_client_cognito, dynamic_props, stub_audio_flow, stub_multi_flow
+):
     """List flows with codec query specified"""
     # Arrange
     path = "/flows"
@@ -621,14 +621,18 @@ def test_List_Flows_GET_200_codec(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [{**AUDIO_FLOW, "collected_by": [MULTI_FLOW["id"]]}] == response_json
+    assert [
+        {**stub_audio_flow, "collected_by": [stub_multi_flow["id"]]}
+    ] == response_json
 
 
-def test_List_Flows_GET_200_format(api_client_cognito):
+def test_List_Flows_GET_200_format(
+    api_client_cognito, dynamic_props, stub_data_flow, stub_multi_flow
+):
     """List flows with format query specified"""
     # Arrange
     path = "/flows"
@@ -643,14 +647,18 @@ def test_List_Flows_GET_200_format(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [{**DATA_FLOW, "collected_by": [MULTI_FLOW["id"]]}] == response_json
+    assert [
+        {**stub_data_flow, "collected_by": [stub_multi_flow["id"]]}
+    ] == response_json
 
 
-def test_List_Flows_GET_200_frame_height(api_client_cognito):
+def test_List_Flows_GET_200_frame_height(
+    api_client_cognito, dynamic_props, stub_video_flow, stub_multi_flow
+):
     """List flows with frame_height query specified"""
     # Arrange
     path = "/flows"
@@ -663,14 +671,18 @@ def test_List_Flows_GET_200_frame_height(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [{**VIDEO_FLOW, "collected_by": [MULTI_FLOW["id"]]}] == response_json
+    assert [
+        {**stub_video_flow, "collected_by": [stub_multi_flow["id"]]}
+    ] == response_json
 
 
-def test_List_Flows_GET_200_frame_width(api_client_cognito):
+def test_List_Flows_GET_200_frame_width(
+    api_client_cognito, dynamic_props, stub_video_flow, stub_multi_flow
+):
     """List flows with frame_width query specified"""
     # Arrange
     path = "/flows"
@@ -683,14 +695,16 @@ def test_List_Flows_GET_200_frame_width(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [{**VIDEO_FLOW, "collected_by": [MULTI_FLOW["id"]]}] == response_json
+    assert [
+        {**stub_video_flow, "collected_by": [stub_multi_flow["id"]]}
+    ] == response_json
 
 
-def test_List_Flows_GET_200_label(api_client_cognito):
+def test_List_Flows_GET_200_label(api_client_cognito, dynamic_props, stub_multi_flow):
     """List flows with label query specified"""
     # Arrange
     path = "/flows"
@@ -708,11 +722,11 @@ def test_List_Flows_GET_200_label(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [MULTI_FLOW] == response_json
+    assert [stub_multi_flow] == response_json
 
 
 def test_List_Flows_GET_200_limit(api_client_cognito):
@@ -746,13 +760,15 @@ def test_List_Flows_GET_200_page(api_client_cognito):
     assert 3 == len(response.json())
 
 
-def test_List_Flows_GET_200_source_id(api_client_cognito):
+def test_List_Flows_GET_200_source_id(
+    api_client_cognito, dynamic_props, stub_data_flow, stub_multi_flow
+):
     """List flows with source_id query specified"""
     # Arrange
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"source_id": DATA_FLOW["source_id"]}
+        "GET", path, params={"source_id": stub_data_flow["source_id"]}
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
@@ -761,14 +777,18 @@ def test_List_Flows_GET_200_source_id(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [{**DATA_FLOW, "collected_by": [MULTI_FLOW["id"]]}] == response_json
+    assert [
+        {**stub_data_flow, "collected_by": [stub_multi_flow["id"]]}
+    ] == response_json
 
 
-def test_List_Flows_GET_200_tag_name(api_client_cognito):
+def test_List_Flows_GET_200_tag_name(
+    api_client_cognito, dynamic_props, stub_multi_flow
+):
     """List flows with tag.{name} query specified"""
     # Arrange
     path = "/flows"
@@ -786,11 +806,11 @@ def test_List_Flows_GET_200_tag_name(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert 1 == len(response.json())
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [MULTI_FLOW] == response_json
+    assert [stub_multi_flow] == response_json
 
 
 def test_List_Flows_GET_200_tag_exists_name(api_client_cognito):
@@ -956,13 +976,15 @@ def test_List_Flows_GET_400_page(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_List_Flows_GET_400_source_id(api_client_cognito):
+def test_List_Flows_GET_400_source_id(api_client_cognito, stub_data_flow):
     """List flows with source_id query specified"""
     # Arrange
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"source_id": DATA_FLOW["source_id"], "timerange": "bad"}
+        "GET",
+        path,
+        params={"source_id": stub_data_flow["source_id"], "timerange": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1024,9 +1046,9 @@ def test_List_Flows_GET_400_timerange(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Flow_Details_HEAD_200(api_client_cognito):
+def test_Flow_Details_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1040,9 +1062,9 @@ def test_Flow_Details_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_200_include_timerange(api_client_cognito):
+def test_Flow_Details_HEAD_200_include_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true"}
@@ -1055,9 +1077,9 @@ def test_Flow_Details_HEAD_200_include_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_200_timerange(api_client_cognito):
+def test_Flow_Details_HEAD_200_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request("HEAD", path, params={"timerange": "()"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
@@ -1068,9 +1090,9 @@ def test_Flow_Details_HEAD_200_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_400(api_client_cognito):
+def test_Flow_Details_HEAD_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request("HEAD", path, params={"timerange": "bad"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
@@ -1081,9 +1103,9 @@ def test_Flow_Details_HEAD_400(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito):
+def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
@@ -1096,9 +1118,9 @@ def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_400_timerange(api_client_cognito):
+def test_Flow_Details_HEAD_400_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
@@ -1111,9 +1133,9 @@ def test_Flow_Details_HEAD_400_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_404(api_client_cognito):
+def test_Flow_Details_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1127,9 +1149,9 @@ def test_Flow_Details_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_404_include_timerange(api_client_cognito):
+def test_Flow_Details_HEAD_404_include_timerange(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true"}
@@ -1142,9 +1164,9 @@ def test_Flow_Details_HEAD_404_include_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_HEAD_404_timerange(api_client_cognito):
+def test_Flow_Details_HEAD_404_timerange(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true"}
@@ -1157,9 +1179,11 @@ def test_Flow_Details_HEAD_404_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Details_GET_200(api_client_cognito):
+def test_Flow_Details_GET_200(
+    api_client_cognito, dynamic_props, stub_data_flow, stub_multi_flow
+):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}'
+    path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1171,15 +1195,15 @@ def test_Flow_Details_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
-    assert {**DATA_FLOW, "collected_by": [MULTI_FLOW["id"]]} == response_json
+    assert {**stub_data_flow, "collected_by": [stub_multi_flow["id"]]} == response_json
 
 
-def test_Flow_Details_GET_400(api_client_cognito):
+def test_Flow_Details_GET_400(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}'
+    path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request("GET", path, params={"timerange": "bad"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
@@ -1191,9 +1215,9 @@ def test_Flow_Details_GET_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Flow_Details_GET_400_include_timerange(api_client_cognito):
+def test_Flow_Details_GET_400_include_timerange(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}'
+    path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true", "timerange": "bad"}
@@ -1207,9 +1231,9 @@ def test_Flow_Details_GET_400_include_timerange(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Flow_Details_GET_400_timerange(api_client_cognito):
+def test_Flow_Details_GET_400_timerange(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}'
+    path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true", "timerange": "bad"}
@@ -1223,9 +1247,9 @@ def test_Flow_Details_GET_400_timerange(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Flow_Details_GET_404(api_client_cognito):
+def test_Flow_Details_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1239,9 +1263,9 @@ def test_Flow_Details_GET_404(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Flow_Details_GET_404_include_timerange(api_client_cognito):
+def test_Flow_Details_GET_404_include_timerange(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true"}
@@ -1254,9 +1278,9 @@ def test_Flow_Details_GET_404_include_timerange(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Flow_Details_GET_404_timerange(api_client_cognito):
+def test_Flow_Details_GET_404_timerange(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true"}
@@ -1269,9 +1293,9 @@ def test_Flow_Details_GET_404_timerange(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_List_Flow_Tags_HEAD_200(api_client_cognito):
+def test_List_Flow_Tags_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags'
+    path = f'/flows/{stub_multi_flow["id"]}/tags'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1285,9 +1309,9 @@ def test_List_Flow_Tags_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flow_Tags_HEAD_404(api_client_cognito):
+def test_List_Flow_Tags_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/tags"
+    path = f"/flows/{id_404}/tags"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1301,9 +1325,9 @@ def test_List_Flow_Tags_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flow_Tags_GET_200(api_client_cognito):
+def test_List_Flow_Tags_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags'
+    path = f'/flows/{stub_multi_flow["id"]}/tags'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1314,12 +1338,12 @@ def test_List_Flow_Tags_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_FLOW["tags"] == response.json()
+    assert stub_multi_flow["tags"] == response.json()
 
 
-def test_List_Flow_Tags_GET_404(api_client_cognito):
+def test_List_Flow_Tags_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/tags"
+    path = f"/flows/{id_404}/tags"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1333,9 +1357,9 @@ def test_List_Flow_Tags_GET_404(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Flow_Tag_Value_HEAD_200(api_client_cognito):
+def test_Flow_Tag_Value_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/flow_status'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/flow_status'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1349,9 +1373,9 @@ def test_Flow_Tag_Value_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Tag_Value_HEAD_404_bad_tag(api_client_cognito):
+def test_Flow_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/does_not_exist'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/does_not_exist'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1365,9 +1389,9 @@ def test_Flow_Tag_Value_HEAD_404_bad_tag(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Tag_Value_HEAD_404_bad_flow_id(api_client_cognito):
+def test_Flow_Tag_Value_HEAD_404_bad_flow_id(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/tags/flow_status"
+    path = f"/flows/{id_404}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1381,9 +1405,9 @@ def test_Flow_Tag_Value_HEAD_404_bad_flow_id(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Tag_Value_GET_200(api_client_cognito):
+def test_Flow_Tag_Value_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/flow_status'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/flow_status'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1394,12 +1418,12 @@ def test_Flow_Tag_Value_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_FLOW["tags"]["flow_status"] == response.content.decode("utf-8")
+    assert stub_multi_flow["tags"]["flow_status"] == response.content.decode("utf-8")
 
 
-def test_Flow_Tag_Value_GET_404_bad_tag(api_client_cognito):
+def test_Flow_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/does_not_exist'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/does_not_exist'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1413,9 +1437,9 @@ def test_Flow_Tag_Value_GET_404_bad_tag(api_client_cognito):
     assert "The requested flow or tag does not exist." == response.json()["message"]
 
 
-def test_Flow_Tag_Value_GET_404_bad_flow_id(api_client_cognito):
+def test_Flow_Tag_Value_GET_404_bad_flow_id(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/tags/flow_status"
+    path = f"/flows/{id_404}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1429,9 +1453,9 @@ def test_Flow_Tag_Value_GET_404_bad_flow_id(api_client_cognito):
     assert "The requested flow or tag does not exist." == response.json()["message"]
 
 
-def test_Create_or_Update_Flow_Tag_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Flow_Tag_PUT_204_create(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/pytest'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1446,9 +1470,9 @@ def test_Create_or_Update_Flow_Tag_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Tag_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Flow_Tag_PUT_204_update(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/test'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/test'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1463,9 +1487,9 @@ def test_Create_or_Update_Flow_Tag_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito):
+def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/pytest'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1481,9 +1505,9 @@ def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Flow_Tag_PUT_403(api_client_cognito):
+def test_Create_or_Update_Flow_Tag_PUT_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}/tags/pytest'
+    path = f'/flows/{stub_data_flow["id"]}/tags/pytest'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1501,9 +1525,9 @@ def test_Create_or_Update_Flow_Tag_PUT_403(api_client_cognito):
     )
 
 
-def test_Create_or_Update_Flow_Tag_PUT_404(api_client_cognito):
+def test_Create_or_Update_Flow_Tag_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/tags/pytest"
+    path = f"/flows/{id_404}/tags/pytest"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1518,9 +1542,9 @@ def test_Create_or_Update_Flow_Tag_PUT_404(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Tag_DELETE_204(api_client_cognito):
+def test_Delete_Flow_Tag_DELETE_204(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/tags/pytest'
+    path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1534,9 +1558,9 @@ def test_Delete_Flow_Tag_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Flow_Tag_DELETE_403(api_client_cognito):
+def test_Delete_Flow_Tag_DELETE_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}/tags/test'
+    path = f'/flows/{stub_data_flow["id"]}/tags/test'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1553,9 +1577,9 @@ def test_Delete_Flow_Tag_DELETE_403(api_client_cognito):
     )
 
 
-def test_Delete_Flow_Tag_DELETE_404(api_client_cognito):
+def test_Delete_Flow_Tag_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/tags/test"
+    path = f"/flows/{id_404}/tags/test"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1569,9 +1593,9 @@ def test_Delete_Flow_Tag_DELETE_404(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_Flow_Description_HEAD_200(api_client_cognito):
+def test_Flow_Description_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/description'
+    path = f'/flows/{stub_multi_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1585,9 +1609,9 @@ def test_Flow_Description_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Description_HEAD_404(api_client_cognito):
+def test_Flow_Description_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/description"
+    path = f"/flows/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1601,9 +1625,9 @@ def test_Flow_Description_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Description_GET_200(api_client_cognito):
+def test_Flow_Description_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/description'
+    path = f'/flows/{stub_multi_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1614,12 +1638,12 @@ def test_Flow_Description_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_FLOW["description"] == response.content.decode("utf-8")
+    assert stub_multi_flow["description"] == response.content.decode("utf-8")
 
 
-def test_Flow_Description_GET_404(api_client_cognito):
+def test_Flow_Description_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/description"
+    path = f"/flows/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1633,9 +1657,11 @@ def test_Flow_Description_GET_404(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Create_or_Update_Flow_Description_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Flow_Description_PUT_204_create(
+    api_client_cognito, stub_audio_flow
+):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/description'
+    path = f'/flows/{stub_audio_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1650,9 +1676,11 @@ def test_Create_or_Update_Flow_Description_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Description_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Flow_Description_PUT_204_update(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/description'
+    path = f'/flows/{stub_video_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1667,9 +1695,9 @@ def test_Create_or_Update_Flow_Description_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito):
+def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/description'
+    path = f'/flows/{stub_video_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1685,9 +1713,9 @@ def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Flow_Description_PUT_403(api_client_cognito):
+def test_Create_or_Update_Flow_Description_PUT_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}/description'
+    path = f'/flows/{stub_data_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1705,9 +1733,9 @@ def test_Create_or_Update_Flow_Description_PUT_403(api_client_cognito):
     )
 
 
-def test_Create_or_Update_Flow_Description_PUT_404(api_client_cognito):
+def test_Create_or_Update_Flow_Description_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/description"
+    path = f"/flows/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1722,9 +1750,9 @@ def test_Create_or_Update_Flow_Description_PUT_404(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Description_DELETE_204(api_client_cognito):
+def test_Delete_Flow_Description_DELETE_204(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/description'
+    path = f'/flows/{stub_audio_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1738,9 +1766,9 @@ def test_Delete_Flow_Description_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Flow_Description_DELETE_403(api_client_cognito):
+def test_Delete_Flow_Description_DELETE_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}/description'
+    path = f'/flows/{stub_data_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1757,9 +1785,9 @@ def test_Delete_Flow_Description_DELETE_403(api_client_cognito):
     )
 
 
-def test_Delete_Flow_Description_DELETE_404(api_client_cognito):
+def test_Delete_Flow_Description_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/description"
+    path = f"/flows/{id_404}/description"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1773,9 +1801,9 @@ def test_Delete_Flow_Description_DELETE_404(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_Flow_Label_HEAD_200(api_client_cognito):
+def test_Flow_Label_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/label'
+    path = f'/flows/{stub_multi_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1789,9 +1817,9 @@ def test_Flow_Label_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Label_HEAD_404(api_client_cognito):
+def test_Flow_Label_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/label"
+    path = f"/flows/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1805,9 +1833,9 @@ def test_Flow_Label_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Label_GET_200(api_client_cognito):
+def test_Flow_Label_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/label'
+    path = f'/flows/{stub_multi_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1818,12 +1846,12 @@ def test_Flow_Label_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_FLOW["label"] == response.content.decode("utf-8")
+    assert stub_multi_flow["label"] == response.content.decode("utf-8")
 
 
-def test_Flow_Label_GET_404(api_client_cognito):
+def test_Flow_Label_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/label"
+    path = f"/flows/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1840,9 +1868,11 @@ def test_Flow_Label_GET_404(api_client_cognito):
     )
 
 
-def test_Create_or_Update_Flow_Label_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Flow_Label_PUT_204_create(
+    api_client_cognito, stub_audio_flow
+):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/label'
+    path = f'/flows/{stub_audio_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1857,9 +1887,11 @@ def test_Create_or_Update_Flow_Label_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Label_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Flow_Label_PUT_204_update(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/label'
+    path = f'/flows/{stub_video_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1874,9 +1906,9 @@ def test_Create_or_Update_Flow_Label_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito):
+def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/label'
+    path = f'/flows/{stub_video_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1892,9 +1924,9 @@ def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Flow_Label_PUT_404(api_client_cognito):
+def test_Create_or_Update_Flow_Label_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/label"
+    path = f"/flows/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1909,9 +1941,9 @@ def test_Create_or_Update_Flow_Label_PUT_404(api_client_cognito):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Label_DELETE_204(api_client_cognito):
+def test_Delete_Flow_Label_DELETE_204(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/label'
+    path = f'/flows/{stub_audio_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1925,9 +1957,9 @@ def test_Delete_Flow_Label_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Flow_Label_DELETE_404(api_client_cognito):
+def test_Delete_Flow_Label_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/label"
+    path = f"/flows/{id_404}/label"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1941,9 +1973,9 @@ def test_Delete_Flow_Label_DELETE_404(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_Flow_Flow_Collection_HEAD_200(api_client_cognito):
+def test_Flow_Flow_Collection_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1957,9 +1989,9 @@ def test_Flow_Flow_Collection_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Flow_Collection_HEAD_404(api_client_cognito):
+def test_Flow_Flow_Collection_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/flow_collection"
+    path = f"/flows/{id_404}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1973,9 +2005,9 @@ def test_Flow_Flow_Collection_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Flow_Collection_GET_200(api_client_cognito):
+def test_Flow_Flow_Collection_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1988,12 +2020,12 @@ def test_Flow_Flow_Collection_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert MULTI_FLOW["flow_collection"] == response_json
+    assert stub_multi_flow["flow_collection"] == response_json
 
 
-def test_Flow_Flow_Collection_GET_404(api_client_cognito):
+def test_Flow_Flow_Collection_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/flow_collection"
+    path = f"/flows/{id_404}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2007,9 +2039,9 @@ def test_Flow_Flow_Collection_GET_404(api_client_cognito):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Flow_Collection_DELETE_204(api_client_cognito):
+def test_Delete_Flow_Flow_Collection_DELETE_204(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2023,9 +2055,9 @@ def test_Delete_Flow_Flow_Collection_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito):
+def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/flow_collection"
+    path = f"/flows/{id_404}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2039,14 +2071,16 @@ def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(
+    api_client_cognito, stub_multi_flow
+):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=MULTI_FLOW["flow_collection"][0:1],
+        json=stub_multi_flow["flow_collection"][0:1],
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -2056,14 +2090,16 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(api_client_cognito
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
+    api_client_cognito, stub_multi_flow
+):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/flow_collection'
+    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=MULTI_FLOW["flow_collection"],
+        json=stub_multi_flow["flow_collection"],
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -2073,9 +2109,11 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(api_client_cognito
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Flow_Collection_PUT_400(api_client_cognito):
+def test_Create_or_Update_Flow_Flow_Collection_PUT_400(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/flow_collection'
+    path = f'/flows/{stub_video_flow["id"]}/flow_collection'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2091,9 +2129,9 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito):
+def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/flow_collection"
+    path = f"/flows/{id_404}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2108,9 +2146,9 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Flow_Max_Bit_Rate_HEAD_200(api_client_cognito):
+def test_Flow_Max_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2124,9 +2162,9 @@ def test_Flow_Max_Bit_Rate_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Max_Bit_Rate_HEAD_404(api_client_cognito):
+def test_Flow_Max_Bit_Rate_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/max_bit_rate"
+    path = f"/flows/{id_404}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2140,9 +2178,9 @@ def test_Flow_Max_Bit_Rate_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Max_Bit_Rate_GET_200(api_client_cognito):
+def test_Flow_Max_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2153,12 +2191,12 @@ def test_Flow_Max_Bit_Rate_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert VIDEO_FLOW["max_bit_rate"] == int(response.content.decode("utf-8"))
+    assert stub_video_flow["max_bit_rate"] == int(response.content.decode("utf-8"))
 
 
-def test_Flow_Max_Bit_Rate_GET_404(api_client_cognito):
+def test_Flow_Max_Bit_Rate_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/max_bit_rate"
+    path = f"/flows/{id_404}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2172,9 +2210,11 @@ def test_Flow_Max_Bit_Rate_GET_404(api_client_cognito):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(
+    api_client_cognito, stub_audio_flow
+):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/max_bit_rate'
+    path = f'/flows/{stub_audio_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2189,9 +2229,11 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2206,9 +2248,11 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(api_client_cognito):
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/max_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2224,9 +2268,9 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito):
+def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/max_bit_rate"
+    path = f"/flows/{id_404}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2241,9 +2285,9 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Max_Bit_Rate_DELETE_204(api_client_cognito):
+def test_Delete_Flow_Max_Bit_Rate_DELETE_204(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/max_bit_rate'
+    path = f'/flows/{stub_audio_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2257,9 +2301,9 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito):
+def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/max_bit_rate"
+    path = f"/flows/{id_404}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2273,9 +2317,9 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_Flow_Avg_Bit_Rate_HEAD_200(api_client_cognito):
+def test_Flow_Avg_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2289,9 +2333,9 @@ def test_Flow_Avg_Bit_Rate_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Avg_Bit_Rate_HEAD_404(api_client_cognito):
+def test_Flow_Avg_Bit_Rate_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/avg_bit_rate"
+    path = f"/flows/{id_404}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2305,9 +2349,9 @@ def test_Flow_Avg_Bit_Rate_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Avg_Bit_Rate_GET_200(api_client_cognito):
+def test_Flow_Avg_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2318,12 +2362,12 @@ def test_Flow_Avg_Bit_Rate_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert VIDEO_FLOW["avg_bit_rate"] == int(response.content.decode("utf-8"))
+    assert stub_video_flow["avg_bit_rate"] == int(response.content.decode("utf-8"))
 
 
-def test_Flow_Avg_Bit_Rate_GET_404(api_client_cognito):
+def test_Flow_Avg_Bit_Rate_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/avg_bit_rate"
+    path = f"/flows/{id_404}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2337,9 +2381,11 @@ def test_Flow_Avg_Bit_Rate_GET_404(api_client_cognito):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(api_client_cognito):
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(
+    api_client_cognito, stub_audio_flow
+):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/avg_bit_rate'
+    path = f'/flows/{stub_audio_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2354,9 +2400,11 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(api_client_cognito):
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2371,9 +2419,11 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(api_client_cognito):
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/avg_bit_rate'
+    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2389,9 +2439,9 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito):
+def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/avg_bit_rate"
+    path = f"/flows/{id_404}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2406,9 +2456,9 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(api_client_cognito):
+def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/avg_bit_rate'
+    path = f'/flows/{stub_audio_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2422,9 +2472,9 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito):
+def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/avg_bit_rate"
+    path = f"/flows/{id_404}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2438,9 +2488,9 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_Flow_Read_Only_HEAD_200(api_client_cognito):
+def test_Flow_Read_Only_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/read_only'
+    path = f'/flows/{stub_multi_flow["id"]}/read_only'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2454,9 +2504,9 @@ def test_Flow_Read_Only_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Read_Only_HEAD_404(api_client_cognito):
+def test_Flow_Read_Only_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/read_only"
+    path = f"/flows/{id_404}/read_only"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2470,9 +2520,9 @@ def test_Flow_Read_Only_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Read_Only_GET_200(api_client_cognito):
+def test_Flow_Read_Only_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/read_only'
+    path = f'/flows/{stub_multi_flow["id"]}/read_only'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2486,9 +2536,9 @@ def test_Flow_Read_Only_GET_200(api_client_cognito):
     assert str(False).lower() == response.content.decode("utf-8")
 
 
-def test_Flow_Read_Only_GET_404(api_client_cognito):
+def test_Flow_Read_Only_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/read_only"
+    path = f"/flows/{id_404}/read_only"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2502,9 +2552,9 @@ def test_Flow_Read_Only_GET_404(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Set_Flow_Read_Only_PUT_204_DATA(api_client_cognito):
+def test_Set_Flow_Read_Only_PUT_204_DATA(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}/read_only'
+    path = f'/flows/{stub_data_flow["id"]}/read_only'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2519,9 +2569,9 @@ def test_Set_Flow_Read_Only_PUT_204_DATA(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Set_Flow_Read_Only_PUT_204_AUDIO(api_client_cognito):
+def test_Set_Flow_Read_Only_PUT_204_AUDIO(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/read_only'
+    path = f'/flows/{stub_audio_flow["id"]}/read_only'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2536,9 +2586,9 @@ def test_Set_Flow_Read_Only_PUT_204_AUDIO(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Set_Flow_Read_Only_PUT_400(api_client_cognito):
+def test_Set_Flow_Read_Only_PUT_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/read_only'
+    path = f'/flows/{stub_multi_flow["id"]}/read_only'
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2554,9 +2604,9 @@ def test_Set_Flow_Read_Only_PUT_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
+def test_Set_Flow_Read_Only_PUT_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/read_only"
+    path = f"/flows/{id_404}/read_only"
     # Act
     response = api_client_cognito.request(
         "PUT",

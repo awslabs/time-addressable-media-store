@@ -120,6 +120,160 @@ def delete_requests():
     return []
 
 
+@pytest.fixture(scope="session")
+def dynamic_props():
+    return [
+        "created_by",
+        "updated_by",
+        "created",
+        "metadata_updated",
+        "updated",
+        "source_collection",
+        "segments_updated",
+    ]
+
+
+@pytest.fixture(scope="session")
+def id_404():
+    return "00000000-0000-1000-8000-00000000000a"
+
+
+@pytest.fixture(scope="session")
+def stub_video_flow():
+    return {
+        "id": "10000000-0000-1000-8000-000000000000",
+        "source_id": "00000000-0000-1000-8000-000000000000",
+        "format": "urn:x-nmos:format:video",
+        "generation": 0,
+        "label": "pytest - video",
+        "description": "pytest - video",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "codec": "video/h264",
+        "container": "video/mp2t",
+        "avg_bit_rate": 5000000,
+        "max_bit_rate": 5000000,
+        "essence_parameters": {
+            "frame_rate": {"numerator": 50, "denominator": 1},
+            "frame_width": 1920,
+            "frame_height": 1080,
+            "bit_depth": 8,
+            "interlace_mode": "progressive",
+            "component_type": "YCbCr",
+            "horiz_chroma_subs": 2,
+            "vert_chroma_subs": 1,
+            "avc_parameters": {"profile": 122, "level": 42, "flags": 0},
+        },
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_audio_flow():
+    return {
+        "id": "10000000-0000-1000-8000-000000000001",
+        "source_id": "00000000-0000-1000-8000-000000000001",
+        "format": "urn:x-nmos:format:audio",
+        "generation": 0,
+        "label": "pytest - audio",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "codec": "audio/aac",
+        "container": "video/mp2t",
+        "essence_parameters": {
+            "sample_rate": 48000,
+            "channels": 2,
+            "bit_depth": 32,
+            "codec_parameters": {"coded_frame_size": 1024, "mp4_oti": 2},
+        },
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_data_flow():
+    return {
+        "id": "10000000-0000-1000-8000-000000000002",
+        "source_id": "00000000-0000-1000-8000-000000000002",
+        "format": "urn:x-nmos:format:data",
+        "generation": 0,
+        "label": "pytest - data",
+        "description": "pytest - data",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "codec": "text/plain",
+        "essence_parameters": {
+            "data_type": "text",
+        },
+        "read_only": True,
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_multi_flow():
+    return {
+        "id": "10000000-0000-1000-8000-000000000003",
+        "source_id": "00000000-0000-1000-8000-000000000003",
+        "format": "urn:x-nmos:format:multi",
+        "generation": 0,
+        "label": "pytest",
+        "description": "pytest",
+        "tags": {
+            "input_quality": "contribution",
+            "flow_status": "ingesting",
+            "test": "this",
+        },
+        "container": "video/mp2t",
+        "flow_collection": [
+            {"id": "10000000-0000-1000-8000-000000000000", "role": "video"},
+            {"id": "10000000-0000-1000-8000-000000000001", "role": "audio"},
+            {"id": "10000000-0000-1000-8000-000000000002", "role": "data"},
+        ],
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_video_source():
+    return {
+        "id": "00000000-0000-1000-8000-000000000000",
+        "format": "urn:x-nmos:format:video",
+        "label": "pytest - video",
+        "description": "pytest - video",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_audio_source():
+    return {
+        "id": "00000000-0000-1000-8000-000000000001",
+        "format": "urn:x-nmos:format:audio",
+        "label": "pytest - audio",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_data_source():
+    return {
+        "id": "00000000-0000-1000-8000-000000000002",
+        "format": "urn:x-nmos:format:data",
+        "label": "pytest - data",
+        "description": "pytest - data",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_multi_source():
+    return {
+        "id": "00000000-0000-1000-8000-000000000003",
+        "format": "urn:x-nmos:format:multi",
+        "label": "pytest",
+        "description": "pytest",
+        "tags": {
+            "input_quality": "contribution",
+            "flow_status": "ingesting",
+            "test": "this",
+        },
+    }
+
+
 #############
 # FUNCTIONS #
 #############

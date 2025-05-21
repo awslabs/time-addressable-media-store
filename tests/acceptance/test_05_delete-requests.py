@@ -4,15 +4,11 @@ from collections import deque
 import pytest
 import requests
 
-# pylint: disable=no-name-in-module
-from constants import ID_404
-
 pytestmark = [
-    pytest.mark.delete,
+    pytest.mark.acceptance,
 ]
 
 
-@pytest.mark.no_auth
 @pytest.mark.parametrize(
     "path, verb",
     [
@@ -117,9 +113,9 @@ def test_Flow_Delete_Request_Details_HEAD_200(api_client_cognito, delete_request
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito):
+def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flow-delete-requests/{ID_404}"
+    path = f"/flow-delete-requests/{id_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -133,9 +129,9 @@ def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_Flow_Delete_Request_Details_GET_404(api_client_cognito):
+def test_Flow_Delete_Request_Details_GET_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flow-delete-requests/{ID_404}"
+    path = f"/flow-delete-requests/{id_404}"
     # Act
     response = api_client_cognito.request(
         "GET",

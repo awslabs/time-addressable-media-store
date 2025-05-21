@@ -49,8 +49,7 @@ def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None
                 object_ids.add(item["object_id"])
                 publish_event(
                     "flows/segments_deleted",
-                    {"flow_id": item["flow_id"],
-                        "timerange": item["timerange"]},
+                    {"flow_id": item["flow_id"], "timerange": item["timerange"]},
                     enhance_resources([f'tams:flow:{item["flow_id"]}']),
                 )
         except ClientError as e:
@@ -162,8 +161,7 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
         if timerange_filter.start:
             args["KeyConditionExpression"] = And(
                 args["KeyConditionExpression"],
-                get_timerange_expression(
-                    Key, TimeRangeBoundary.END, timerange_filter),
+                get_timerange_expression(Key, TimeRangeBoundary.END, timerange_filter),
             )
         else:
             # Get the end of the first overlapping segment and use that to set the key filter when a start timerange is not specified.
