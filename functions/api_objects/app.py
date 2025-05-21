@@ -46,7 +46,7 @@ def get_objects_by_id(
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
 ):
-    if not check_object_exists(bucket, object_id) is None:
+    if not check_object_exists(bucket, object_id):
         raise NotFoundError("The requested media object does not exist.")  # 404
     args = get_query_kwargs(
         object_id,
