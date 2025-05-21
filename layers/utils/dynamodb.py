@@ -24,6 +24,7 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
+storage_table = dynamodb.Table(os.environ["STORAGE_TABLE"])
 
 
 class TimeRangeBoundary(Enum):
@@ -49,8 +50,7 @@ def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None
                 object_ids.add(item["object_id"])
                 publish_event(
                     "flows/segments_deleted",
-                    {"flow_id": item["flow_id"],
-                        "timerange": item["timerange"]},
+                    {"flow_id": item["flow_id"], "timerange": item["timerange"]},
                     enhance_resources([f'tams:flow:{item["flow_id"]}']),
                 )
         except ClientError as e:
@@ -162,8 +162,7 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
         if timerange_filter.start:
             args["KeyConditionExpression"] = And(
                 args["KeyConditionExpression"],
-                get_timerange_expression(
-                    Key, TimeRangeBoundary.END, timerange_filter),
+                get_timerange_expression(Key, TimeRangeBoundary.END, timerange_filter),
             )
         else:
             # Get the end of the first overlapping segment and use that to set the key filter when a start timerange is not specified.
@@ -279,3 +278,44 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
         if items["Items"][0]["timerange_end"] != timerange_end:
             return items["Items"][0]["timerange_end"]
     return timerange_end
+
+
+@tracer.capture_method(capture_response=False)
+def validate_object_id(object_id: str, flow_id: str) -> bool:
+    """Check supplied object_id can be used for the supplied flow_id"""
+    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+    items = query["Items"]
+    if len(items) == 0:
+        # No matching object_id found so must be invalid
+        return False
+    object_item = items[0]
+    if object_item["flow_id"] == flow_id:
+        if object_item.get("expires_at"):
+            # expires_at exists so this is first time use and needs updating to prevent TTL deletion
+            storage_table.update_item(
+                Key={
+                    "object_id": object_id,
+                    "flow_id": flow_id,
+                },
+                AttributeUpdates={"expires_at": {"Action": "DELETE"}},
+            )
+        # flow_id matches so is a valida object_id
+        return True
+    if object_item.get("expires_at") is None:
+        # object_id already used therefore can be re-used by any flow_id
+        return True
+    # All other options are invalid
+    return False
+
+
+@tracer.capture_method(capture_response=False)
+def delete_flow_storage_record(object_id) -> None:
+    """Delete the DDB record associated with the supplied object_id"""
+    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+    for item in query["Items"]:
+        storage_table.delete_item(
+            Key={
+                "object_id": item["object_id"],
+                "flow_id": item["flow_id"],
+            },
+        )

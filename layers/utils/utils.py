@@ -31,7 +31,8 @@ events = boto3.client("events")
 sqs = boto3.client("sqs")
 lmda = boto3.client("lambda")
 s3 = boto3.client(
-    "s3", config=Config(s3={"addressing_style": "virtual"})
+    "s3",
+    config=Config(s3={"addressing_style": "virtual"}),
     # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 )
 idp = boto3.client("cognito-idp")
@@ -140,7 +141,13 @@ def get_username(claims_tuple: tuple[str, str]) -> str:
     )
     if invoke["StatusCode"] != 200:
         raise ClientError(
-            operation_name="LambdaInvoke", error_response={'Error': {'Message': invoke["FunctionError"], 'Code': invoke['StatusCode']}}
+            operation_name="LambdaInvoke",
+            error_response={
+                "Error": {
+                    "Message": invoke["FunctionError"],
+                    "Code": invoke["StatusCode"],
+                }
+            },
         )
     return json.loads(invoke["Payload"].read().decode("utf-8"))
 
@@ -153,8 +160,7 @@ def model_dump(
     if isinstance(model, list):
         model_dict = [model_dump(m, **kwargs) for m in model]
     else:
-        args = {"by_alias": True, "exclude_unset": True,
-                "exclude_none": True, **kwargs}
+        args = {"by_alias": True, "exclude_unset": True, "exclude_none": True, **kwargs}
         model_dict = model.model_dump(mode="json", **args)
         remove_null(model_dict)
     return model_dict
@@ -204,10 +210,10 @@ def parse_tag_parameters(params: None) -> tuple[dict, dict]:
         return (values, exists)
     for key, value in params.items():
         if key.startswith("tag."):
-            values[key[len("tag."):]] = value
+            values[key[len("tag.") :]] = value
         if key.startswith("tag_exists."):
             if value.lower() in ["true", "false"]:
-                exists[key[len("tag_exists."):]] = value.lower() == "true"
+                exists[key[len("tag_exists.") :]] = value.lower() == "true"
             else:
                 raise BadRequestError(
                     [
@@ -252,7 +258,7 @@ def deserialise_neptune_obj(obj: dict) -> dict:
     deserialised = {}
     for prop_name, prop_value in obj.items():
         if prop_name.startswith(constants.SERIALISE_PREFIX):
-            actual_name = prop_name[len(constants.SERIALISE_PREFIX):]
+            actual_name = prop_name[len(constants.SERIALISE_PREFIX) :]
             deserialised[actual_name] = json.loads(prop_value)
         elif isinstance(prop_value, dict):
             deserialised[prop_name] = deserialise_neptune_obj(prop_value)
@@ -274,8 +280,7 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
                 elif essence_params[key] == "float":
                     return_dict["essence_properties"][key] = float(value)
                 elif essence_params[key] == "bool":
-                    return_dict["essence_properties"][key] = value.lower(
-                    ) == "true"
+                    return_dict["essence_properties"][key] = value.lower() == "true"
             elif key == "tag_values":
                 for tag_name, tag_value in value.items():
                     return_dict["tag_properties"][tag_name] = tag_value
@@ -330,26 +335,6 @@ def check_object_exists(bucket, object_id: str) -> bool:
         return True
     except ClientError:
         return False
-
-
-@tracer.capture_method(capture_response=False)
-def get_object_tags(bucket, object_id: str) -> dict | None:
-    """Retrieves the S3 object tags for the specified object_id"""
-    try:
-        tagset = s3.get_object_tagging(Bucket=bucket, Key=object_id)["TagSet"]
-        return {t["Key"]: t["Value"] for t in tagset}
-    except ClientError:
-        return None
-
-
-@tracer.capture_method(capture_response=False)
-def set_object_tags(bucket, object_id: str, tags: dict) -> None:
-    """Sets the S3 object tags for the specified object_id"""
-    s3.put_object_tagging(
-        Bucket=bucket,
-        Key=object_id,
-        Tagging={"TagSet": [{"Key": k, "Value": v} for k, v in tags.items()]},
-    )
 
 
 @tracer.capture_method(capture_response=False)

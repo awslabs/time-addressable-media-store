@@ -24,10 +24,10 @@ from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
-from dynamodb import segments_table
+from dynamodb import segments_table, storage_table
 from schema import Object
 from typing_extensions import Annotated
-from utils import generate_link_url, get_object_tags, model_dump
+from utils import check_object_exists, generate_link_url, model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -46,8 +46,7 @@ def get_objects_by_id(
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
 ):
-    object_s3_tags = get_object_tags(bucket, object_id)
-    if object_s3_tags is None:
+    if not check_object_exists(bucket, object_id) is None:
         raise NotFoundError("The requested media object does not exist.")  # 404
     args = get_query_kwargs(
         object_id,
@@ -79,13 +78,20 @@ def get_objects_by_id(
             body=None,
             headers=custom_headers,
         )
+    object_query = storage_table.query(
+        KeyConditionExpression=Key("object_id").eq(object_id)
+    )
+    valid_object_items = [
+        item for item in object_query["Items"] if item.get("expires_at") is None
+    ]
+    first_referenced_by_flow = (
+        None if len(valid_object_items) == 0 else valid_object_items[0]["flow_id"]
+    )
     schema_item = Object(
         **{
             "object_id": object_id,
             "referenced_by_flows": set([item["flow_id"] for item in items]),
-            "first_referenced_by_flow": object_s3_tags.get(
-                "first_referenced_by_flow", None
-            ),
+            "first_referenced_by_flow": first_referenced_by_flow,
         }
     )
     return Response(

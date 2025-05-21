@@ -12,7 +12,7 @@ from aws_lambda_powertools.utilities.batch import (
 from aws_lambda_powertools.utilities.data_classes.sqs_event import SQSEvent, SQSRecord
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
-from dynamodb import segments_table
+from dynamodb import delete_flow_storage_record, segments_table
 
 tracer = Tracer()
 logger = Logger()
@@ -43,6 +43,8 @@ def record_handler(record: SQSRecord) -> None:
             Bucket=bucket,
             Delete={"Objects": delete_batch},
         )
+        for delete_item in delete_batch:
+            delete_flow_storage_record(delete_item["Key"])
 
 
 @logger.inject_lambda_context(log_event=True)

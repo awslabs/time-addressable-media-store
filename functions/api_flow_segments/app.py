@@ -31,6 +31,7 @@ from dynamodb import (
     get_key_and_args,
     get_timerange_expression,
     segments_table,
+    validate_object_id,
 )
 from mediatimestamp.immutable import TimeRange
 from neptune import (
@@ -48,12 +49,10 @@ from utils import (
     check_object_exists,
     generate_link_url,
     generate_presigned_url,
-    get_object_tags,
     get_store_name,
     model_dump,
     publish_event,
     put_message,
-    set_object_tags,
 )
 
 tracer = Tracer()
@@ -350,9 +349,25 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def process_single_segment(flow, flow_segment):
+def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
+    """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
-    if not check_object_exists(bucket, flow_segment.object_id):
+    if not validate_object_id(flow_segment.object_id, flow["id"]):
+        return FailedSegment(
+            **{
+                "object_id": flow_segment.object_id,
+                "timerange": item_dict["timerange"],
+                "error": {
+                    "type": "BadRequestError",
+                    "summary": "Bad request. The object id is not valid to be used for the flow id supplied.",
+                    "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+            }
+        )
+    # If get_urls is supplied then not need to check if item exists in S3
+    if not flow_segment.get_urls and not check_object_exists(
+        bucket, flow_segment.object_id
+    ):
         return FailedSegment(
             **{
                 "object_id": flow_segment.object_id,
@@ -392,7 +407,6 @@ def process_single_segment(flow, flow_segment):
     schema_item.get_urls = (
         schema_item.get_urls.append(get_url) if schema_item.get_urls else [get_url]
     )
-    set_first_referenced_by_flow(flow["id"], flow_segment.object_id)
     publish_event(
         "flows/segments_added",
         {"flow_id": flow["id"], "segments": [model_dump(schema_item)]},
@@ -407,13 +421,3 @@ def process_single_segment(flow, flow_segment):
             ]
         ),
     )
-
-
-@tracer.capture_method(capture_response=False)
-def set_first_referenced_by_flow(flow_id: str, object_id: str) -> None:
-    """Sets the S3 object tag for first_referenced_by_flow if not already set"""
-    tagset = get_object_tags(bucket, object_id)
-    if "first_referenced_by_flow" not in tagset:
-        set_object_tags(
-            bucket, object_id, {**tagset, "first_referenced_by_flow": flow_id}
-        )
