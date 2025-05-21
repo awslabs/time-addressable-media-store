@@ -352,18 +352,17 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
     for item in schema_items:
         if accept_get_urls == "":
             item.get_urls = None
-        else:
-            get_url = get_nonsigned_url(item.object_id)
-            if item.get_urls is None:
-                item.get_urls = [get_url]
-            else:
-                item.get_urls.append(get_url)
-            if item.object_id in presigned_urls:
-                presigned_get_url = GetUrl(
-                    label=f"aws.{bucket_region}:s3.presigned:{store_name}",
-                    url=presigned_urls[item.object_id],
-                )
-                item.get_urls.append(presigned_get_url)
+            continue
+        get_url = get_nonsigned_url(item.object_id)
+        item.get_urls = [*item.get_urls, get_url] if item.get_urls else [get_url]
+        # Add pre-signed urls where supplied
+        if item.object_id in presigned_urls:
+            presigned_get_url = GetUrl(
+                label=f"aws.{bucket_region}:s3.presigned:{store_name}",
+                url=presigned_urls[item.object_id],
+            )
+            item.get_urls.append(presigned_get_url)
+        # Filter returned get_urls when specified
         if accept_get_urls:
             get_url_labels = [
                 label for label in accept_get_urls.split(",") if label.strip()
