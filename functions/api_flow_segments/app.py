@@ -174,11 +174,12 @@ def post_flow_segments_by_id(
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
         )  # 400
-    if not flow_segment.get_urls:
-        if not check_object_exists(bucket, flow_segment.object_id):
-            raise BadRequestError(
-                "Bad request. The object id provided for a segment MUST exist."
-            )  # 400
+    if not flow_segment.get_urls and not check_object_exists(
+        bucket, flow_segment.object_id
+    ):
+        raise BadRequestError(
+            "Bad request. The object id provided for a segment MUST exist."
+        )  # 400
     item_dict = model_dump(flow_segment)
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow_id, segment_timerange):
