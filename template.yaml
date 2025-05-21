@@ -1665,6 +1665,7 @@ Resources:
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          STORAGE_TABLE: !Ref FlowStorageTable
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
       Policies:
@@ -1738,6 +1739,7 @@ Resources:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
             - Effect: Allow
               Action:
+                - dynamodb:Query
                 - dynamodb:DeleteItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
