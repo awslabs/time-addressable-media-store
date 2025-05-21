@@ -1451,6 +1451,11 @@ Resources:
               Resource:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
                 - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
       Events:
         headMediaObjectInformation:
           Type: Api
