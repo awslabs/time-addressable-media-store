@@ -2,11 +2,10 @@ import pytest
 import requests
 
 pytestmark = [
-    pytest.mark.service,
+    pytest.mark.acceptance,
 ]
 
 
-@pytest.mark.no_auth
 @pytest.mark.parametrize(
     "path, verb",
     [

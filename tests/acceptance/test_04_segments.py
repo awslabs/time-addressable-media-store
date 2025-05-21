@@ -2,21 +2,14 @@
 import pytest
 import requests
 
-# pylint: disable=no-name-in-module
-from constants import (
-    AUDIO_FLOW,
-    DATA_FLOW,
-    DYNAMIC_PROPS,
-    ID_404,
-    MULTI_FLOW,
-    VIDEO_FLOW,
-)
+pytestmark = [
+    pytest.mark.acceptance,
+]
 
 
-@pytest.mark.storage
-def test_Allocate_Flow_Storage_POST_201_default(api_client_cognito):
+def test_Allocate_Flow_Storage_POST_201_default(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/storage'
+    path = f'/flows/{stub_video_flow["id"]}/storage'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -32,10 +25,11 @@ def test_Allocate_Flow_Storage_POST_201_default(api_client_cognito):
     assert 100 == len(response.json()["media_objects"])
 
 
-@pytest.mark.storage
-def test_Allocate_Flow_Storage_POST_201(api_client_cognito, media_objects):
+def test_Allocate_Flow_Storage_POST_201(
+    api_client_cognito, media_objects, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/storage'
+    path = f'/flows/{stub_video_flow["id"]}/storage'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -55,14 +49,13 @@ def test_Allocate_Flow_Storage_POST_201(api_client_cognito, media_objects):
         assert "put_url" in record
         assert "url" in record["put_url"]
         assert "content-type" in record["put_url"]
-        assert VIDEO_FLOW["container"] == record["put_url"]["content-type"]
+        assert stub_video_flow["container"] == record["put_url"]["content-type"]
 
 
-@pytest.mark.storage
-def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito):
+def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito, stub_multi_flow):
     """Bad request body"""
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/storage'
+    path = f'/flows/{stub_multi_flow["id"]}/storage'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -77,11 +70,10 @@ def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.storage
-def test_Allocate_Flow_Storage_POST_400_container(api_client_cognito):
+def test_Allocate_Flow_Storage_POST_400_container(api_client_cognito, stub_data_flow):
     """Flow missing container"""
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}/storage'
+    path = f'/flows/{stub_data_flow["id"]}/storage'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -99,10 +91,9 @@ def test_Allocate_Flow_Storage_POST_400_container(api_client_cognito):
     )
 
 
-@pytest.mark.storage
-def test_Allocate_Flow_Storage_POST_403(api_client_cognito):
+def test_Allocate_Flow_Storage_POST_403(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/storage'
+    path = f'/flows/{stub_audio_flow["id"]}/storage'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -120,10 +111,9 @@ def test_Allocate_Flow_Storage_POST_403(api_client_cognito):
     )
 
 
-@pytest.mark.storage
-def test_Allocate_Flow_Storage_POST_404(api_client_cognito):
+def test_Allocate_Flow_Storage_POST_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/storage"
+    path = f"/flows/{id_404}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -138,7 +128,6 @@ def test_Allocate_Flow_Storage_POST_404(api_client_cognito):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-@pytest.mark.storage
 def test_Presigned_PUT_URL_POST_200(media_objects):
     # Act
     for record in media_objects:
@@ -152,7 +141,6 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
         assert 200 == put_file.status_code
 
 
-@pytest.mark.storage
 def test_S3_PUT_bulk_objects(session, region, stack):
     # Arrange
     bucket_name = stack["outputs"]["MediaStorageBucket"]
@@ -168,12 +156,11 @@ def test_S3_PUT_bulk_objects(session, region, stack):
     assert True
 
 
-@pytest.mark.segments
 def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
-    api_client_cognito, media_objects
+    api_client_cognito, media_objects, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     for n, record in enumerate(media_objects):
         response = api_client_cognito.request(
@@ -185,10 +172,9 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
         assert 201 == response.status_code
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_201_VIDEO_bulk(api_client_cognito):
+def test_Create_Flow_Segment_POST_201_VIDEO_bulk(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     for n in range(5, 100):
         response = api_client_cognito.request(
@@ -203,10 +189,11 @@ def test_Create_Flow_Segment_POST_201_VIDEO_bulk(api_client_cognito):
         assert 201 == response.status_code
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_201_MULTI(api_client_cognito, media_objects):
+def test_Create_Flow_Segment_POST_201_MULTI(
+    api_client_cognito, media_objects, stub_multi_flow
+):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -220,10 +207,9 @@ def test_Create_Flow_Segment_POST_201_MULTI(api_client_cognito, media_objects):
     assert 201 == response.status_code
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_201_negative(api_client_cognito):
+def test_Create_Flow_Segment_POST_201_negative(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -237,10 +223,9 @@ def test_Create_Flow_Segment_POST_201_negative(api_client_cognito):
     assert 201 == response.status_code
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_200(api_client_cognito):
+def test_List_Flow_Segments_HEAD_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -254,11 +239,12 @@ def test_List_Flow_Segments_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_200_accept_get_urls(api_client_cognito):
+def test_List_Flow_Segments_HEAD_200_accept_get_urls(
+    api_client_cognito, stub_video_flow
+):
     """List segments with accept_get_urls query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -278,11 +264,10 @@ def test_List_Flow_Segments_HEAD_200_accept_get_urls(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_200_limit(api_client_cognito):
+def test_List_Flow_Segments_HEAD_200_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -302,11 +287,10 @@ def test_List_Flow_Segments_HEAD_200_limit(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_200_object_id(api_client_cognito):
+def test_List_Flow_Segments_HEAD_200_object_id(api_client_cognito, stub_video_flow):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -321,11 +305,10 @@ def test_List_Flow_Segments_HEAD_200_object_id(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_200_page(api_client_cognito):
+def test_List_Flow_Segments_HEAD_200_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -340,11 +323,10 @@ def test_List_Flow_Segments_HEAD_200_page(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_200_reverse_order(api_client_cognito):
+def test_List_Flow_Segments_HEAD_200_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -359,11 +341,10 @@ def test_List_Flow_Segments_HEAD_200_reverse_order(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_200_timerange(api_client_cognito):
+def test_List_Flow_Segments_HEAD_200_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -378,10 +359,9 @@ def test_List_Flow_Segments_HEAD_200_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_400(api_client_cognito):
+def test_List_Flow_Segments_HEAD_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -396,11 +376,12 @@ def test_List_Flow_Segments_HEAD_400(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_400_accept_get_urls(api_client_cognito):
+def test_List_Flow_Segments_HEAD_400_accept_get_urls(
+    api_client_cognito, stub_video_flow
+):
     """List segments with accept_get_urls query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -415,11 +396,10 @@ def test_List_Flow_Segments_HEAD_400_accept_get_urls(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito):
+def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -434,11 +414,10 @@ def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_400_object_id(api_client_cognito):
+def test_List_Flow_Segments_HEAD_400_object_id(api_client_cognito, stub_video_flow):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -456,11 +435,10 @@ def test_List_Flow_Segments_HEAD_400_object_id(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_400_page(api_client_cognito):
+def test_List_Flow_Segments_HEAD_400_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -475,11 +453,10 @@ def test_List_Flow_Segments_HEAD_400_page(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito):
+def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -494,11 +471,10 @@ def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_HEAD_400_timerange(api_client_cognito):
+def test_List_Flow_Segments_HEAD_400_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -513,7 +489,6 @@ def test_List_Flow_Segments_HEAD_400_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404(api_client_cognito):
     # Arrange
     path = "/flows/invalid-id/segments"
@@ -530,7 +505,6 @@ def test_List_Flow_Segments_HEAD_404(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404_limit(api_client_cognito):
     """List segments with limit query specified"""
     # Arrange
@@ -549,7 +523,6 @@ def test_List_Flow_Segments_HEAD_404_limit(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404_accept_get_urls(api_client_cognito):
     """List segments with accept_get_urls query specified"""
     # Arrange
@@ -568,7 +541,6 @@ def test_List_Flow_Segments_HEAD_404_accept_get_urls(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito):
     """List segments with object_id query specified"""
     # Arrange
@@ -587,7 +559,6 @@ def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404_page(api_client_cognito):
     """List flows with page query specified"""
     # Arrange
@@ -606,7 +577,6 @@ def test_List_Flow_Segments_HEAD_404_page(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404_reverse_order(api_client_cognito):
     """List segments with limit query specified"""
     # Arrange
@@ -625,7 +595,6 @@ def test_List_Flow_Segments_HEAD_404_reverse_order(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_HEAD_404_timerange(api_client_cognito):
     """List segments with limit query specified"""
     # Arrange
@@ -644,10 +613,9 @@ def test_List_Flow_Segments_HEAD_404_timerange(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.flows
-def test_Flow_Details_GET_200_include_timerange(api_client_cognito):
+def test_Flow_Details_GET_200_include_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true"}
@@ -661,10 +629,11 @@ def test_Flow_Details_GET_200_include_timerange(api_client_cognito):
     assert "segments_updated" in response.json()
 
 
-@pytest.mark.flows
-def test_Flow_Details_GET_200_timerange(api_client_cognito):
+def test_Flow_Details_GET_200_timerange(
+    api_client_cognito, dynamic_props, stub_video_flow, stub_multi_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}'
+    path = f'/flows/{stub_video_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true", "timerange": "[1:0_3:0)"}
@@ -676,21 +645,20 @@ def test_Flow_Details_GET_200_timerange(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "segments_updated" in response.json()
-    for prop in DYNAMIC_PROPS:
+    for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
     assert {
-        **VIDEO_FLOW,
+        **stub_video_flow,
         "label": "pytest",
         "description": "pytest",
-        "collected_by": [MULTI_FLOW["id"]],
+        "collected_by": [stub_multi_flow["id"]],
         "timerange": "[1:0_3:0)",
         "avg_bit_rate": 6000000,
         "max_bit_rate": 6000000,
     } == response_json
 
 
-@pytest.mark.flows
 def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
     """List flows with timerange query specified"""
     # Arrange
@@ -705,7 +673,6 @@ def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
     assert 2 == len(response.json())
 
 
-@pytest.mark.flows
 def test_List_Flows_GET_200_timerange_never(api_client_cognito):
     """List flows with timerange query specified"""
     # Arrange
@@ -720,10 +687,9 @@ def test_List_Flows_GET_200_timerange_never(api_client_cognito):
     assert 2 == len(response.json())
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200(api_client_cognito):
+def test_List_Flow_Segments_GET_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -749,11 +715,10 @@ def test_List_Flow_Segments_GET_200(api_client_cognito):
         assert 2 == len(record["get_urls"])
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_non_existant(api_client_cognito):
+def test_List_Flow_Segments_GET_200_non_existant(api_client_cognito, id_404):
     """A request for segments from a non-existent flow will return an empty list, not a 404."""
     # Arrange
-    path = f"/flows/{ID_404}/segments"
+    path = f"/flows/{id_404}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -767,10 +732,11 @@ def test_List_Flow_Segments_GET_200_non_existant(api_client_cognito):
     assert 0 == len(response.json())
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_accept_get_urls_empty(api_client_cognito):
+def test_List_Flow_Segments_GET_200_accept_get_urls_empty(
+    api_client_cognito, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -789,10 +755,11 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_empty(api_client_cognito):
         assert "get_urls" not in record
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_accept_get_urls_single(api_client_cognito, region):
+def test_List_Flow_Segments_GET_200_accept_get_urls_single(
+    api_client_cognito, region, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -812,12 +779,11 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_single(api_client_cognito, r
         assert 1 == len(record["get_urls"])
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
-    api_client_cognito, region
+    api_client_cognito, region, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -839,11 +805,10 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
         assert 2 == len(record["get_urls"])
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_limit(api_client_cognito):
+def test_List_Flow_Segments_GET_200_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -863,12 +828,11 @@ def test_List_Flow_Segments_GET_200_limit(api_client_cognito):
     assert 2 == len(response.json())
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_object_id(api_client_cognito):
+def test_List_Flow_Segments_GET_200_object_id(api_client_cognito, stub_video_flow):
     """List segments with object_id query specified"""
     # Arrange
     object_id = "20000000-0000-1000-8000-000000000005"
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -884,11 +848,10 @@ def test_List_Flow_Segments_GET_200_object_id(api_client_cognito):
     assert object_id == response.json()[0]["object_id"]
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_page(api_client_cognito):
+def test_List_Flow_Segments_GET_200_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -903,11 +866,10 @@ def test_List_Flow_Segments_GET_200_page(api_client_cognito):
     assert 30 == len(response.json())
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_reverse_order(api_client_cognito):
+def test_List_Flow_Segments_GET_200_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -929,11 +891,10 @@ def test_List_Flow_Segments_GET_200_reverse_order(api_client_cognito):
     assert start_first > start_last
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_200_timerange(api_client_cognito):
+def test_List_Flow_Segments_GET_200_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -948,10 +909,9 @@ def test_List_Flow_Segments_GET_200_timerange(api_client_cognito):
     assert 2 == len(response.json())
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_400(api_client_cognito):
+def test_List_Flow_Segments_GET_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -967,11 +927,10 @@ def test_List_Flow_Segments_GET_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_400_limit(api_client_cognito):
+def test_List_Flow_Segments_GET_400_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -987,11 +946,10 @@ def test_List_Flow_Segments_GET_400_limit(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_400_object_id(api_client_cognito):
+def test_List_Flow_Segments_GET_400_object_id(api_client_cognito, stub_video_flow):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1010,11 +968,10 @@ def test_List_Flow_Segments_GET_400_object_id(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_400_page(api_client_cognito):
+def test_List_Flow_Segments_GET_400_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1030,11 +987,10 @@ def test_List_Flow_Segments_GET_400_page(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito):
+def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1050,11 +1006,10 @@ def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_List_Flow_Segments_GET_400_timerange(api_client_cognito):
+def test_List_Flow_Segments_GET_400_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1070,7 +1025,6 @@ def test_List_Flow_Segments_GET_400_timerange(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_GET_404(api_client_cognito):
     # Arrange
     path = "/flows/invalid-id/segments"
@@ -1087,7 +1041,6 @@ def test_List_Flow_Segments_GET_404(api_client_cognito):
     assert "The flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_GET_404_limit(api_client_cognito):
     """List segments with limit query specified"""
     # Arrange
@@ -1106,7 +1059,6 @@ def test_List_Flow_Segments_GET_404_limit(api_client_cognito):
     assert "The flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_GET_404_object_id(api_client_cognito):
     """List segments with object_id query specified"""
     # Arrange
@@ -1125,7 +1077,6 @@ def test_List_Flow_Segments_GET_404_object_id(api_client_cognito):
     assert "The flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_GET_404_page(api_client_cognito):
     """List flows with page query specified"""
     # Arrange
@@ -1144,7 +1095,6 @@ def test_List_Flow_Segments_GET_404_page(api_client_cognito):
     assert "The flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_GET_404_reverse_order(api_client_cognito):
     """List segments with limit query specified"""
     # Arrange
@@ -1163,7 +1113,6 @@ def test_List_Flow_Segments_GET_404_reverse_order(api_client_cognito):
     assert "The flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
 def test_List_Flow_Segments_GET_404_timerange(api_client_cognito):
     """List segments with limit query specified"""
     # Arrange
@@ -1182,11 +1131,10 @@ def test_List_Flow_Segments_GET_404_timerange(api_client_cognito):
     assert "The flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_400_request(api_client_cognito):
+def test_Create_Flow_Segment_POST_400_request(api_client_cognito, stub_multi_flow):
     """Bad request body"""
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1202,11 +1150,10 @@ def test_Create_Flow_Segment_POST_400_request(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_400_container(api_client_cognito):
+def test_Create_Flow_Segment_POST_400_container(api_client_cognito, stub_data_flow):
     """Flow missing container"""
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}/segments'
+    path = f'/flows/{stub_data_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1227,11 +1174,10 @@ def test_Create_Flow_Segment_POST_400_container(api_client_cognito):
     )
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito):
+def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito, stub_multi_flow):
     """Timerange overlaps with existing segment"""
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1252,11 +1198,12 @@ def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito):
     )
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_400_missing_object(api_client_cognito):
+def test_Create_Flow_Segment_POST_400_missing_object(
+    api_client_cognito, stub_multi_flow
+):
     """Object must already exist in S3"""
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1277,10 +1224,9 @@ def test_Create_Flow_Segment_POST_400_missing_object(api_client_cognito):
     )
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_403(api_client_cognito):
+def test_Create_Flow_Segment_POST_403(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_audio_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1298,10 +1244,9 @@ def test_Create_Flow_Segment_POST_403(api_client_cognito):
     )
 
 
-@pytest.mark.segments
-def test_Create_Flow_Segment_POST_404(api_client_cognito):
+def test_Create_Flow_Segment_POST_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/segments"
+    path = f"/flows/{id_404}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1316,12 +1261,11 @@ def test_Create_Flow_Segment_POST_404(api_client_cognito):
     assert "The flow does not exist." == response.json()["message"]
 
 
-@pytest.mark.segments
 def test_Delete_Flow_Segment_DELETE_202(
-    api_client_cognito, delete_requests, api_endpoint
+    api_client_cognito, delete_requests, api_endpoint, stub_multi_flow
 ):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1359,11 +1303,10 @@ def test_Delete_Flow_Segment_DELETE_202_object_id():
     assert True
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito, stub_video_flow):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1378,13 +1321,12 @@ def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.segments
 def test_Delete_Flow_Segment_DELETE_202_timerange(
-    api_client_cognito, delete_requests, api_endpoint
+    api_client_cognito, delete_requests, api_endpoint, stub_video_flow
 ):
     """Delete segments with timerange query specified"""
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1418,10 +1360,9 @@ def test_Delete_Flow_Segment_DELETE_204_timerange():
     assert True
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_400(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}/segments'
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1437,10 +1378,9 @@ def test_Delete_Flow_Segment_DELETE_400(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1459,10 +1399,9 @@ def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito):
     assert 0 < len(response.json()["message"])
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_403(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_403(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_audio_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1479,10 +1418,9 @@ def test_Delete_Flow_Segment_DELETE_403(api_client_cognito):
     )
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_audio_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1500,10 +1438,9 @@ def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito):
     )
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}/segments'
+    path = f'/flows/{stub_audio_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1521,10 +1458,9 @@ def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito):
     )
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_404(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/segments"
+    path = f"/flows/{id_404}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1538,10 +1474,9 @@ def test_Delete_Flow_Segment_DELETE_404(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/segments"
+    path = f"/flows/{id_404}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1556,10 +1491,9 @@ def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.segments
-def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito):
+def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}/segments"
+    path = f"/flows/{id_404}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1574,12 +1508,11 @@ def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito):
     assert "The requested flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.flows
 def test_Delete_Flow_DELETE_202_VIDEO(
-    api_client_cognito, delete_requests, api_endpoint
+    api_client_cognito, delete_requests, api_endpoint, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{VIDEO_FLOW["id"]}'
+    path = f'/flows/{stub_video_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1607,10 +1540,9 @@ def test_Delete_Flow_DELETE_202_VIDEO(
     assert "status" in response.json()
 
 
-@pytest.mark.flows
-def test_Delete_Flow_DELETE_403(api_client_cognito):
+def test_Delete_Flow_DELETE_403(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}'
+    path = f'/flows/{stub_audio_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1627,10 +1559,9 @@ def test_Delete_Flow_DELETE_403(api_client_cognito):
     )
 
 
-@pytest.mark.flows
-def test_Delete_Flow_DELETE_404(api_client_cognito):
+def test_Delete_Flow_DELETE_404(api_client_cognito, id_404):
     # Arrange
-    path = f"/flows/{ID_404}"
+    path = f"/flows/{id_404}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1644,17 +1575,16 @@ def test_Delete_Flow_DELETE_404(api_client_cognito):
     assert "The requested Flow ID in the path is invalid." == response.json()["message"]
 
 
-@pytest.mark.flows
-def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito):
-    """204 returned as AUDIO_FLOW has no segments"""
+def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito, stub_audio_flow):
+    """204 returned as stub_audio_flow has no segments"""
     # Need to set read_only to false prior to delete request
     api_client_cognito.request(
         "PUT",
-        f'/flows/{AUDIO_FLOW["id"]}/read_only',
+        f'/flows/{stub_audio_flow["id"]}/read_only',
         json=False,
     )
     # Arrange
-    path = f'/flows/{AUDIO_FLOW["id"]}'
+    path = f'/flows/{stub_audio_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1668,11 +1598,10 @@ def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.flows
-def test_Delete_Flow_DELETE_204_DATA(api_client_cognito):
-    """204 returned as AUDIO_FLOW has no segments"""
+def test_Delete_Flow_DELETE_204_DATA(api_client_cognito, stub_data_flow):
+    """204 returned as stub_audio_flow has no segments"""
     # Arrange
-    path = f'/flows/{DATA_FLOW["id"]}'
+    path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1686,10 +1615,11 @@ def test_Delete_Flow_DELETE_204_DATA(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.flows
-def test_Delete_Flow_DELETE_204_MULTI(api_client_cognito, delete_requests):
+def test_Delete_Flow_DELETE_204_MULTI(
+    api_client_cognito, delete_requests, stub_multi_flow
+):
     # Arrange
-    path = f'/flows/{MULTI_FLOW["id"]}'
+    path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
