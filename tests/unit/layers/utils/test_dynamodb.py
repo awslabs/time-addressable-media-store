@@ -1,3 +1,5 @@
+import base64
+import json
 import os
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
@@ -578,3 +580,69 @@ class TestDynamoDB:
         dynamodb.delete_flow_storage_record(object_id)
 
         assert 0 == mock_storage_table.delete_item.call_count
+
+    def test_get_object_id_query_kwargs(self):
+        object_id = "test-id"
+        parameters = {}
+
+        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        assert (
+            result["KeyConditionExpression"].get_expression()
+            == Key("object_id").eq(object_id).get_expression()
+        )
+        assert result["Limit"] == constants.DEFAULT_PAGE_LIMIT
+        assert "ExclusiveStartKey" not in result
+
+    def test_get_object_id_query_kwargs_limit(self):
+        object_id = "test-id"
+        parameters = {"limit": 1}
+
+        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        assert (
+            result["KeyConditionExpression"].get_expression()
+            == Key("object_id").eq(object_id).get_expression()
+        )
+        assert result["Limit"] == 1
+        assert "ExclusiveStartKey" not in result
+
+    def test_get_object_id_query_kwargs_max_limit(self):
+        object_id = "test-id"
+        parameters = {"limit": 1000}
+
+        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        assert (
+            result["KeyConditionExpression"].get_expression()
+            == Key("object_id").eq(object_id).get_expression()
+        )
+        assert result["Limit"] == constants.MAX_PAGE_LIMIT
+        assert "ExclusiveStartKey" not in result
+
+    def test_get_object_id_query_kwargs_page(self):
+        object_id = "test-id"
+        exclusive_start_key = {
+            "flow_id": "123",
+            "timerange_end": 1,
+            "object_id": object_id,
+        }
+        parameters = {
+            "page": base64.b64encode(
+                json.dumps(exclusive_start_key).encode("utf-8")
+            ).decode("utf-8")
+        }
+
+        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
+        print(result)
+
+        assert result["IndexName"] == "object-id-index"
+        assert (
+            result["KeyConditionExpression"].get_expression()
+            == Key("object_id").eq(object_id).get_expression()
+        )
+        assert result["Limit"] == constants.DEFAULT_PAGE_LIMIT
+        assert result["ExclusiveStartKey"] == exclusive_start_key

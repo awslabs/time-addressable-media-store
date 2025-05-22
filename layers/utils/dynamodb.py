@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 from datetime import datetime
@@ -319,3 +320,20 @@ def delete_flow_storage_record(object_id: str) -> None:
                 "flow_id": item["flow_id"],
             },
         )
+
+
+@tracer.capture_method(capture_response=False)
+def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
+    """Generate key expression and args for a dynamodb query operation"""
+    kwargs = {
+        "IndexName": "object-id-index",
+        "ProjectionExpression": "flow_id",
+        "KeyConditionExpression": Key("object_id").eq(object_id),
+        "Limit": constants.DEFAULT_PAGE_LIMIT,
+    }
+    # Pagination query string parameters
+    if parameters.get("limit"):
+        kwargs["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
+    if parameters.get("page"):
+        kwargs["ExclusiveStartKey"] = json.loads(base64.b64decode(parameters["page"]))
+    return kwargs

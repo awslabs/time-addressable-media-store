@@ -4,8 +4,6 @@ import os
 from http import HTTPStatus
 from typing import Optional
 
-# pylint: disable=no-member
-import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
     APIGatewayRestResolver,
@@ -24,7 +22,7 @@ from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
-from dynamodb import segments_table, storage_table
+from dynamodb import get_object_id_query_kwargs, segments_table, storage_table
 from schema import Object
 from typing_extensions import Annotated
 from utils import check_object_exists, generate_link_url, model_dump
@@ -48,7 +46,7 @@ def get_objects_by_id(
 ):
     if not check_object_exists(bucket, object_id):
         raise NotFoundError("The requested media object does not exist.")  # 404
-    args = get_query_kwargs(
+    args = get_object_id_query_kwargs(
         object_id,
         {
             "limit": param_limit,
@@ -114,19 +112,3 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
     raise BadRequestError(ex.errors())  # 400
-
-
-@tracer.capture_method(capture_response=False)
-def get_query_kwargs(object_id: str, parameters: dict) -> dict:
-    """Generate key expression and args for a dynamodb query operation"""
-    kwargs = {
-        "IndexName": "object-id-index",
-        "KeyConditionExpression": Key("object_id").eq(object_id),
-        "Limit": constants.DEFAULT_PAGE_LIMIT,
-    }
-    # Pagination query string parameters
-    if parameters.get("limit"):
-        kwargs["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
-    if parameters.get("page"):
-        kwargs["ExclusiveStartKey"] = json.loads(base64.b64decode(parameters["page"]))
-    return kwargs
