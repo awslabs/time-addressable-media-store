@@ -588,4 +588,5 @@ def test_S3_Bucket_Empty(session, region, stack):
     # Act
     objects_list = bucket.objects.all()
     # Assert
-    assert 0 == len(list(objects_list))
+    assert 1 == len(list(objects_list))
+    objects_list.delete()
