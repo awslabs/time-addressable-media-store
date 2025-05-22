@@ -20,6 +20,7 @@ builder = ConditionExpressionBuilder()
 os.environ["AWS_REGION"] = "eu-west-1"
 os.environ["NEPTUNE_ENDPOINT"] = "example.com"
 os.environ["SEGMENTS_TABLE"] = "example-table"
+os.environ["STORAGE_TABLE"] = "example-table"
 MS_INCLUDE_START = 1
 MS_INCLUDE_END = 2
 
@@ -461,3 +462,119 @@ class TestDynamoDB:
         result = dynamodb.get_exact_timerange_end(flow_id, time_range_end)
 
         assert result == time_range_end
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_object_id_not_found(self, mock_storage_table):
+        object_id = "abc"
+        flow_id = "123"
+
+        return_items = {"Items": []}
+
+        mock_storage_table.query.return_value = return_items
+
+        result = dynamodb.validate_object_id(object_id, flow_id)
+
+        assert 0 == mock_storage_table.update_item.call_count
+        assert not result
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_matched_flow_id_expire_present(
+        self, mock_storage_table
+    ):
+        object_id = "abc"
+        flow_id = "123"
+
+        return_items = {
+            "Items": [
+                {"object_id": "abc", "flow_id": "123", "expire_at": 12345},
+            ]
+        }
+        mock_storage_table.query.return_value = return_items
+
+        result = dynamodb.validate_object_id(object_id, flow_id)
+
+        assert 1 == mock_storage_table.update_item.call_count
+        assert result
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_matched_flow_id_expire_not_present(
+        self, mock_storage_table
+    ):
+        object_id = "abc"
+        flow_id = "123"
+
+        return_items = {
+            "Items": [
+                {"object_id": "abc", "flow_id": "123"},
+            ]
+        }
+        mock_storage_table.query.return_value = return_items
+
+        result = dynamodb.validate_object_id(object_id, flow_id)
+
+        assert 0 == mock_storage_table.update_item.call_count
+        assert result
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_not_matched_flow_id_expire_present(
+        self, mock_storage_table
+    ):
+        object_id = "abc"
+        flow_id = "456"
+
+        return_items = {
+            "Items": [
+                {"object_id": "abc", "flow_id": "123", "expire_at": 12345},
+            ]
+        }
+        mock_storage_table.query.return_value = return_items
+
+        result = dynamodb.validate_object_id(object_id, flow_id)
+
+        assert 0 == mock_storage_table.update_item.call_count
+        assert not result
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_not_matched_flow_id_expire_not_present(
+        self, mock_storage_table
+    ):
+        object_id = "abc"
+        flow_id = "456"
+
+        return_items = {
+            "Items": [
+                {"object_id": "abc", "flow_id": "123"},
+            ]
+        }
+        mock_storage_table.query.return_value = return_items
+
+        result = dynamodb.validate_object_id(object_id, flow_id)
+
+        assert 0 == mock_storage_table.update_item.call_count
+        assert result
+
+    @patch("dynamodb.storage_table")
+    def test_delete_flow_storage_record_object_id_present(self, mock_storage_table):
+        object_id = "abc"
+
+        return_items = {
+            "Items": [
+                {"object_id": "abc", "flow_id": "123"},
+            ]
+        }
+        mock_storage_table.query.return_value = return_items
+
+        dynamodb.delete_flow_storage_record(object_id)
+
+        assert 1 == mock_storage_table.delete_item.call_count
+
+    @patch("dynamodb.storage_table")
+    def test_delete_flow_storage_record_object_id_not_present(self, mock_storage_table):
+        object_id = "abc"
+
+        return_items = {"Items": []}
+        mock_storage_table.query.return_value = return_items
+
+        dynamodb.delete_flow_storage_record(object_id)
+
+        assert 0 == mock_storage_table.delete_item.call_count
