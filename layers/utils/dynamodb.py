@@ -309,7 +309,7 @@ def validate_object_id(object_id: str, flow_id: str) -> bool:
 
 
 @tracer.capture_method(capture_response=False)
-def delete_flow_storage_record(object_id) -> None:
+def delete_flow_storage_record(object_id: str) -> None:
     """Delete the DDB record associated with the supplied object_id"""
     query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
     for item in query["Items"]:
