@@ -10,6 +10,26 @@ pytestmark = [
 ]
 
 
+@pytest.mark.parametrize(
+    "path, verb",
+    [
+        ("/objects", "GET"),
+        ("/objects", "HEAD"),
+    ],
+)
+def test_auth_401(verb, path, api_endpoint):
+    # Arrange
+    url = f"{api_endpoint}{path}"
+    # Act
+    response = requests.request(
+        verb,
+        url=url,
+        timeout=30,
+    )
+    # Assert
+    assert 401 == response.status_code
+
+
 def test_Allocate_Flow_Storage_POST_201_default(
     api_client_cognito, media_objects, stub_video_flow
 ):
