@@ -400,6 +400,21 @@ def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
     item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
         0 if segment_timerange.includes_end() else 1
     )
+    # Remove get_url if the url matches the one for this store, this allows registering of existing S3 objects
+    default_get_url = get_nonsigned_url(flow_segment.object_id)
+    if item_dict.get("get_urls"):
+        other_get_urls = [
+            get_url
+            for get_url in item_dict["get_urls"]
+            if not (
+                get_url["label"] == default_get_url.label
+                and get_url["url"] == default_get_url.url
+            )
+        ]
+        if len(other_get_urls) == 0:
+            del item_dict["get_urls"]
+        else:
+            item_dict["get_urls"] = other_get_urls
     segments_table.put_item(
         Item={**item_dict, "flow_id": flow["id"]}, ReturnValues="ALL_OLD"
     )
