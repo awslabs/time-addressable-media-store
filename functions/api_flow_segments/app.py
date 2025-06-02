@@ -352,7 +352,9 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
 def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
     """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
-    if not validate_object_id(flow_segment.object_id, flow["id"]):
+    if not flow_segment.get_urls and not validate_object_id(
+        flow_segment.object_id, flow["id"]
+    ):
         return FailedSegment(
             **{
                 "object_id": flow_segment.object_id,
