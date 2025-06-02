@@ -296,6 +296,135 @@ def test_Create_Flow_Segment_POST_200_list_failed(
     assert 200 == response.status_code
 
 
+def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
+    api_client_cognito, region, stack, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    bucket_name = stack["outputs"]["MediaStorageBucket"]
+    object_id = "test-123"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": object_id,
+            "timerange": "[4:0_5:0)",
+            "get_urls": [
+                {
+                    "label": f"aws.{region}:s3:Example TAMS",
+                    "url": f"https://{bucket_name}.s3.{region}.amazonaws.com/{object_id}",
+                }
+            ],
+        },
+    )
+    # Assert
+    assert 201 == response.status_code
+
+
+def test_Create_Flow_Segment_POST_201_with_get_urls_external(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    object_id = "test-456"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": object_id,
+            "timerange": "[5:0_6:0)",
+            "get_urls": [
+                {
+                    "label": "something-external",
+                    "url": f"https://foo.bar/{object_id}",
+                }
+            ],
+        },
+    )
+    # Assert
+    assert 201 == response.status_code
+
+
+def test_List_Flow_Segments_GET_200_with_get_urls_same_store(
+    api_client_cognito, region, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "object_id": "test-123",
+            "accept_get_urls": f"aws.{region}:s3:Example TAMS",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response.json())
+
+
+def test_List_Flow_Segments_GET_200_with_get_urls_external(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "object_id": "test-456",
+            "accept_get_urls": "something-external",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response.json())
+
+
+def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={
+            "object_id": "test-123",
+        },
+    )
+    # Assert
+    assert 204 == response.status_code
+
+
+def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={
+            "object_id": "test-456",
+        },
+    )
+    # Assert
+    assert 204 == response.status_code
+
+
 def test_List_Flow_Segments_HEAD_200(api_client_cognito, stub_video_flow):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
