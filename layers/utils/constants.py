@@ -10,6 +10,7 @@ FLOW_PUT_IGNORE_FIELDS = [
     "metadata_updated",
     "segments_updated",
     "collected_by",
+    "timerange",
 ]
 SERIALISE_PREFIX = "SERIALISE_"
 RETURN_LITERAL = {
