@@ -789,7 +789,11 @@ def post_flow_storage_by_id(
             for _ in range(flow_storage_post.limit)
         ]
     )
-    expire_at = int((datetime.now() + timedelta(seconds=3600)).timestamp())
+    expire_at = int(
+        (
+            datetime.now() + timedelta(seconds=constants.PRESIGNED_URL_EXPIRES_IN)
+        ).timestamp()
+    )
     for media_object in flow_storage.media_objects:
         storage_table.put_item(
             Item={

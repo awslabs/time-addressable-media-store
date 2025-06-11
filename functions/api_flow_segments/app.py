@@ -1,7 +1,6 @@
 import concurrent.futures
 import json
 import os
-from datetime import datetime
 from http import HTTPStatus
 from typing import List, Optional, Union
 
@@ -42,11 +41,12 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, FailedSegment, Flowsegment, GetUrl, Timerange, Uuid
+from schema import Deletionrequest, Flowsegment, GetUrl, Timerange, Uuid
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
     check_object_exists,
+    generate_failed_segment,
     generate_link_url,
     generate_presigned_url,
     get_store_name,
@@ -355,44 +355,26 @@ def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
     if not flow_segment.get_urls and not validate_object_id(
         flow_segment.object_id, flow["id"]
     ):
-        return FailedSegment(
-            **{
-                "object_id": flow_segment.object_id,
-                "timerange": item_dict["timerange"],
-                "error": {
-                    "type": "BadRequestError",
-                    "summary": "Bad request. The object id is not valid to be used for the flow id supplied.",
-                    "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                },
-            }
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The object id is not valid to be used for the flow id supplied.",
         )
     # If get_urls is supplied then not need to check if item exists in S3
     if not flow_segment.get_urls and not check_object_exists(
         bucket, flow_segment.object_id
     ):
-        return FailedSegment(
-            **{
-                "object_id": flow_segment.object_id,
-                "timerange": item_dict["timerange"],
-                "error": {
-                    "type": "BadRequestError",
-                    "summary": "Bad request. The object id provided for a segment MUST exist.",
-                    "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                },
-            }
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The object id provided for a segment MUST exist.",
         )
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
-        return FailedSegment(
-            **{
-                "object_id": flow_segment.object_id,
-                "timerange": item_dict["timerange"],
-                "error": {
-                    "type": "BadRequestError",
-                    "summary": "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow.",
-                    "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                },
-            }
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow.",
         )
     item_dict["timerange_start"] = segment_timerange.start.to_nanosec() + (
         0 if segment_timerange.includes_start() else 1
@@ -421,9 +403,10 @@ def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
     update_flow_segments_updated(flow["id"])
     schema_item = Flowsegment(**item_dict)
     get_url = get_nonsigned_url(schema_item.object_id)
-    schema_item.get_urls = (
-        schema_item.get_urls.append(get_url) if schema_item.get_urls else [get_url]
-    )
+    if schema_item.get_urls:
+        schema_item.get_urls.append(get_url)
+    else:
+        schema_item.get_urls = [get_url]
     publish_event(
         "flows/segments_added",
         {"flow_id": flow["id"], "segments": [model_dump(schema_item)]},
