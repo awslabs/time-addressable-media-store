@@ -255,6 +255,7 @@ def test_List_Sources_GET_200(
     stub_video_source,
     stub_audio_source,
     stub_data_source,
+    stub_image_source,
     stub_multi_source,
 ):
     # Arrange
@@ -275,7 +276,7 @@ def test_List_Sources_GET_200(
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert 5 == len(response.json())
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -290,6 +291,10 @@ def test_List_Sources_GET_200(
     } in response_json
     assert {
         **stub_data_source,
+        "collected_by": [stub_multi_source["id"]],
+    } in response_json
+    assert {
+        **stub_image_source,
         "collected_by": [stub_multi_source["id"]],
     } in response_json
     assert stub_multi_source in response_json
@@ -390,7 +395,7 @@ def test_List_Sources_GET_200_page(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Sources_GET_200_tag_name(
@@ -439,7 +444,7 @@ def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Sources_GET_400(api_client_cognito):

@@ -1,5 +1,6 @@
 import logging
 import os
+import warnings
 from datetime import datetime, timedelta
 
 import pytest
@@ -93,3 +94,10 @@ def stub_flowsegment():
             }
         ],
     }
+
+
+@pytest.fixture(autouse=True)
+def ignore_warnings():
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, module="aws_lambda_powertools.metrics"
+    )

@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import Optional
 
@@ -24,7 +24,7 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.params import Body, Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from dynamodb import get_flow_timerange
+from dynamodb import get_flow_timerange, storage_table
 from mediatimestamp.immutable import TimeRange
 from neptune import (
     check_delete_source,
@@ -789,6 +789,19 @@ def post_flow_storage_by_id(
             for _ in range(flow_storage_post.limit)
         ]
     )
+    expire_at = int(
+        (
+            datetime.now() + timedelta(seconds=constants.PRESIGNED_URL_EXPIRES_IN)
+        ).timestamp()
+    )
+    for media_object in flow_storage.media_objects:
+        storage_table.put_item(
+            Item={
+                "object_id": media_object.object_id,
+                "flow_id": flow_id,
+                "expire_at": expire_at,
+            }
+        )
     return model_dump(flow_storage), HTTPStatus.CREATED.value  # 201
 
 

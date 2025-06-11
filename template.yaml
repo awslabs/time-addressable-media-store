@@ -259,6 +259,33 @@ Resources:
             ProjectionType: KEYS_ONLY
     Condition: SupportWebhooks
 
+  FlowStorageTable:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
+    Type: AWS::DynamoDB::Table
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W74
+            reason: Encryption not required
+          - id: W78
+            reason: Backup not required
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: object_id
+          AttributeType: S
+        - AttributeName: flow_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: object_id
+          KeyType: HASH
+        - AttributeName: flow_id
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expire_at
+        Enabled: true
+
   MediaStorageBucket:
     DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
@@ -268,8 +295,6 @@ Resources:
         rules_to_suppress:
           - id: W35
             reason: Access logging not required
-          - id: W41
-            reason: Encryption not required
           - id: W51
             reason: Bucket policy not required
     Properties:
@@ -281,6 +306,11 @@ Resources:
               - GET
             AllowedOrigins:
               - '*'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: False
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
 
   DeleteRequestQueue:
     Type: AWS::SQS::Queue
@@ -820,6 +850,7 @@ Resources:
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          STORAGE_TABLE: !Ref FlowStorageTable
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
           BUCKET: !Ref MediaStorageBucket
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
@@ -839,6 +870,11 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !GetAtt FlowSegmentsTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource:
+                - !GetAtt FlowStorageTable.Arn
             - Effect: Allow
               Action:
                 - s3:PutObject
@@ -1279,6 +1315,7 @@ Resources:
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          STORAGE_TABLE: !Ref FlowStorageTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
           S3_QUEUE_URL: !Ref CleanupS3Queue
@@ -1304,6 +1341,12 @@ Resources:
               Resource:
                 - !GetAtt FlowSegmentsTable.Arn
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt FlowStorageTable.Arn
             - Effect: Allow
               Action:
                 - sqs:SendMessage
@@ -1374,6 +1417,68 @@ Resources:
               AuthorizationScopes:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Delete]
+
+  ObjectsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W76
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/api_objects/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_SERVICE_NAME: tams-segments
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+          SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          STORAGE_TABLE: !Ref FlowStorageTable
+          BUCKET: !Ref MediaStorageBucket
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+                - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
+      Events:
+        headMediaObjectInformation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /objects/{objectId}
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+        getMediaObjectInformation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /objects/{objectId}
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
 
   FlowDeleteRequestsFunction:
     Type: AWS::Serverless::Function
@@ -1565,6 +1670,7 @@ Resources:
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          STORAGE_TABLE: !Ref FlowStorageTable
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
       Policies:
@@ -1626,6 +1732,7 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
+          STORAGE_TABLE: !Ref FlowStorageTable
           BUCKET: !Ref MediaStorageBucket
       Policies:
         - Version: "2012-10-17"
@@ -1635,6 +1742,12 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt FlowStorageTable.Arn
             - Effect: Allow
               Action:
                 - s3:DeleteObject

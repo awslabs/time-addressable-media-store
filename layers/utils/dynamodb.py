@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 from datetime import datetime
@@ -24,6 +25,7 @@ tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
 segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
+storage_table = dynamodb.Table(os.environ["STORAGE_TABLE"])
 
 
 class TimeRangeBoundary(Enum):
@@ -277,3 +279,61 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
         if items["Items"][0]["timerange_end"] != timerange_end:
             return items["Items"][0]["timerange_end"]
     return timerange_end
+
+
+@tracer.capture_method(capture_response=False)
+def validate_object_id(object_id: str, flow_id: str) -> bool:
+    """Check supplied object_id can be used for the supplied flow_id"""
+    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+    items = query["Items"]
+    if len(items) == 0:
+        # No matching object_id found so must be invalid
+        return False
+    object_item = items[0]
+    if object_item["flow_id"] == flow_id:
+        if object_item.get("expire_at"):
+            # expire_at exists so this is first time use and needs updating to prevent TTL deletion
+            storage_table.update_item(
+                Key={
+                    "object_id": object_id,
+                    "flow_id": flow_id,
+                },
+                AttributeUpdates={"expire_at": {"Action": "DELETE"}},
+            )
+        # flow_id matches so is a valida object_id
+        return True
+    if object_item.get("expire_at") is None:
+        # object_id already used therefore can be re-used by any flow_id
+        return True
+    # All other options are invalid
+    return False
+
+
+@tracer.capture_method(capture_response=False)
+def delete_flow_storage_record(object_id: str) -> None:
+    """Delete the DDB record associated with the supplied object_id"""
+    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+    for item in query["Items"]:
+        storage_table.delete_item(
+            Key={
+                "object_id": item["object_id"],
+                "flow_id": item["flow_id"],
+            },
+        )
+
+
+@tracer.capture_method(capture_response=False)
+def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
+    """Generate key expression and args for a dynamodb query operation"""
+    kwargs = {
+        "IndexName": "object-id-index",
+        "ProjectionExpression": "flow_id",
+        "KeyConditionExpression": Key("object_id").eq(object_id),
+        "Limit": constants.DEFAULT_PAGE_LIMIT,
+    }
+    # Pagination query string parameters
+    if parameters.get("limit"):
+        kwargs["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
+    if parameters.get("page"):
+        kwargs["ExclusiveStartKey"] = json.loads(base64.b64decode(parameters["page"]))
+    return kwargs

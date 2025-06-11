@@ -24,6 +24,7 @@ from botocore.exceptions import ClientError
 from mediatimestamp.immutable import TimeRange
 from params import essence_params
 from pydantic import BaseModel
+from schema import FailedSegment
 
 tracer = Tracer()
 
@@ -349,6 +350,24 @@ def generate_presigned_url(
             "Key": key,
             **kwargs,
         },
-        ExpiresIn=3600,
+        ExpiresIn=constants.PRESIGNED_URL_EXPIRES_IN,
     )
     return url
+
+
+@tracer.capture_method(capture_response=False)
+def generate_failed_segment(
+    object_id: str, timerange: str, message: str
+) -> FailedSegment:
+    """Generates a FailedSegment object for a specific object and error message"""
+    return FailedSegment(
+        **{
+            "object_id": object_id,
+            "timerange": timerange,
+            "error": {
+                "type": "BadRequestError",
+                "summary": message,
+                "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+        }
+    )

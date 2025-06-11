@@ -10,6 +10,7 @@ FLOW_PUT_IGNORE_FIELDS = [
     "metadata_updated",
     "segments_updated",
     "collected_by",
+    "timerange",
 ]
 SERIALISE_PREFIX = "SERIALISE_"
 RETURN_LITERAL = {
@@ -17,3 +18,4 @@ RETURN_LITERAL = {
     "flow": "flow {.*, source_id: s.id, essence_parameters: e {.*}, tags: t {.*}, flow_collection: collect(DISTINCT c {.*, id: fc.id}), collected_by: collect(DISTINCT cb.id)}",
     "delete_request": "delete_request {.*, error: CASE WHEN e.type IS NULL THEN NULL ELSE e {.*} END}",
 }
+PRESIGNED_URL_EXPIRES_IN = 3600

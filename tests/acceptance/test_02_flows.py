@@ -128,6 +128,27 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito, stub_data_flow)
     assert stub_data_flow == response_json
 
 
+def test_Create_or_Replace_Flow_PUT_201_IMAGE(api_client_cognito, stub_image_flow):
+    # Arrange
+    path = f'/flows/{stub_image_flow["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=stub_image_flow,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 201 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    for prop in ["created_by", "created"]:
+        assert prop in response_json
+        del response_json[prop]
+    assert stub_image_flow == response_json
+
+
 def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito, stub_multi_flow):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}'
@@ -575,6 +596,7 @@ def test_List_Flows_GET_200(
     stub_video_flow,
     stub_audio_flow,
     stub_data_flow,
+    stub_image_flow,
     stub_multi_flow,
 ):
     # Arrange
@@ -595,7 +617,7 @@ def test_List_Flows_GET_200(
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert 5 == len(response.json())
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -603,6 +625,7 @@ def test_List_Flows_GET_200(
     assert {**stub_video_flow, "collected_by": [stub_multi_flow["id"]]} in response_json
     assert {**stub_audio_flow, "collected_by": [stub_multi_flow["id"]]} in response_json
     assert {**stub_data_flow, "collected_by": [stub_multi_flow["id"]]} in response_json
+    assert {**stub_image_flow, "collected_by": [stub_multi_flow["id"]]} in response_json
     assert stub_multi_flow in response_json
 
 
@@ -757,7 +780,7 @@ def test_List_Flows_GET_200_page(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Flows_GET_200_source_id(
@@ -826,7 +849,7 @@ def test_List_Flows_GET_200_tag_exists_name(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 3 == len(response.json())
+    assert 4 == len(response.json())
 
 
 def test_List_Flows_GET_200_timerange(api_client_cognito):
@@ -840,7 +863,7 @@ def test_List_Flows_GET_200_timerange(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert 5 == len(response.json())
 
 
 def test_List_Flows_GET_400(api_client_cognito):

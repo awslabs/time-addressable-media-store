@@ -14,6 +14,10 @@ from undecorated import undecorated
 
 builder = ConditionExpressionBuilder()
 
+pytestmark = [
+    pytest.mark.unit,
+]
+
 with patch("boto3.client"):
     with patch("boto3.resource"):
         with patch("utils.get_store_name", lambda: "tams"):

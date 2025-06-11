@@ -1,4 +1,7 @@
 # pylint: disable=too-many-lines
+import base64
+import json
+
 import pytest
 import requests
 
@@ -7,7 +10,29 @@ pytestmark = [
 ]
 
 
-def test_Allocate_Flow_Storage_POST_201_default(api_client_cognito, stub_video_flow):
+@pytest.mark.parametrize(
+    "path, verb",
+    [
+        ("/objects", "GET"),
+        ("/objects", "HEAD"),
+    ],
+)
+def test_auth_401(verb, path, api_endpoint):
+    # Arrange
+    url = f"{api_endpoint}{path}"
+    # Act
+    response = requests.request(
+        verb,
+        url=url,
+        timeout=30,
+    )
+    # Assert
+    assert 401 == response.status_code
+
+
+def test_Allocate_Flow_Storage_POST_201_default(
+    api_client_cognito, media_objects, stub_video_flow
+):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/storage'
     # Act
@@ -17,6 +42,7 @@ def test_Allocate_Flow_Storage_POST_201_default(api_client_cognito, stub_video_f
         json={},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    media_objects.extend(response.json()["media_objects"])
     # Assert
     assert 201 == response.status_code
     assert "content-type" in response_headers_lower
@@ -34,7 +60,7 @@ def test_Allocate_Flow_Storage_POST_201(
     response = api_client_cognito.request(
         "POST",
         path,
-        json={"limit": 5},
+        json={"limit": 7},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     media_objects.extend(response.json()["media_objects"])
@@ -43,7 +69,7 @@ def test_Allocate_Flow_Storage_POST_201(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "media_objects" in response.json()
-    assert 5 == len(response.json()["media_objects"])
+    assert 7 == len(response.json()["media_objects"])
     for record in response.json()["media_objects"]:
         assert "object_id" in record
         assert "put_url" in record
@@ -130,7 +156,7 @@ def test_Allocate_Flow_Storage_POST_404(api_client_cognito, id_404):
 
 def test_Presigned_PUT_URL_POST_200(media_objects):
     # Act
-    for record in media_objects:
+    for record in media_objects[:-1]:
         put_file = requests.put(
             record["put_url"]["url"],
             headers={"Content-Type": record["put_url"]["content-type"]},
@@ -141,49 +167,17 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
         assert 200 == put_file.status_code
 
 
-def test_S3_PUT_bulk_objects(session, region, stack):
-    # Arrange
-    bucket_name = stack["outputs"]["MediaStorageBucket"]
-    s3 = session.resource("s3", region_name=region)
-    bucket = s3.Bucket(bucket_name)
-    # Act
-    for n in range(5, 100):
-        bucket.put_object(
-            Key=f"20000000-0000-1000-8000-0000000{n:05}",
-            Body="test file content",
-        )
-    # Assert
-    assert True
-
-
 def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
     api_client_cognito, media_objects, stub_video_flow
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
-    for n, record in enumerate(media_objects):
+    for n, record in enumerate(media_objects[:-2]):
         response = api_client_cognito.request(
             "POST",
             path,
             json={"object_id": record["object_id"], "timerange": f"[{n}:0_{n + 1}:0)"},
-        )
-        # Assert
-        assert 201 == response.status_code
-
-
-def test_Create_Flow_Segment_POST_201_VIDEO_bulk(api_client_cognito, stub_video_flow):
-    # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
-    # Act
-    for n in range(5, 100):
-        response = api_client_cognito.request(
-            "POST",
-            path,
-            json={
-                "object_id": f"20000000-0000-1000-8000-0000000{n:05}",
-                "timerange": f"[{n}:0_{n + 1}:0)",
-            },
         )
         # Assert
         assert 201 == response.status_code
@@ -207,7 +201,9 @@ def test_Create_Flow_Segment_POST_201_MULTI(
     assert 201 == response.status_code
 
 
-def test_Create_Flow_Segment_POST_201_negative(api_client_cognito, stub_multi_flow):
+def test_Create_Flow_Segment_POST_201_negative(
+    api_client_cognito, media_objects, stub_multi_flow
+):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
@@ -215,12 +211,218 @@ def test_Create_Flow_Segment_POST_201_negative(api_client_cognito, stub_multi_fl
         "POST",
         path,
         json={
-            "object_id": "20000000-0000-1000-8000-000000000005",
+            "object_id": media_objects[5]["object_id"],
             "timerange": "[-60:0_-30:0)",
         },
     )
     # Assert
     assert 201 == response.status_code
+
+
+def test_Create_Flow_Segment_POST_201_list_ok(
+    api_client_cognito, media_objects, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json=[
+            {
+                "object_id": media_objects[6]["object_id"],
+                "timerange": "[1:0_2:0)",
+            },
+            {
+                "object_id": media_objects[7]["object_id"],
+                "timerange": "[2:0_3:0)",
+            },
+        ],
+    )
+    # Assert
+    assert 201 == response.status_code
+
+
+def test_Create_Flow_Segment_POST_200_list_partial(
+    api_client_cognito, media_objects, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json=[
+            {
+                "object_id": media_objects[8]["object_id"],
+                "timerange": "[2:0_3:0)",
+            },
+            {
+                "object_id": media_objects[9]["object_id"],
+                "timerange": "[3:0_4:0)",
+            },
+        ],
+    )
+    response_json = response.json()
+    # Assert
+    assert 1 == len(response_json)
+    assert "BadRequestError" == response_json[0]["error"]["type"]
+    assert 200 == response.status_code
+
+
+def test_Create_Flow_Segment_POST_200_list_failed(
+    api_client_cognito, media_objects, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json=[
+            {
+                "object_id": media_objects[8]["object_id"],
+                "timerange": "[2:0_3:0)",
+            },
+            {
+                "object_id": "does-not-exist",
+                "timerange": "[4:0_5:0)",
+            },
+        ],
+    )
+    response_json = response.json()
+    # Assert
+    assert 2 == len(response_json)
+    assert 200 == response.status_code
+
+
+def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
+    api_client_cognito, region, stack, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    bucket_name = stack["outputs"]["MediaStorageBucket"]
+    object_id = "test-123"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": object_id,
+            "timerange": "[4:0_5:0)",
+            "get_urls": [
+                {
+                    "label": f"aws.{region}:s3:Example TAMS",
+                    "url": f"https://{bucket_name}.s3.{region}.amazonaws.com/{object_id}",
+                }
+            ],
+        },
+    )
+    # Assert
+    assert 201 == response.status_code
+
+
+def test_Create_Flow_Segment_POST_201_with_get_urls_external(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    object_id = "test-456"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": object_id,
+            "timerange": "[5:0_6:0)",
+            "get_urls": [
+                {
+                    "label": "something-external",
+                    "url": f"https://foo.bar/{object_id}",
+                }
+            ],
+        },
+    )
+    # Assert
+    assert 201 == response.status_code
+
+
+def test_List_Flow_Segments_GET_200_with_get_urls_same_store(
+    api_client_cognito, region, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "object_id": "test-123",
+            "accept_get_urls": f"aws.{region}:s3:Example TAMS",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response.json())
+
+
+def test_List_Flow_Segments_GET_200_with_get_urls_external(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "object_id": "test-456",
+            "accept_get_urls": "something-external",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response.json())
+
+
+def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={
+            "object_id": "test-123",
+        },
+    )
+    # Assert
+    assert 204 == response.status_code
+
+
+def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
+    api_client_cognito, stub_multi_flow
+):
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={
+            "object_id": "test-456",
+        },
+    )
+    # Assert
+    assert 204 == response.status_code
 
 
 def test_List_Flow_Segments_HEAD_200(api_client_cognito, stub_video_flow):
@@ -287,7 +489,9 @@ def test_List_Flow_Segments_HEAD_200_limit(api_client_cognito, stub_video_flow):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flow_Segments_HEAD_200_object_id(api_client_cognito, stub_video_flow):
+def test_List_Flow_Segments_HEAD_200_object_id(
+    api_client_cognito, media_objects, stub_video_flow
+):
     """List segments with object_id query specified"""
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -295,7 +499,7 @@ def test_List_Flow_Segments_HEAD_200_object_id(api_client_cognito, stub_video_fl
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005"},
+        params={"object_id": media_objects[5]["object_id"]},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -414,7 +618,9 @@ def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito, stub_video_flow):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flow_Segments_HEAD_400_object_id(api_client_cognito, stub_video_flow):
+def test_List_Flow_Segments_HEAD_400_object_id(
+    api_client_cognito, media_objects, stub_video_flow
+):
     """List segments with object_id query specified"""
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -423,7 +629,7 @@ def test_List_Flow_Segments_HEAD_400_object_id(api_client_cognito, stub_video_fl
         "HEAD",
         path,
         params={
-            "object_id": "20000000-0000-1000-8000-000000000005",
+            "object_id": media_objects[5]["object_id"],
             "timerange": "bad",
         },
     )
@@ -541,7 +747,7 @@ def test_List_Flow_Segments_HEAD_404_accept_get_urls(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito):
+def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito, media_objects):
     """List segments with object_id query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
@@ -549,7 +755,7 @@ def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD",
         path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005"},
+        params={"object_id": media_objects[5]["object_id"]},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -684,7 +890,7 @@ def test_List_Flows_GET_200_timerange_never(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 2 == len(response.json())
+    assert 3 == len(response.json())
 
 
 def test_List_Flow_Segments_GET_200(api_client_cognito, stub_video_flow):
@@ -828,10 +1034,12 @@ def test_List_Flow_Segments_GET_200_limit(api_client_cognito, stub_video_flow):
     assert 2 == len(response.json())
 
 
-def test_List_Flow_Segments_GET_200_object_id(api_client_cognito, stub_video_flow):
+def test_List_Flow_Segments_GET_200_object_id(
+    api_client_cognito, media_objects, stub_video_flow
+):
     """List segments with object_id query specified"""
     # Arrange
-    object_id = "20000000-0000-1000-8000-000000000005"
+    object_id = media_objects[5]["object_id"]
     path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
@@ -946,7 +1154,9 @@ def test_List_Flow_Segments_GET_400_limit(api_client_cognito, stub_video_flow):
     assert 0 < len(response.json()["message"])
 
 
-def test_List_Flow_Segments_GET_400_object_id(api_client_cognito, stub_video_flow):
+def test_List_Flow_Segments_GET_400_object_id(
+    api_client_cognito, media_objects, stub_video_flow
+):
     """List segments with object_id query specified"""
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -955,7 +1165,7 @@ def test_List_Flow_Segments_GET_400_object_id(api_client_cognito, stub_video_flo
         "GET",
         path,
         params={
-            "object_id": "20000000-0000-1000-8000-000000000005",
+            "object_id": media_objects[5]["object_id"],
             "timerange": "bad",
         },
     )
@@ -1059,7 +1269,7 @@ def test_List_Flow_Segments_GET_404_limit(api_client_cognito):
     assert "The flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_List_Flow_Segments_GET_404_object_id(api_client_cognito):
+def test_List_Flow_Segments_GET_404_object_id(api_client_cognito, media_objects):
     """List segments with object_id query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
@@ -1067,7 +1277,7 @@ def test_List_Flow_Segments_GET_404_object_id(api_client_cognito):
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005"},
+        params={"object_id": media_objects[5]["object_id"]},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1150,7 +1360,9 @@ def test_Create_Flow_Segment_POST_400_request(api_client_cognito, stub_multi_flo
     assert 0 < len(response.json()["message"])
 
 
-def test_Create_Flow_Segment_POST_400_container(api_client_cognito, stub_data_flow):
+def test_Create_Flow_Segment_POST_400_container(
+    api_client_cognito, media_objects, stub_data_flow
+):
     """Flow missing container"""
     # Arrange
     path = f'/flows/{stub_data_flow["id"]}/segments'
@@ -1159,7 +1371,7 @@ def test_Create_Flow_Segment_POST_400_container(api_client_cognito, stub_data_fl
         "POST",
         path,
         json={
-            "object_id": "20000000-0000-1000-8000-000000000005",
+            "object_id": media_objects[5]["object_id"],
             "timerange": "[0:0_1:0)",
         },
     )
@@ -1168,13 +1380,12 @@ def test_Create_Flow_Segment_POST_400_container(api_client_cognito, stub_data_fl
     assert 400 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
-        == response.json()["message"]
-    )
+    assert "Bad request. The flow 'container' is not set." == response.json()["message"]
 
 
-def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito, stub_multi_flow):
+def test_Create_Flow_Segment_POST_400_overlap(
+    api_client_cognito, media_objects, stub_multi_flow
+):
     """Timerange overlaps with existing segment"""
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -1183,7 +1394,7 @@ def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito, stub_multi_flo
         "POST",
         path,
         json={
-            "object_id": "20000000-0000-1000-8000-000000000005",
+            "object_id": media_objects[5]["object_id"],
             "timerange": "[0:100_1:0)",
         },
     )
@@ -1199,17 +1410,17 @@ def test_Create_Flow_Segment_POST_400_overlap(api_client_cognito, stub_multi_flo
 
 
 def test_Create_Flow_Segment_POST_400_missing_object(
-    api_client_cognito, stub_multi_flow
+    api_client_cognito, media_objects, stub_video_flow
 ):
     """Object must already exist in S3"""
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f'/flows/{stub_video_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
         json={
-            "object_id": "dummy_id",
+            "object_id": media_objects[-1]["object_id"],
             "timerange": "[0:100_1:0)",
         },
     )
@@ -1224,14 +1435,42 @@ def test_Create_Flow_Segment_POST_400_missing_object(
     )
 
 
-def test_Create_Flow_Segment_POST_403(api_client_cognito, stub_audio_flow):
+def test_Create_Flow_Segment_POST_400_incorrect_flow(
+    api_client_cognito, media_objects, stub_multi_flow
+):
+    """Object must already exist in S3"""
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": media_objects[-2]["object_id"],
+            "timerange": "[0:100_1:0)",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert (
+        "Bad request. The object id is not valid to be used for the flow id supplied."
+        == response.json()["message"]
+    )
+
+
+def test_Create_Flow_Segment_POST_403(
+    api_client_cognito, media_objects, stub_audio_flow
+):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
-        json={"object_id": "dummy_id", "timerange": "[0:0_1:0)"},
+        json={"object_id": media_objects[-1]["object_id"], "timerange": "[0:0_1:0)"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1244,14 +1483,14 @@ def test_Create_Flow_Segment_POST_403(api_client_cognito, stub_audio_flow):
     )
 
 
-def test_Create_Flow_Segment_POST_404(api_client_cognito, id_404):
+def test_Create_Flow_Segment_POST_404(api_client_cognito, media_objects, id_404):
     # Arrange
     path = f"/flows/{id_404}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
-        json={"object_id": "dummy_id", "timerange": "[0:0_1:0)"},
+        json={"object_id": media_objects[-1]["object_id"], "timerange": "[0:0_1:0)"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1261,113 +1500,184 @@ def test_Create_Flow_Segment_POST_404(api_client_cognito, id_404):
     assert "The flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Segment_DELETE_202(
-    api_client_cognito, delete_requests, api_endpoint, stub_multi_flow
-):
+def test_Get_Media_Object_Information_HEAD_200(api_client_cognito, media_objects):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
     # Act
     response = api_client_cognito.request(
-        "DELETE",
+        "HEAD",
         path,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    delete_requests.append(response.json()["id"])
     # Assert
-    assert 202 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "location" in response_headers_lower
-    assert (
-        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
-        == response_headers_lower["location"]
-    )
-    assert "id" in response.json()
-    assert "flow_id" in response.json()
-    assert "timerange_to_delete" in response.json()
-    assert "timerange_remaining" in response.json()
-    assert "delete_flow" in response.json()
-    assert "created" in response.json()
-    assert "created_by" in response.json()
-    assert "updated" in response.json()
-    assert "status" in response.json()
-
-
-@pytest.mark.skip("Delete requests always returned unless object_id used")
-def test_Delete_Flow_Segment_DELETE_204():
-    assert True
-
-
-@pytest.mark.skip("Delete requests always returned unless object_id used")
-def test_Delete_Flow_Segment_DELETE_202_object_id():
-    assert True
-
-
-def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito, stub_video_flow):
-    """List segments with object_id query specified"""
-    # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005"},
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 204 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
 
 
-def test_Delete_Flow_Segment_DELETE_202_timerange(
-    api_client_cognito, delete_requests, api_endpoint, stub_video_flow
-):
-    """Delete segments with timerange query specified"""
+def test_Get_Media_Object_Information_HEAD_200_limit(api_client_cognito, media_objects):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
     # Act
     response = api_client_cognito.request(
-        "DELETE",
+        "HEAD",
         path,
-        params={"timerange": "[3:5_4:5)"},
+        params={"limit": "1"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    delete_requests.append(response.json()["id"])
     # Assert
-    assert 202 == response.status_code
+    assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "location" in response_headers_lower
-    assert (
-        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
-        == response_headers_lower["location"]
-    )
-    assert "id" in response.json()
-    assert "flow_id" in response.json()
-    assert "timerange_to_delete" in response.json()
-    assert "timerange_remaining" in response.json()
-    assert "delete_flow" in response.json()
-    assert "created" in response.json()
-    assert "created_by" in response.json()
-    assert "updated" in response.json()
-    assert "status" in response.json()
+    assert "" == response.content.decode("utf-8")
 
 
-@pytest.mark.skip("Delete requests always returned unless object_id used")
-def test_Delete_Flow_Segment_DELETE_204_timerange():
-    assert True
-
-
-def test_Delete_Flow_Segment_DELETE_400(api_client_cognito, stub_multi_flow):
+def test_Get_Media_Object_Information_HEAD_200_page(
+    api_client_cognito, media_objects, stub_video_flow
+):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    object_id = media_objects[5]["object_id"]
+    page = base64.b64encode(
+        json.dumps(
+            {
+                "flow_id": stub_video_flow["id"],
+                "timerange_end": 5999999999,
+                "object_id": object_id,
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    path = f"/objects/{object_id}"
     # Act
     response = api_client_cognito.request(
-        "DELETE",
+        "HEAD",
         path,
-        params={"timerange": "bad"},
+        params={"limit": "1", "page": page},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Get_Media_Object_Information_HEAD_400(api_client_cognito, media_objects):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"limit": "bad"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Get_Media_Object_Information_HEAD_404(api_client_cognito):
+    # Arrange
+    object_id = "does-not-exist"
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_Get_Media_Object_Information_GET_200(
+    api_client_cognito, media_objects, stub_video_flow
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert object_id == response_json["object_id"]
+    assert 2 == len(response_json["referenced_by_flows"])
+    assert stub_video_flow["id"] == response_json["first_referenced_by_flow"]
+
+
+def test_Get_Media_Object_Information_GET_200_limit(api_client_cognito, media_objects):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"limit": "1"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response_json["referenced_by_flows"])
+
+
+def test_Get_Media_Object_Information_GET_200_page(
+    api_client_cognito, media_objects, stub_video_flow
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    page = base64.b64encode(
+        json.dumps(
+            {
+                "flow_id": stub_video_flow["id"],
+                "timerange_end": 5999999999,
+                "object_id": object_id,
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"limit": "1", "page": page},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response_json["referenced_by_flows"])
+
+
+def test_Get_Media_Object_Information_GET_400(api_client_cognito, media_objects):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"limit": "bad"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -1378,92 +1688,13 @@ def test_Delete_Flow_Segment_DELETE_400(api_client_cognito, stub_multi_flow):
     assert 0 < len(response.json()["message"])
 
 
-def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito, stub_video_flow):
+def test_Get_Media_Object_Information_GET_404(api_client_cognito):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    object_id = "does-not-exist"
+    path = f"/objects/{object_id}"
     # Act
     response = api_client_cognito.request(
-        "DELETE",
-        path,
-        params={
-            "object_id": "20000000-0000-1000-8000-000000000005",
-            "timerange": "bad",
-        },
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
-
-
-def test_Delete_Flow_Segment_DELETE_403(api_client_cognito, stub_audio_flow):
-    # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/segments'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
-    )
-
-
-def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito, stub_audio_flow):
-    # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/segments'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005"},
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
-    )
-
-
-def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito, stub_audio_flow):
-    # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/segments'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-        params={"timerange": "[3:5_4:5)"},
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
-    )
-
-
-def test_Delete_Flow_Segment_DELETE_404(api_client_cognito, id_404):
-    # Arrange
-    path = f"/flows/{id_404}/segments"
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
+        "GET",
         path,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
@@ -1471,164 +1702,4 @@ def test_Delete_Flow_Segment_DELETE_404(api_client_cognito, id_404):
     assert 404 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
-
-
-def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito, id_404):
-    # Arrange
-    path = f"/flows/{id_404}/segments"
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-        params={"object_id": "20000000-0000-1000-8000-000000000005"},
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
-
-
-def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito, id_404):
-    # Arrange
-    path = f"/flows/{id_404}/segments"
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-        params={"timerange": "[3:5_4:5)"},
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
-
-
-def test_Delete_Flow_DELETE_202_VIDEO(
-    api_client_cognito, delete_requests, api_endpoint, stub_video_flow
-):
-    # Arrange
-    path = f'/flows/{stub_video_flow["id"]}'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    delete_requests.append(response.json()["id"])
-    # Assert
-    assert 202 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "location" in response_headers_lower
-    assert (
-        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
-        == response_headers_lower["location"]
-    )
-    assert "id" in response.json()
-    assert "flow_id" in response.json()
-    assert "timerange_to_delete" in response.json()
-    assert "timerange_remaining" in response.json()
-    assert "delete_flow" in response.json()
-    assert "created" in response.json()
-    assert "created_by" in response.json()
-    assert "updated" in response.json()
-    assert "status" in response.json()
-
-
-def test_Delete_Flow_DELETE_403(api_client_cognito, stub_audio_flow):
-    # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
-    )
-
-
-def test_Delete_Flow_DELETE_404(api_client_cognito, id_404):
-    # Arrange
-    path = f"/flows/{id_404}"
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow ID in the path is invalid." == response.json()["message"]
-
-
-def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito, stub_audio_flow):
-    """204 returned as stub_audio_flow has no segments"""
-    # Need to set read_only to false prior to delete request
-    api_client_cognito.request(
-        "PUT",
-        f'/flows/{stub_audio_flow["id"]}/read_only',
-        json=False,
-    )
-    # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-
-
-def test_Delete_Flow_DELETE_204_DATA(api_client_cognito, stub_data_flow):
-    """204 returned as stub_audio_flow has no segments"""
-    # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-
-
-def test_Delete_Flow_DELETE_204_MULTI(
-    api_client_cognito, delete_requests, stub_multi_flow
-):
-    # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
-    # Act
-    response = api_client_cognito.request(
-        "DELETE",
-        path,
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    if response.status_code == 202:
-        delete_requests.append(response.json()["id"])
-    # Assert
-    assert response.status_code in [202, 204]
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert "The requested media object does not exist." == response.json()["message"]

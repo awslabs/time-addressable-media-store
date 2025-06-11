@@ -1,12 +1,13 @@
+import os
 from copy import deepcopy
 
 import boto3
 import pytest
 import requests
 
-STACK_NAME = "tams-api"
-REGION = "eu-west-1"
-PROFILE = "default"
+STACK_NAME = os.environ["TAMS_STACK_NAME"]
+REGION = os.environ["TAMS_REGION"]
+PROFILE = os.environ["AWS_PROFILE"]
 
 
 ############
@@ -205,6 +206,25 @@ def stub_data_flow():
 
 
 @pytest.fixture(scope="session")
+def stub_image_flow():
+    return {
+        "id": "10000000-0000-1000-8000-000000000004",
+        "source_id": "00000000-0000-1000-8000-000000000004",
+        "format": "urn:x-tam:format:image",
+        "generation": 0,
+        "label": "pytest - image",
+        "description": "pytest - image",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "codec": "video/jpeg",
+        "container": "video/jpeg",
+        "essence_parameters": {
+            "frame_width": 320,
+            "frame_height": 180,
+        },
+    }
+
+
+@pytest.fixture(scope="session")
 def stub_multi_flow():
     return {
         "id": "10000000-0000-1000-8000-000000000003",
@@ -223,6 +243,7 @@ def stub_multi_flow():
             {"id": "10000000-0000-1000-8000-000000000000", "role": "video"},
             {"id": "10000000-0000-1000-8000-000000000001", "role": "audio"},
             {"id": "10000000-0000-1000-8000-000000000002", "role": "data"},
+            {"id": "10000000-0000-1000-8000-000000000004", "role": "image"},
         ],
     }
 
@@ -255,6 +276,17 @@ def stub_data_source():
         "format": "urn:x-nmos:format:data",
         "label": "pytest - data",
         "description": "pytest - data",
+        "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_image_source():
+    return {
+        "id": "00000000-0000-1000-8000-000000000004",
+        "format": "urn:x-tam:format:image",
+        "label": "pytest - image",
+        "description": "pytest - image",
         "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
     }
 
