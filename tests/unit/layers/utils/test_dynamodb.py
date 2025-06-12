@@ -19,10 +19,6 @@ pytestmark = [
 
 builder = ConditionExpressionBuilder()
 
-os.environ["AWS_REGION"] = "eu-west-1"
-os.environ["NEPTUNE_ENDPOINT"] = "example.com"
-os.environ["SEGMENTS_TABLE"] = "example-table"
-os.environ["STORAGE_TABLE"] = "example-table"
 MS_INCLUDE_START = 1
 MS_INCLUDE_END = 2
 
