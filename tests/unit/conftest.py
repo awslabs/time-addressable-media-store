@@ -3,17 +3,25 @@ import os
 import warnings
 from datetime import datetime, timedelta
 
+import boto3
 import pytest
 from boto3.dynamodb.conditions import ConditionExpressionBuilder
 from mediatimestamp.immutable import TimeRange, Timestamp
+from moto import mock_aws
 
-os.environ["WEBHOOKS_TABLE"] = "TEST_TABLE"
-os.environ["BUCKET"] = "TEST_BUCKET"
+os.environ["NEPTUNE_ENDPOINT"] = "example.com"
+os.environ["SEGMENTS_TABLE"] = "segments-table"
+os.environ["STORAGE_TABLE"] = "storage-table"
+os.environ["WEBHOOKS_TABLE"] = "webhooks-table"
+os.environ["BUCKET"] = "test-bucket"
 os.environ["BUCKET_REGION"] = "eu-west-1"
-os.environ["WEBHOOKS_QUEUE_URL"] = "TEST_QUEUE"
+os.environ["WEBHOOKS_QUEUE_URL"] = "test-queue"
 os.environ["USER_POOL_ID"] = "123"
-os.environ["COGNITO_LAMBDA_NAME"] = "USERNAME_LAMBDA"
+os.environ["COGNITO_LAMBDA_NAME"] = "test-lambda-name"
 os.environ["AWS_REGION"] = "eu-west-1"
+os.environ["POWERTOOLS_LOG_LEVEL"] = "INFO"
+os.environ["POWERTOOLS_SERVICE_NAME"] = "tams"
+os.environ["POWERTOOLS_METRICS_NAMESPACE"] = "TAMS"
 
 logger = logging.getLogger(__name__)
 builder = ConditionExpressionBuilder()
@@ -94,6 +102,85 @@ def stub_flowsegment():
             }
         ],
     }
+
+
+@pytest.fixture
+def lambda_context():
+    class LambdaContext:
+        def __init__(self):
+            self.function_name = "test-func"
+            self.memory_limit_in_mb = 128
+            self.invoked_function_arn = (
+                "arn:aws:lambda:eu-west-1:809313241234:function:test-func"
+            )
+            self.aws_request_id = "52fdfc07-2182-154f-163f-5f0f9a621d72"
+
+        def get_remaining_time_in_millis(self) -> int:
+            return 1000
+
+    return LambdaContext()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def aws_setup():
+    with mock_aws():
+        # Set up AWS credentials
+        os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+        os.environ["AWS_SESSION_TOKEN"] = "testing"
+        os.environ["AWS_DEFAULT_REGION"] = os.environ["AWS_REGION"]
+
+        # Create S3 bucket
+        s3 = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
+        s3.create_bucket(
+            Bucket=os.environ["BUCKET"],
+            CreateBucketConfiguration={
+                "LocationConstraint": os.environ["BUCKET_REGION"]
+            },
+        )
+
+        # Create DynamoDB tables with the required indexes
+        dynamodb = boto3.client(
+            "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
+        )
+        dynamodb.create_table(
+            TableName=os.environ["SEGMENTS_TABLE"],
+            KeySchema=[
+                {"AttributeName": "flow_id", "KeyType": "HASH"},
+                {"AttributeName": "timerange_end", "KeyType": "RANGE"},
+            ],
+            AttributeDefinitions=[
+                {"AttributeName": "flow_id", "AttributeType": "S"},
+                {"AttributeName": "timerange_end", "AttributeType": "N"},
+                {"AttributeName": "object_id", "AttributeType": "S"},
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    "IndexName": "object-id-index",
+                    "KeySchema": [
+                        {"AttributeName": "object_id", "KeyType": "HASH"},
+                        {"AttributeName": "flow_id", "KeyType": "RANGE"},
+                    ],
+                    "Projection": {"ProjectionType": "ALL"},
+                }
+            ],
+            BillingMode="PAY_PER_REQUEST",
+        )
+
+        dynamodb.create_table(
+            TableName=os.environ["STORAGE_TABLE"],
+            KeySchema=[
+                {"AttributeName": "object_id", "KeyType": "HASH"},
+                {"AttributeName": "flow_id", "KeyType": "RANGE"},
+            ],
+            AttributeDefinitions=[
+                {"AttributeName": "object_id", "AttributeType": "S"},
+                {"AttributeName": "flow_id", "AttributeType": "S"},
+            ],
+            BillingMode="PAY_PER_REQUEST",
+        )
+
+        yield
 
 
 @pytest.fixture(autouse=True)

@@ -242,3 +242,7 @@ $RECYCLE.BIN/
 Flashpost-tests
 samconfig.toml
 api/build/tams
+
+# Remove old pip entries, add:
+poetry.lock should be committed
+__pycache__/

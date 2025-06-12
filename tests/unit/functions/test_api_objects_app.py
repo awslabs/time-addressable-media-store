@@ -2,303 +2,291 @@ import base64
 import json
 import os
 from http import HTTPStatus
-from unittest.mock import Mock, patch
 
+import boto3
 import pytest
 
 pytestmark = [
     pytest.mark.unit,
 ]
 
-with patch.dict(
-    os.environ,
-    {
-        "POWERTOOLS_LOG_LEVEL": "INFO",
-        "POWERTOOLS_SERVICE_NAME": "tams",
-        "POWERTOOLS_METRICS_NAMESPACE": "TAMS",
-        "AWS_REGION": "eu-west-1",
-        "NEPTUNE_ENDPOINT": "example.com",
-        "SEGMENTS_TABLE": "example-table",
-        "STORAGE_TABLE": "example-table",
-        "BUCKET": "test-bucket",
-    },
-), patch("boto3.resource"), patch("boto3.client"):
+
+def test_GET_object_id_not_exists(lambda_context):
+    """Tests a GET call with an object_id that does not exist"""
+    # pylint: disable=import-outside-toplevel
+    # Import app inside the test to ensure moto is active
     from api_objects import app
 
+    # Arrange
+    object_id = "nonexistent-object"
+    event = {
+        "httpMethod": "GET",
+        "path": f"/objects/{object_id}",
+        "queryStringParameters": None,
+        "requestContext": {
+            "httpMethod": "GET",
+            "domainName": "test.com",
+            "path": f"/objects/{object_id}",
+        },
+    }
 
-class TestGetObjectsById:
-    """Test cases for the get_objects_by_id function."""
+    # Act
+    response = app.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
 
-    @patch("api_objects.app.check_object_exists")
-    def test_get_objects_by_id_not_exists(self, mock_check_object_exists):
-        # Arrange
-        object_id = "nonexistent-object"
+    # Assert
+    assert response["statusCode"] == HTTPStatus.NOT_FOUND.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert response_body.get("message") == "The requested media object does not exist."
 
-        # Mock the object exists check
-        mock_check_object_exists.return_value = False
 
-        with pytest.raises(app.NotFoundError) as exc_info:
-            # Act
-            app.get_objects_by_id(object_id)
+def test_GET_object_id_exists(lambda_context):
+    """Tests a GET call with no query parameters and an object_id that exists"""
+    # pylint: disable=import-outside-toplevel
+    # Import app inside the test to ensure moto is active
+    from api_objects import app
 
-        # Assert
-        assert str(exc_info.value) == "The requested media object does not exist."
-        mock_check_object_exists.assert_called_once_with(app.bucket, object_id)
+    # Arrange
+    object_id = "test-object-123"
+    flow_ids = [
+        "10000000-0000-1000-8000-000000000000",
+        "10000000-0000-1000-8000-000000000001",
+    ]
+    event = {
+        "httpMethod": "GET",
+        "path": f"/objects/{object_id}",
+        "queryStringParameters": None,
+        "requestContext": {
+            "httpMethod": "GET",
+            "domainName": "test.com",
+            "path": f"/objects/{object_id}",
+        },
+    }
 
-    @patch("api_objects.app.check_object_exists")
-    @patch("api_objects.app.segments_table")
-    @patch("api_objects.app.storage_table")
-    def test_get_objects_by_id_GET_exists_basic(
-        self,
-        mock_storage_table,
-        mock_segments_table,
-        mock_check_object_exists,
-    ):
-        # Arrange
-        object_id = "test-object-123"
-        flow_ids = [
-            "10000000-0000-1000-8000-000000000000",
-            "10000000-0000-1000-8000-000000000001",
-        ]
+    # Create the S3 object
+    s3 = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
+    s3.put_object(Bucket=os.environ["BUCKET"], Key=object_id, Body="test content")
 
-        # Mock the object exists check
-        mock_check_object_exists.return_value = True
-
-        # Mock segments table query response
-        mock_segments_table.query.return_value = {
-            "Items": [{"flow_id": flow_id} for flow_id in flow_ids]
+    # Add items to DynamoDB tables
+    dynamodb = boto3.resource("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
+    storage_table = dynamodb.Table(os.environ["STORAGE_TABLE"])
+    for flow_id in flow_ids:
+        segments_table.put_item(
+            Item={
+                "flow_id": flow_id,
+                "timerange_end": 6000000000,
+                "object_id": object_id,
+                "timerange": "[0:0_6:0)",
+            }
+        )
+    storage_table.put_item(
+        Item={
+            "object_id": object_id,
+            "flow_id": flow_ids[0],
+            "expire_at": None,
         }
+    )
 
-        # Mock storage table query response
-        mock_storage_table.query.return_value = {
-            "Items": [
-                {
-                    "object_id": object_id,
-                    "flow_id": flow_ids[0],
-                    "expire_at": None,
-                }
-            ]
+    # Act
+    response = app.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert response_body.get("object_id") == object_id
+    assert set(response_body.get("referenced_by_flows")) == set(flow_ids)
+    assert response_body.get("first_referenced_by_flow") == flow_ids[0]
+
+
+def test_GET_object_id_with_limit(lambda_context):
+    """Tests a GET call with limit query parameter and an object_id that exists"""
+    # pylint: disable=import-outside-toplevel
+    # Import app inside the test to ensure moto is active
+    from api_objects import app
+
+    # Arrange
+    object_id = "test-object-123"
+    flow_ids = [
+        "10000000-0000-1000-8000-000000000000",
+        "10000000-0000-1000-8000-000000000001",
+    ]
+    event = {
+        "httpMethod": "GET",
+        "path": f"/objects/{object_id}",
+        "queryStringParameters": {"limit": "1"},
+        "requestContext": {
+            "httpMethod": "GET",
+            "domainName": "test.com",
+            "path": f"/objects/{object_id}",
+        },
+    }
+
+    # Create the S3 object
+    s3 = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
+    s3.put_object(Bucket=os.environ["BUCKET"], Key=object_id, Body="test content")
+
+    # Add items to DynamoDB tables
+    dynamodb = boto3.resource("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
+    storage_table = dynamodb.Table(os.environ["STORAGE_TABLE"])
+    for flow_id in flow_ids:
+        segments_table.put_item(
+            Item={
+                "flow_id": flow_id,
+                "timerange_end": 6000000000,
+                "object_id": object_id,
+                "timerange": "[0:0_6:0)",
+            }
+        )
+    storage_table.put_item(
+        Item={
+            "object_id": object_id,
+            "flow_id": flow_ids[0],
+            "expire_at": None,
         }
+    )
 
-        # Mock the app's current_event
-        mock_current_event = Mock()
-        mock_current_event.request_context.http_method = "GET"
+    # Act
+    response = app.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
 
-        with patch.object(app.app, "current_event", mock_current_event, create=True):
-            # Act
-            result = app.get_objects_by_id(object_id)
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert len(response_headers.get("Link")) == 1
+    assert len(response_headers.get("X-Paging-NextKey")) == 1
+    assert response_body.get("object_id") == object_id
+    assert len(response_body.get("referenced_by_flows")) == 1
+    assert response_body.get("referenced_by_flows")[0] == flow_ids[0]
+    assert response_body.get("first_referenced_by_flow") == flow_ids[0]
 
-            # Assert
-            assert result.status_code == HTTPStatus.OK.value
-            assert result.content_type == "application/json"
-            assert result.body.get("object_id") == object_id
-            assert set(result.body.get("referenced_by_flows")) == set(flow_ids)
-            assert result.body.get("first_referenced_by_flow") == flow_ids[0]
-            mock_check_object_exists.assert_called_once_with(app.bucket, object_id)
-            mock_segments_table.query.assert_called_once()
-            mock_storage_table.query.assert_called_once()
 
-    @patch("api_objects.app.check_object_exists")
-    @patch("api_objects.app.segments_table")
-    @patch("api_objects.app.storage_table")
-    def test_get_objects_by_id_GET_exists_limit(
-        self,
-        mock_storage_table,
-        mock_segments_table,
-        mock_check_object_exists,
-    ):
-        # Arrange
-        object_id = "test-object-123"
-        limit = 1
-        flow_ids = [
-            "10000000-0000-1000-8000-000000000000",
-            "10000000-0000-1000-8000-000000000001",
-        ]
+def test_GET_object_id_pagination(lambda_context):
+    """Tests pagination with a GET call with limit and page query parameters and an object_id that exists"""
+    # pylint: disable=import-outside-toplevel
+    # Import app inside the test to ensure moto is active
+    from api_objects import app
 
-        # Mock the object exists check
-        mock_check_object_exists.return_value = True
+    # Arrange
+    object_id = "test-object-123"
+    flow_ids = [
+        "10000000-0000-1000-8000-000000000000",
+        "10000000-0000-1000-8000-000000000001",
+    ]
+    event = {
+        "httpMethod": "GET",
+        "path": f"/objects/{object_id}",
+        "queryStringParameters": {
+            "limit": "1",
+            "page": base64.b64encode(
+                json.dumps(
+                    {
+                        "flow_id": flow_ids[0],
+                        "timerange_end": 6000000000,
+                        "object_id": object_id,
+                    },
+                    default=int,
+                ).encode("utf-8")
+            ).decode("utf-8"),
+        },
+        "requestContext": {
+            "httpMethod": "GET",
+            "domainName": "test.com",
+            "path": f"/objects/{object_id}",
+        },
+    }
 
-        # Mock segments table query response
-        mock_segments_table.query.return_value = {
-            "Items": [{"flow_id": flow_ids[0]}],
-            "LastEvaluatedKey": {
-                "flow_id": "test",
-                "timerange_end": 0,
-            },
+    # Create the S3 object
+    s3 = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
+    s3.put_object(Bucket=os.environ["BUCKET"], Key=object_id, Body="test content")
+
+    # Add items to DynamoDB tables
+    dynamodb = boto3.resource("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
+    storage_table = dynamodb.Table(os.environ["STORAGE_TABLE"])
+    for flow_id in flow_ids:
+        segments_table.put_item(
+            Item={
+                "flow_id": flow_id,
+                "timerange_end": 6000000000,
+                "object_id": object_id,
+                "timerange": "[0:0_6:0)",
+            }
+        )
+    storage_table.put_item(
+        Item={
+            "object_id": object_id,
+            "flow_id": flow_ids[0],
+            "expire_at": None,
         }
+    )
 
-        # Mock storage table query response
-        mock_storage_table.query.return_value = {
-            "Items": [
-                {
-                    "object_id": object_id,
-                    "flow_id": flow_ids[0],
-                    "expire_at": None,
-                }
-            ]
-        }
+    # Act
+    response = app.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
 
-        # Mock the app's current_event
-        mock_current_event = Mock()
-        mock_current_event.request_context.http_method = "GET"
-        mock_current_event.request_context.domain_name = "test.com"
-        mock_current_event.request_context.path = f"/Prod/objects/{object_id}"
-        mock_current_event.query_string_parameters = {"limit": str(limit)}
-
-        with patch.object(app.app, "current_event", mock_current_event, create=True):
-            # Act
-            result = app.get_objects_by_id(object_id, param_limit=limit)
-
-            # Assert
-            assert result.status_code == HTTPStatus.OK.value
-            assert result.content_type == "application/json"
-            assert result.body.get("object_id") == object_id
-            assert result.body.get("referenced_by_flows") == [flow_ids[0]]
-            assert result.body.get("first_referenced_by_flow") == flow_ids[0]
-            assert "X-Paging-NextKey" in result.headers
-            assert "Link" in result.headers
-            mock_check_object_exists.assert_called_once_with(app.bucket, object_id)
-            mock_segments_table.query.assert_called_once()
-            mock_storage_table.query.assert_called_once()
-
-    @patch("api_objects.app.check_object_exists")
-    @patch("api_objects.app.segments_table")
-    @patch("api_objects.app.storage_table")
-    def test_get_objects_by_id_GET_exists_limit_page(
-        self,
-        mock_storage_table,
-        mock_segments_table,
-        mock_check_object_exists,
-    ):
-        # Arrange
-        object_id = "test-object-123"
-        limit = 1
-        page = base64.b64encode(
-            json.dumps(
-                {
-                    "flow_id": "test",
-                    "timerange_end": 0,
-                },
-                default=int,
-            ).encode("utf-8")
-        ).decode("utf-8")
-        flow_ids = [
-            "10000000-0000-1000-8000-000000000000",
-            "10000000-0000-1000-8000-000000000001",
-        ]
-
-        # Mock the object exists check
-        mock_check_object_exists.return_value = True
-
-        # Mock segments table query response
-        mock_segments_table.query.return_value = {
-            "Items": [{"flow_id": flow_ids[1]}],
-        }
-
-        # Mock storage table query response
-        mock_storage_table.query.return_value = {
-            "Items": [
-                {
-                    "object_id": object_id,
-                    "flow_id": flow_ids[0],
-                    "expire_at": None,
-                }
-            ]
-        }
-
-        # Mock the app's current_event
-        mock_current_event = Mock()
-        mock_current_event.request_context.http_method = "GET"
-        mock_current_event.request_context.domain_name = "test.com"
-        mock_current_event.request_context.path = f"/Prod/objects/{object_id}"
-        mock_current_event.query_string_parameters = {"limit": str(limit), "page": page}
-
-        with patch.object(app.app, "current_event", mock_current_event, create=True):
-            # Act
-            result = app.get_objects_by_id(object_id, page, limit)
-
-            # Assert
-            assert result.status_code == HTTPStatus.OK.value
-            assert result.content_type == "application/json"
-            assert result.body.get("object_id") == object_id
-            assert result.body.get("referenced_by_flows") == [flow_ids[1]]
-            assert result.body.get("first_referenced_by_flow") == flow_ids[0]
-            assert "X-Paging-NextKey" not in result.headers
-            assert "Link" not in result.headers
-            mock_check_object_exists.assert_called_once_with(app.bucket, object_id)
-            mock_segments_table.query.assert_called_once()
-            mock_storage_table.query.assert_called_once()
-
-    @patch("api_objects.app.check_object_exists")
-    @patch("api_objects.app.segments_table")
-    @patch("api_objects.app.storage_table")
-    def test_get_objects_by_id_HEAD_exists_basic(
-        self,
-        mock_storage_table,
-        mock_segments_table,
-        mock_check_object_exists,
-    ):
-        # Arrange
-        object_id = "test-object-123"
-        flow_ids = [
-            "10000000-0000-1000-8000-000000000000",
-            "10000000-0000-1000-8000-000000000001",
-        ]
-
-        # Mock the object exists check
-        mock_check_object_exists.return_value = True
-
-        # Mock segments table query response
-        mock_segments_table.query.return_value = {
-            "Items": [{"flow_id": flow_id} for flow_id in flow_ids]
-        }
-
-        # Mock the app's current_event
-        mock_current_event = Mock()
-        mock_current_event.request_context.http_method = "HEAD"
-
-        with patch.object(app.app, "current_event", mock_current_event, create=True):
-            # Act
-            result = app.get_objects_by_id(object_id)
-
-            # Assert
-            assert result.status_code == HTTPStatus.OK.value
-            assert result.content_type == "application/json"
-            assert result.body is None
-            mock_check_object_exists.assert_called_once_with(app.bucket, object_id)
-            mock_segments_table.query.assert_called_once()
-            mock_storage_table.assert_not_called()
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert response_headers.get("Link") is None
+    assert response_headers.get("X-Paging-NextKey") is None
+    assert response_body.get("object_id") == object_id
+    assert len(response_body.get("referenced_by_flows")) == 1
+    assert response_body.get("referenced_by_flows")[0] == flow_ids[1]
+    assert response_body.get("first_referenced_by_flow") == flow_ids[0]
 
 
-class TestLambdaHandler:
-    """Test cases for the lambda_handler function."""
+def test_HEAD_object_id_exists(lambda_context):
+    # pylint: disable=import-outside-toplevel
+    # Import app inside the test to ensure moto is active
+    from api_objects import app
 
-    @patch.object(app.app, "resolve")
-    def test_lambda_handler_calls_app_resolve(self, mock_resolve):
-        """Test that lambda_handler properly calls app.resolve."""
-        # Arrange
-        test_event = {"test": "event"}
-        test_context = Mock()
-        expected_response = {"statusCode": 200, "body": "test"}
-        mock_resolve.return_value = expected_response
+    # Arrange
+    object_id = "test-object-123"
+    flow_ids = [
+        "10000000-0000-1000-8000-000000000000",
+        "10000000-0000-1000-8000-000000000001",
+    ]
+    event = {
+        "httpMethod": "HEAD",
+        "path": f"/objects/{object_id}",
+        "queryStringParameters": None,
+        "requestContext": {
+            "httpMethod": "HEAD",
+            "domainName": "test.com",
+            "path": f"/objects/{object_id}",
+        },
+    }
 
-        # Act
-        result = app.lambda_handler(test_event, test_context)
+    # Create the S3 object
+    s3 = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
+    s3.put_object(Bucket=os.environ["BUCKET"], Key=object_id, Body="test content")
 
-        # Assert
-        assert result == expected_response
-        mock_resolve.assert_called_once_with(test_event, test_context)
+    # Add items to DynamoDB tables
+    dynamodb = boto3.resource("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
+    for flow_id in flow_ids:
+        segments_table.put_item(
+            Item={
+                "flow_id": flow_id,
+                "timerange_end": 6000000000,
+                "object_id": object_id,
+                "timerange": "[0:0_6:0)",
+            }
+        )
 
+    # Act
+    response = app.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
 
-class TestExceptionHandler:
-    """Test cases for the exception handler."""
-
-    def test_handle_validation_error_raises_bad_request(self):
-        """Test that validation errors are converted to BadRequestError."""
-        # Arrange
-        mock_validation_error = Mock()
-        mock_validation_error.errors.return_value = ["error1", "error2"]
-
-        # Act & Assert
-        with pytest.raises(app.BadRequestError):
-            app.handle_validation_error(mock_validation_error)
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert response_body is None
