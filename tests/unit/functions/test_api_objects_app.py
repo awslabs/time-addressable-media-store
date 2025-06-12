@@ -243,6 +243,7 @@ def test_GET_object_id_pagination(lambda_context):
 
 
 def test_HEAD_object_id_exists(lambda_context):
+    """Tests a HEAD call with no query parameters and an object_id that exists"""
     # pylint: disable=import-outside-toplevel
     # Import app inside the test to ensure moto is active
     from api_objects import app
