@@ -6,7 +6,7 @@ import boto3
 import pytest
 
 pytestmark = [
-    pytest.mark.unit,
+    pytest.mark.functional,
 ]
 
 DEFAULT_TIMERANGE_END = 6000000000
