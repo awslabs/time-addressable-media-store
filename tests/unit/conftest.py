@@ -1,3 +1,5 @@
+import base64
+import json
 import logging
 import os
 import warnings
@@ -105,6 +107,25 @@ def stub_flowsegment():
 
 
 @pytest.fixture
+def api_event_factory():
+    """Factory fixture to create API Gateway events"""
+
+    def _create_event(http_method, path, query_params=None):
+        return {
+            "httpMethod": http_method,
+            "path": path,
+            "queryStringParameters": query_params,
+            "requestContext": {
+                "httpMethod": http_method,
+                "domainName": "test.com",
+                "path": path,
+            },
+        }
+
+    return _create_event
+
+
+@pytest.fixture
 def lambda_context():
     class LambdaContext:
         def __init__(self):
@@ -188,3 +209,15 @@ def ignore_warnings():
     warnings.filterwarnings(
         "ignore", category=UserWarning, module="aws_lambda_powertools.metrics"
     )
+
+
+@pytest.fixture
+def create_pagination_token():
+    """Create a base64 encoded dynamodb pagination token"""
+
+    def _create_token(data):
+        return base64.b64encode(json.dumps(data, default=int).encode("utf-8")).decode(
+            "utf-8"
+        )
+
+    return _create_token
