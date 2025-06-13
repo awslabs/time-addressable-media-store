@@ -87,7 +87,7 @@ def get_flow_segments_by_id(
         Optional[str], Query(alias="accept_get_urls", pattern=r"^([^,]+(,[^,]+)*)?$")
     ] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
-    param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     try:
         Uuid(root=flow_id)

@@ -59,66 +59,86 @@ def lambda_context():
     return LambdaContext()
 
 
-@pytest.fixture(scope="function", autouse=True)
-def aws_setup():
+@pytest.fixture(scope="session", autouse=True)
+def aws_credentials():
     with mock_aws():
         # Set up AWS credentials
         os.environ["AWS_ACCESS_KEY_ID"] = "testing"
         os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
         os.environ["AWS_SESSION_TOKEN"] = "testing"
         os.environ["AWS_DEFAULT_REGION"] = os.environ["AWS_REGION"]
-
-        # Create S3 bucket
-        s3 = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
-        s3.create_bucket(
-            Bucket=os.environ["BUCKET"],
-            CreateBucketConfiguration={
-                "LocationConstraint": os.environ["BUCKET_REGION"]
-            },
-        )
-
-        # Create DynamoDB tables with the required indexes
-        dynamodb = boto3.client(
-            "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
-        )
-        dynamodb.create_table(
-            TableName=os.environ["SEGMENTS_TABLE"],
-            KeySchema=[
-                {"AttributeName": "flow_id", "KeyType": "HASH"},
-                {"AttributeName": "timerange_end", "KeyType": "RANGE"},
-            ],
-            AttributeDefinitions=[
-                {"AttributeName": "flow_id", "AttributeType": "S"},
-                {"AttributeName": "timerange_end", "AttributeType": "N"},
-                {"AttributeName": "object_id", "AttributeType": "S"},
-            ],
-            GlobalSecondaryIndexes=[
-                {
-                    "IndexName": "object-id-index",
-                    "KeySchema": [
-                        {"AttributeName": "object_id", "KeyType": "HASH"},
-                        {"AttributeName": "flow_id", "KeyType": "RANGE"},
-                    ],
-                    "Projection": {"ProjectionType": "ALL"},
-                }
-            ],
-            BillingMode="PAY_PER_REQUEST",
-        )
-
-        dynamodb.create_table(
-            TableName=os.environ["STORAGE_TABLE"],
-            KeySchema=[
-                {"AttributeName": "object_id", "KeyType": "HASH"},
-                {"AttributeName": "flow_id", "KeyType": "RANGE"},
-            ],
-            AttributeDefinitions=[
-                {"AttributeName": "object_id", "AttributeType": "S"},
-                {"AttributeName": "flow_id", "AttributeType": "S"},
-            ],
-            BillingMode="PAY_PER_REQUEST",
-        )
-
         yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def s3_bucket():
+    # Create S3 bucket
+    client = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
+    client.create_bucket(
+        Bucket=os.environ["BUCKET"],
+        CreateBucketConfiguration={"LocationConstraint": os.environ["BUCKET_REGION"]},
+    )
+    yield boto3.resource("s3", region_name=os.environ["AWS_DEFAULT_REGION"]).Bucket(
+        os.environ["BUCKET"]
+    )
+    client.delete_bucket(
+        Bucket=os.environ["BUCKET"],
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def segments_table():
+    # Create DynamoDB table
+    client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    client.create_table(
+        TableName=os.environ["SEGMENTS_TABLE"],
+        KeySchema=[
+            {"AttributeName": "flow_id", "KeyType": "HASH"},
+            {"AttributeName": "timerange_end", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "flow_id", "AttributeType": "S"},
+            {"AttributeName": "timerange_end", "AttributeType": "N"},
+            {"AttributeName": "object_id", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "object-id-index",
+                "KeySchema": [
+                    {"AttributeName": "object_id", "KeyType": "HASH"},
+                    {"AttributeName": "flow_id", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            }
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    yield boto3.resource(
+        "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
+    ).Table(os.environ["SEGMENTS_TABLE"])
+    client.delete_table(TableName=os.environ["SEGMENTS_TABLE"])
+
+
+@pytest.fixture(scope="session", autouse=True)
+def storage_table():
+    # Create DynamoDB table
+    client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    client.create_table(
+        TableName=os.environ["STORAGE_TABLE"],
+        KeySchema=[
+            {"AttributeName": "object_id", "KeyType": "HASH"},
+            {"AttributeName": "flow_id", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "object_id", "AttributeType": "S"},
+            {"AttributeName": "flow_id", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    yield boto3.resource(
+        "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
+    ).Table(os.environ["STORAGE_TABLE"])
+    client.delete_table(TableName=os.environ["STORAGE_TABLE"])
 
 
 @pytest.fixture(autouse=True)

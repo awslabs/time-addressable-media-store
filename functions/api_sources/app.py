@@ -59,7 +59,7 @@ def list_sources(
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
-    param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
