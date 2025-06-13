@@ -70,6 +70,7 @@ def api_objects():
         "missing_fields",  # missing required fields
     ]
 )
+# pylint: disable=redefined-outer-name
 def invalid_page_value(request, object_id):
     """Fixture that provides different invalid page values"""
     param_type = request.param

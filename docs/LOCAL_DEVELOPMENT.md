@@ -1,6 +1,5 @@
 # Local Development
 
-
 > **This guide is not yet complete.**
 
 ## Pre-Requisites
