@@ -152,13 +152,13 @@ def ignore_warnings():
     )
 
 
-@pytest.fixture
-def create_pagination_token():
+#############
+# FUNCTIONS #
+#############
+
+
+def create_pagination_token(data):
     """Create a base64 encoded dynamodb pagination token"""
-
-    def _create_token(data):
-        return base64.b64encode(json.dumps(data, default=int).encode("utf-8")).decode(
-            "utf-8"
-        )
-
-    return _create_token
+    return base64.b64encode(json.dumps(data, default=int).encode("utf-8")).decode(
+        "utf-8"
+    )

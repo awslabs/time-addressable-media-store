@@ -4,6 +4,7 @@ from http import HTTPStatus
 
 import constants
 import pytest
+from conftest import create_pagination_token
 
 pytestmark = [
     pytest.mark.functional,
@@ -53,19 +54,44 @@ def aws_setup(s3_bucket, segments_table, storage_table, object_id, timerange, fl
     s3_bucket.delete_objects(Delete={"Objects": [{"Key": object_id}]})
 
 
+@pytest.fixture(scope="module")
+def api_objects():
+    """Import api_objects after moto is active"""
+    # pylint: disable=import-outside-toplevel
+    from api_objects import app
+
+    return app
+
+
+@pytest.fixture(
+    params=[
+        "invalid_token",  # non base64
+        "non_json",  # non json
+        "missing_fields",  # missing required fields
+    ]
+)
+def invalid_page_value(request, object_id):
+    """Fixture that provides different invalid page values"""
+    param_type = request.param
+
+    if param_type == "invalid_token":
+        return "invalid_token"
+    elif param_type == "non_json":
+        return create_pagination_token("invalid token")
+    elif param_type == "missing_fields":
+        return create_pagination_token({"object_id": object_id})
+
+
 #########
 # TESTS #
 #########
 
 
+# pylint: disable=redefined-outer-name
 def test_GET_object_returns_404_when_object_id_does_not_exist(
-    lambda_context, api_event_factory
+    lambda_context, api_event_factory, api_objects
 ):
     """Tests a GET call with an object_id that does not exist"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
     # Arrange
     event = api_event_factory("GET", "/objects/nonexistent-object")
 
@@ -82,13 +108,9 @@ def test_GET_object_returns_404_when_object_id_does_not_exist(
 
 # pylint: disable=redefined-outer-name
 def test_GET_object_returns_200_with_complete_flow_references_when_object_exists(
-    lambda_context, api_event_factory, object_id, flow_ids
+    lambda_context, api_event_factory, object_id, flow_ids, api_objects
 ):
     """Tests a GET call with no query parameters and an object_id that exists"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
     # Arrange
     event = api_event_factory("GET", f"/objects/{object_id}")
 
@@ -107,13 +129,9 @@ def test_GET_object_returns_200_with_complete_flow_references_when_object_exists
 
 # pylint: disable=redefined-outer-name
 def test_GET_object_returns_limited_flow_references_with_pagination_headers_when_limit_specified(
-    lambda_context, api_event_factory, object_id, flow_ids
+    lambda_context, api_event_factory, object_id, flow_ids, api_objects
 ):
     """Tests a GET call with limit query parameter and an object_id that exists"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
     # Arrange
     event = api_event_factory("GET", f"/objects/{object_id}", {"limit": "1"})
 
@@ -137,16 +155,12 @@ def test_GET_object_returns_limited_flow_references_with_pagination_headers_when
 def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_provided(
     lambda_context,
     api_event_factory,
-    create_pagination_token,
     object_id,
     timerange,
     flow_ids,
+    api_objects,
 ):
     """Tests pagination with a GET call with limit and page query parameters and an object_id that exists"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
     # Arrange
     event = api_event_factory(
         "GET",
@@ -180,13 +194,9 @@ def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_p
 
 
 def test_HEAD_object_returns_200_with_empty_body_when_object_exists(
-    lambda_context, api_event_factory, object_id
+    lambda_context, api_event_factory, object_id, api_objects
 ):
     """Tests a HEAD call with no query parameters and an object_id that exists"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
     # Arrange
     event = api_event_factory("HEAD", f"/objects/{object_id}")
 
@@ -201,61 +211,10 @@ def test_HEAD_object_returns_200_with_empty_body_when_object_exists(
     assert response_body is None
 
 
-def test_GET_object_handles_invalid_limit_parameter(
-    lambda_context, api_event_factory, object_id
-):
-    """Tests handling of non-numeric limit parameter"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
-    # Arrange
-    event = api_event_factory("GET", f"/objects/{object_id}", {"limit": "invalid"})
-
-    # Act
-    response = api_objects.lambda_handler(event, lambda_context)
-    response_headers = response["multiValueHeaders"]
-    response_body = json.loads(response["body"])
-
-    # Assert
-    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
-    assert response_headers.get("Content-Type")[0] == "application/json"
-    assert (
-        response_body.get("message")[0]["msg"]
-        == "Input should be a valid integer, unable to parse string as an integer"
-    )
-
-
-def test_GET_object_handles_negative_limit_parameter(
-    lambda_context, api_event_factory, object_id
-):
-    """Tests handling of negative limit parameter"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
-    # Arrange
-    event = api_event_factory("GET", f"/objects/{object_id}", {"limit": "-5"})
-
-    # Act
-    response = api_objects.lambda_handler(event, lambda_context)
-    response_headers = response["multiValueHeaders"]
-    response_body = json.loads(response["body"])
-
-    # Assert
-    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
-    assert response_headers.get("Content-Type")[0] == "application/json"
-    assert response_body.get("message")[0]["msg"] == "Input should be greater than 0"
-
-
 def test_GET_object_handles_maximum_limit_parameter(
-    lambda_context, api_event_factory, object_id
+    lambda_context, api_event_factory, object_id, api_objects
 ):
     """Tests handling of limit parameter exceeding maximum allowed value"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
     # Arrange
     event = api_event_factory("GET", f"/objects/{object_id}", {"limit": "1000"})
 
@@ -268,67 +227,46 @@ def test_GET_object_handles_maximum_limit_parameter(
     assert response_headers.get("X-Paging-Limit")[0] == str(constants.MAX_PAGE_LIMIT)
 
 
-def test_GET_object_handles_invalid_pagination_token_non_base64(
-    lambda_context, api_event_factory, object_id
+@pytest.mark.parametrize(
+    "limit_value,expected_message",
+    [
+        (
+            "invalid",
+            "Input should be a valid integer, unable to parse string as an integer",
+        ),
+        ("-5", "Input should be greater than 0"),
+    ],
+)
+def test_GET_object_handles_invalid_limit_parameter(
+    lambda_context,
+    api_event_factory,
+    object_id,
+    api_objects,
+    limit_value,
+    expected_message,
 ):
-    """Tests handling of invalid pagination token, where the value is not base64 encoded"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
+    """Tests handling of non-numeric limit parameter"""
     # Arrange
-    event = api_event_factory("GET", f"/objects/{object_id}", {"page": "invalid_token"})
+    event = api_event_factory("GET", f"/objects/{object_id}", {"limit": limit_value})
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
     response_body = json.loads(response["body"])
 
+    # Assert
     assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
-    assert response_body.get("message") == "Invalid page parameter value"
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert response_body.get("message")[0]["msg"] == expected_message
 
 
-def test_GET_object_handles_invalid_pagination_token_non_json(
-    lambda_context, api_event_factory, create_pagination_token, object_id
+def test_GET_object_handles_invalid_page_parameter(
+    lambda_context, api_event_factory, object_id, api_objects, invalid_page_value
 ):
-    """Tests handling of invalid pagination token, where the value is not base64 encoded json"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
+    """Tests handling of invalid page values"""
     # Arrange
     event = api_event_factory(
-        "GET",
-        f"/objects/{object_id}",
-        {"page": create_pagination_token("invalid token")},
-    )
-
-    # Act
-    response = api_objects.lambda_handler(event, lambda_context)
-    response_body = json.loads(response["body"])
-
-    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
-    assert response_body.get("message") == "Invalid page parameter value"
-
-
-def test_GET_object_handles_invalid_pagination_token_non_valid_json(
-    lambda_context, api_event_factory, create_pagination_token, object_id
-):
-    """Tests handling of invalid pagination token, where the value is not base64 encoded valid json"""
-    # pylint: disable=import-outside-toplevel
-    # Import app inside the test to ensure moto is active
-    from api_objects import app as api_objects
-
-    # Arrange
-    event = api_event_factory(
-        "GET",
-        f"/objects/{object_id}",
-        {
-            "page": create_pagination_token(
-                {
-                    "object_id": object_id,
-                }
-            )
-        },
+        "GET", f"/objects/{object_id}", {"page": invalid_page_value}
     )
 
     # Act
