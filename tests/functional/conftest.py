@@ -3,10 +3,10 @@ import json
 import logging
 import os
 import warnings
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
-from boto3.dynamodb.conditions import ConditionExpressionBuilder
 from moto import mock_aws
 
 os.environ["AWS_REGION"] = "eu-west-1"
@@ -18,21 +18,43 @@ os.environ["POWERTOOLS_METRICS_NAMESPACE"] = "TAMS"
 os.environ["POWERTOOLS_SERVICE_NAME"] = "tams"
 os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
+os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
 
 logger = logging.getLogger(__name__)
-builder = ConditionExpressionBuilder()
+
 
 ############
 # FIXTURES #
 ############
 
 
+@pytest.fixture(scope="module", autouse=True)
+def mock_neptune_client():
+    """Mock the Neptune client before any imports"""
+    # Create a mock Neptune client
+    mock_client = MagicMock()
+    mock_client.execute_open_cypher_query.return_value = {"results": []}
+
+    # Save original and patch
+    original_client = boto3.client
+
+    def patched_client(service_name, *args, **kwargs):
+        if service_name == "neptunedata":
+            return mock_client
+        return original_client(service_name, *args, **kwargs)
+
+    # Apply patch
+    boto3.client = patched_client
+
+    yield mock_client
+
+
 @pytest.fixture
 def api_event_factory():
     """Factory fixture to create API Gateway events"""
 
-    def _create_event(http_method, path, query_params=None):
-        return {
+    def _create_event(http_method, path, query_params=None, json_body=None):
+        event = {
             "httpMethod": http_method,
             "path": path,
             "queryStringParameters": query_params,
@@ -42,6 +64,10 @@ def api_event_factory():
                 "path": path,
             },
         }
+        if json_body is not None:
+            event["body"] = json.dumps(json_body)
+            event["headers"] = {"Content-Type": "application/json"}
+        return event
 
     return _create_event
 
@@ -74,7 +100,7 @@ def aws_credentials():
         yield
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def s3_bucket():
     # Create S3 bucket
     client = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
@@ -90,7 +116,7 @@ def s3_bucket():
     )
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def segments_table():
     # Create DynamoDB table
     client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
@@ -123,7 +149,7 @@ def segments_table():
     client.delete_table(TableName=os.environ["SEGMENTS_TABLE"])
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def storage_table():
     # Create DynamoDB table
     client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
