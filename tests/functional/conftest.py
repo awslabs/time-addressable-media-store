@@ -22,6 +22,10 @@ os.environ["STORAGE_TABLE"] = "storage-table"
 logger = logging.getLogger(__name__)
 builder = ConditionExpressionBuilder()
 
+############
+# FIXTURES #
+############
+
 
 @pytest.fixture
 def api_event_factory():
