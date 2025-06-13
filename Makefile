@@ -18,6 +18,6 @@ build-api-spec-tag:
 	mv ./api/build/tams-$(TAMS_TAG)/ ./api/build/tams
 
 build-api-schema:
-	python ./api/build/generate_spec.py
-	datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel --target-python-version 3.13 --use-schema-description --use-double-quotes
+	poetry run python ./api/build/generate_spec.py
+	poetry run datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel --target-python-version 3.13 --use-schema-description --use-double-quotes
 	rm -rf ./api/build/tams
