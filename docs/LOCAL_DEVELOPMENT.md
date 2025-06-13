@@ -1,6 +1,5 @@
 # Local Development
 
-
 > **This guide is not yet complete.**
 
 ## Pre-Requisites
@@ -11,7 +10,7 @@ The following dependencies must be installed. Please refer to your operating sys
 > for example, here are the instructions on how to install [Ubuntu](https://ubuntu.com/tutorials/ubuntu-on-windows).
 
 - Python ~= 3.13.0 and pip
-- [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) (optional)
+- [poetry](https://python-poetry.org/)
 - [pre-commit](https://pre-commit.com/#install)
 - [cfn-lint](https://github.com/aws-cloudformation/cfn-lint)
 - [cfn-nag](https://github.com/stelligent/cfn_nag)
@@ -19,3 +18,7 @@ The following dependencies must be installed. Please refer to your operating sys
 ## Build local development environment
 
 Once you have installed pre-requisites, follow steps below.
+
+```bash
+poetry install
+```

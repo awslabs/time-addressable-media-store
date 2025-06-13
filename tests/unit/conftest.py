@@ -1,19 +1,21 @@
 import logging
 import os
-import warnings
 from datetime import datetime, timedelta
 
 import pytest
 from boto3.dynamodb.conditions import ConditionExpressionBuilder
 from mediatimestamp.immutable import TimeRange, Timestamp
 
-os.environ["WEBHOOKS_TABLE"] = "TEST_TABLE"
-os.environ["BUCKET"] = "TEST_BUCKET"
-os.environ["BUCKET_REGION"] = "eu-west-1"
-os.environ["WEBHOOKS_QUEUE_URL"] = "TEST_QUEUE"
-os.environ["USER_POOL_ID"] = "123"
-os.environ["COGNITO_LAMBDA_NAME"] = "USERNAME_LAMBDA"
 os.environ["AWS_REGION"] = "eu-west-1"
+os.environ["BUCKET"] = "test-bucket"
+os.environ["BUCKET_REGION"] = "eu-west-1"
+os.environ["COGNITO_LAMBDA_NAME"] = "test-lambda-name"
+os.environ["NEPTUNE_ENDPOINT"] = "example.com"
+os.environ["SEGMENTS_TABLE"] = "segments-table"
+os.environ["STORAGE_TABLE"] = "storage-table"
+os.environ["USER_POOL_ID"] = "123"
+os.environ["WEBHOOKS_QUEUE_URL"] = "test-queue"
+os.environ["WEBHOOKS_TABLE"] = "webhooks-table"
 
 logger = logging.getLogger(__name__)
 builder = ConditionExpressionBuilder()
@@ -94,10 +96,3 @@ def stub_flowsegment():
             }
         ],
     }
-
-
-@pytest.fixture(autouse=True)
-def ignore_warnings():
-    warnings.filterwarnings(
-        "ignore", category=UserWarning, module="aws_lambda_powertools.metrics"
-    )

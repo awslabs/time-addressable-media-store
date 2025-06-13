@@ -10,6 +10,7 @@ import boto3
 # pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Tracer
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from botocore.exceptions import ClientError
@@ -335,5 +336,19 @@ def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
     if parameters.get("limit"):
         kwargs["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
     if parameters.get("page"):
-        kwargs["ExclusiveStartKey"] = json.loads(base64.b64decode(parameters["page"]))
+        try:
+            decoded_page = base64.b64decode(parameters["page"]).decode("utf-8")
+            exclusive_start_key = json.loads(decoded_page)
+        except UnicodeDecodeError as ex:
+            raise BadRequestError("Invalid page parameter value") from ex  # 400
+        except json.decoder.JSONDecodeError as ex:
+            raise BadRequestError("Invalid page parameter value") from ex  # 400
+        if any(
+            f not in exclusive_start_key
+            for f in ["flow_id", "object_id", "timerange_end"]
+        ):
+            raise BadRequestError("Invalid page parameter value")  # 400
+        if exclusive_start_key["object_id"] != object_id:
+            raise BadRequestError("Invalid page parameter value")  # 400
+        kwargs["ExclusiveStartKey"] = exclusive_start_key
     return kwargs

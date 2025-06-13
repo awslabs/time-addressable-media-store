@@ -104,7 +104,7 @@ def get_flows(
     param_frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
     param_frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
-    param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters

@@ -42,7 +42,7 @@ bucket = os.environ["BUCKET"]
 def get_objects_by_id(
     object_id: Annotated[str, Path(alias="objectId")],
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
-    param_limit: Annotated[Optional[int], Query(alias="limit")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     if not check_object_exists(bucket, object_id):
         raise NotFoundError("The requested media object does not exist.")  # 404

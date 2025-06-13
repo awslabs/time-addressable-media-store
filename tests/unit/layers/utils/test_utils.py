@@ -325,4 +325,4 @@ class TestUtils:
 
         assert mock_s3.generate_presigned_url.call_count == 1
         assert result == expected
-        assert kw_args["ExpiresIn"] == 3600
+        assert kw_args["ExpiresIn"] == utils.constants.PRESIGNED_URL_EXPIRES_IN
