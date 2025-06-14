@@ -128,6 +128,7 @@ make deploy STACK_NAME=<stack-name> AWS_REGION=<region> PROFILE=<aws-profile>
 ```
 
 Default values:
+
 - STACK_NAME: tams
 - AWS_REGION: us-east-1
 - PROFILE: default
