@@ -773,6 +773,16 @@ def post_flow_storage_by_id(
         )  # 400
     if flow_storage_post.limit is None and flow_storage_post.object_ids is None:
         flow_storage_post.limit = constants.DEFAULT_PUT_LIMIT
+    # Check if any object_ids already exist in the storage table
+    if flow_storage_post.object_ids:
+        for object_id in flow_storage_post.object_ids:
+            get_item = storage_table.get_item(
+                Key={"object_id": object_id, "flow_id": flow_id}
+            )
+            if get_item.get("Item"):
+                raise BadRequestError(
+                    "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
+                )  # 400
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
