@@ -112,7 +112,7 @@ def test_Allocate_Flow_Storage_POST_400_container(api_client_cognito, stub_data_
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert (
-        "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
+        "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
         == response.json()["message"]
     )
 
