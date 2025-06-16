@@ -831,7 +831,9 @@ def handle_validation_error(ex: RequestValidationError):
 
 
 @tracer.capture_method(capture_response=False)
-def get_presigned_put(content_type, object_id=str(uuid.uuid4())):
+def get_presigned_put(content_type, object_id=None):
+    if object_id is None:
+        object_id = str(uuid.uuid4())
     url = generate_presigned_url(
         "put_object",
         bucket,
