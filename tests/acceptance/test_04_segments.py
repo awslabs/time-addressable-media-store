@@ -78,6 +78,30 @@ def test_Allocate_Flow_Storage_POST_201(
         assert stub_video_flow["container"] == record["put_url"]["content-type"]
 
 
+def test_Allocate_Flow_Storage_POST_201_object_ids(api_client_cognito, stub_video_flow):
+    # Arrange
+    path = f'/flows/{stub_video_flow["id"]}/storage'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"object_ids": ["test-1", "test-2"]},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 201 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "media_objects" in response.json()
+    assert 2 == len(response.json()["media_objects"])
+    for record in response.json()["media_objects"]:
+        assert "object_id" in record
+        assert "put_url" in record
+        assert "url" in record["put_url"]
+        assert "content-type" in record["put_url"]
+        assert stub_video_flow["container"] == record["put_url"]["content-type"]
+
+
 def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito, stub_multi_flow):
     """Bad request body"""
     # Arrange
