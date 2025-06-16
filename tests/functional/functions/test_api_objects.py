@@ -16,47 +16,90 @@ pytestmark = [
 
 
 @pytest.fixture(scope="module")
-def object_id():
+def test_object_id():
+    """
+    Provides a unique test object identifier for testing.
+
+    Returns:
+        str: A unique test object identifier with UUID
+    """
     yield f"test-object-{str(uuid.uuid4())}"
 
 
 @pytest.fixture(scope="module")
-def timerange():
+def sample_timerange():
+    """
+    Provides a sample timerange for testing.
+
+    Returns:
+        dict: A dictionary containing string representation and end timestamp
+    """
     yield {"str": "[0:0_6:0)", "end": 5999999999}
 
 
 @pytest.fixture(scope="module")
-def flow_ids():
+def multiple_flow_ids():
+    """
+    Provides multiple unique flow IDs for testing.
+
+    Returns:
+        list: A list of UUID strings representing flow IDs
+    """
     yield sorted([str(uuid.uuid4()) for _ in range(2)])
 
 
 @pytest.fixture(scope="module", autouse=True)
 # pylint: disable=redefined-outer-name
-def aws_setup(s3_bucket, segments_table, storage_table, object_id, timerange, flow_ids):
-    s3_bucket.put_object(Key=object_id, Body="test content")
-    for flow_id in flow_ids:
+def aws_setup(
+    s3_bucket,
+    segments_table,
+    storage_table,
+    test_object_id,
+    sample_timerange,
+    multiple_flow_ids,
+):
+    """
+    Sets up test data in AWS resources before tests run.
+
+    Creates test objects in S3 and entries in DynamoDB tables for testing.
+
+    Args:
+        s3_bucket: The S3 bucket fixture
+        segments_table: The DynamoDB segments table fixture
+        storage_table: The DynamoDB storage table fixture
+        test_object_id: The test object ID fixture
+        sample_timerange: The sample timerange fixture
+        multiple_flow_ids: The multiple flow IDs fixture
+    """
+    s3_bucket.put_object(Key=test_object_id, Body="test content")
+    for flow_id in multiple_flow_ids:
         segments_table.put_item(
             Item={
                 "flow_id": flow_id,
-                "timerange_end": timerange["end"],
-                "object_id": object_id,
-                "timerange": timerange["str"],
+                "timerange_end": sample_timerange["end"],
+                "object_id": test_object_id,
+                "timerange": sample_timerange["str"],
             }
         )
     storage_table.put_item(
         Item={
-            "object_id": object_id,
-            "flow_id": flow_ids[0],
+            "object_id": test_object_id,
+            "flow_id": multiple_flow_ids[0],
             "expire_at": None,
         }
     )
     yield
-    s3_bucket.delete_objects(Delete={"Objects": [{"Key": object_id}]})
+    s3_bucket.delete_objects(Delete={"Objects": [{"Key": test_object_id}]})
 
 
 @pytest.fixture(scope="module")
 def api_objects():
-    """Import api_objects after moto is active"""
+    """
+    Import api_objects Lambda handler after moto is active.
+
+    Returns:
+        module: The api_objects Lambda handler module
+    """
     # pylint: disable=import-outside-toplevel
     from api_objects import app
 
@@ -71,8 +114,22 @@ def api_objects():
     ]
 )
 # pylint: disable=redefined-outer-name
-def invalid_page_value(request, object_id):
-    """Fixture that provides different invalid page values"""
+def invalid_page_value(request, test_object_id):
+    """
+    Provides different types of invalid pagination token values for testing error handling.
+
+    Parameterized to test:
+    - Non-base64 encoded tokens
+    - Base64 encoded non-JSON content
+    - JSON missing required fields
+
+    Args:
+        request: pytest request object containing the parameter
+        test_object_id: The object ID to use in the token when applicable
+
+    Returns:
+        str: An invalid pagination token
+    """
     param_type = request.param
 
     if param_type == "invalid_token":
@@ -80,7 +137,7 @@ def invalid_page_value(request, object_id):
     elif param_type == "non_json":
         return create_pagination_token("invalid token")
     elif param_type == "missing_fields":
-        return create_pagination_token({"object_id": object_id})
+        return create_pagination_token({"object_id": test_object_id})
 
 
 #########
@@ -92,7 +149,10 @@ def invalid_page_value(request, object_id):
 def test_GET_object_returns_404_when_object_id_does_not_exist(
     lambda_context, api_event_factory, api_objects
 ):
-    """Tests a GET call with an object_id that does not exist"""
+    """
+    Verifies that a GET request for a non-existent object returns 404 Not Found
+    with an appropriate error message.
+    """
     # Arrange
     event = api_event_factory("GET", "/objects/nonexistent-object")
 
@@ -109,11 +169,14 @@ def test_GET_object_returns_404_when_object_id_does_not_exist(
 
 # pylint: disable=redefined-outer-name
 def test_GET_object_returns_200_with_complete_flow_references_when_object_exists(
-    lambda_context, api_event_factory, object_id, flow_ids, api_objects
+    lambda_context, api_event_factory, test_object_id, multiple_flow_ids, api_objects
 ):
-    """Tests a GET call with no query parameters and an object_id that exists"""
+    """
+    Verifies that a GET request for an existing object returns 200 OK
+    with complete flow references and correct object metadata.
+    """
     # Arrange
-    event = api_event_factory("GET", f"/objects/{object_id}")
+    event = api_event_factory("GET", f"/objects/{test_object_id}")
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
@@ -123,18 +186,23 @@ def test_GET_object_returns_200_with_complete_flow_references_when_object_exists
     # Assert
     assert response["statusCode"] == HTTPStatus.OK.value
     assert response_headers.get("Content-Type")[0] == "application/json"
-    assert response_body.get("object_id") == object_id
-    assert set(response_body.get("referenced_by_flows")) == set(flow_ids)
-    assert response_body.get("first_referenced_by_flow") == flow_ids[0]
+    assert response_body.get("object_id") == test_object_id
+    assert set(response_body.get("referenced_by_flows")) == set(multiple_flow_ids)
+    assert response_body.get("first_referenced_by_flow") == multiple_flow_ids[0]
 
 
 # pylint: disable=redefined-outer-name
 def test_GET_object_returns_limited_flow_references_with_pagination_headers_when_limit_specified(
-    lambda_context, api_event_factory, object_id, flow_ids, api_objects
+    lambda_context, api_event_factory, test_object_id, multiple_flow_ids, api_objects
 ):
-    """Tests a GET call with limit query parameter and an object_id that exists"""
+    """
+    Verifies that a GET request with a limit parameter returns:
+    1. The correct number of flow references (limited to the specified value)
+    2. Appropriate pagination headers (Link and X-Paging-NextKey)
+    3. The expected object metadata
+    """
     # Arrange
-    event = api_event_factory("GET", f"/objects/{object_id}", {"limit": "1"})
+    event = api_event_factory("GET", f"/objects/{test_object_id}", {"limit": "1"})
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
@@ -146,33 +214,38 @@ def test_GET_object_returns_limited_flow_references_with_pagination_headers_when
     assert response_headers.get("Content-Type")[0] == "application/json"
     assert len(response_headers.get("Link")) == 1
     assert len(response_headers.get("X-Paging-NextKey")) == 1
-    assert response_body.get("object_id") == object_id
+    assert response_body.get("object_id") == test_object_id
     assert len(response_body.get("referenced_by_flows")) == 1
-    assert response_body.get("referenced_by_flows")[0] == flow_ids[0]
-    assert response_body.get("first_referenced_by_flow") == flow_ids[0]
+    assert response_body.get("referenced_by_flows")[0] == multiple_flow_ids[0]
+    assert response_body.get("first_referenced_by_flow") == multiple_flow_ids[0]
 
 
 # pylint: disable=redefined-outer-name
 def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_provided(
     lambda_context,
     api_event_factory,
-    object_id,
-    timerange,
-    flow_ids,
+    test_object_id,
+    sample_timerange,
+    multiple_flow_ids,
     api_objects,
 ):
-    """Tests pagination with a GET call with limit and page query parameters and an object_id that exists"""
+    """
+    Verifies that a GET request with pagination token returns the next page of results:
+    1. Returns the correct flow references from the next page
+    2. Does not include pagination headers when at the end of results
+    3. Maintains consistent object metadata across pages
+    """
     # Arrange
     event = api_event_factory(
         "GET",
-        f"/objects/{object_id}",
+        f"/objects/{test_object_id}",
         {
             "limit": "1",
             "page": create_pagination_token(
                 {
-                    "flow_id": flow_ids[0],
-                    "timerange_end": timerange["end"],
-                    "object_id": object_id,
+                    "flow_id": multiple_flow_ids[0],
+                    "timerange_end": sample_timerange["end"],
+                    "object_id": test_object_id,
                 }
             ),
         },
@@ -188,18 +261,21 @@ def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_p
     assert response_headers.get("Content-Type")[0] == "application/json"
     assert response_headers.get("Link") is None
     assert response_headers.get("X-Paging-NextKey") is None
-    assert response_body.get("object_id") == object_id
+    assert response_body.get("object_id") == test_object_id
     assert len(response_body.get("referenced_by_flows")) == 1
-    assert response_body.get("referenced_by_flows")[0] == flow_ids[1]
-    assert response_body.get("first_referenced_by_flow") == flow_ids[0]
+    assert response_body.get("referenced_by_flows")[0] == multiple_flow_ids[1]
+    assert response_body.get("first_referenced_by_flow") == multiple_flow_ids[0]
 
 
 def test_HEAD_object_returns_200_with_empty_body_when_object_exists(
-    lambda_context, api_event_factory, object_id, api_objects
+    lambda_context, api_event_factory, test_object_id, api_objects
 ):
-    """Tests a HEAD call with no query parameters and an object_id that exists"""
+    """
+    Verifies that a HEAD request for an existing object returns 200 OK
+    with appropriate headers but an empty response body.
+    """
     # Arrange
-    event = api_event_factory("HEAD", f"/objects/{object_id}")
+    event = api_event_factory("HEAD", f"/objects/{test_object_id}")
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
@@ -213,16 +289,20 @@ def test_HEAD_object_returns_200_with_empty_body_when_object_exists(
 
 
 def test_GET_object_handles_maximum_limit_parameter(
-    lambda_context, api_event_factory, object_id, api_objects
+    lambda_context, api_event_factory, test_object_id, api_objects
 ):
-    """Tests handling of limit parameter exceeding maximum allowed value"""
+    """
+    Verifies that a GET request with a limit parameter exceeding the maximum allowed value
+    is handled correctly by capping the limit at the maximum allowed value.
+    """
     # Arrange
-    event = api_event_factory("GET", f"/objects/{object_id}", {"limit": "1000"})
+    event = api_event_factory("GET", f"/objects/{test_object_id}", {"limit": "1000"})
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
     response_headers = response["multiValueHeaders"]
 
+    # Assert
     assert response["statusCode"] == HTTPStatus.OK.value
     assert response_headers.get("Content-Type")[0] == "application/json"
     assert response_headers.get("X-Paging-Limit")[0] == str(constants.MAX_PAGE_LIMIT)
@@ -241,14 +321,23 @@ def test_GET_object_handles_maximum_limit_parameter(
 def test_GET_object_handles_invalid_limit_parameter(
     lambda_context,
     api_event_factory,
-    object_id,
+    test_object_id,
     api_objects,
     limit_value,
     expected_message,
 ):
-    """Tests handling of non-numeric limit parameter"""
+    """
+    Verifies that a GET request with an invalid limit parameter returns 400 Bad Request
+    with appropriate validation error messages.
+
+    Tests various invalid limit scenarios:
+    - Non-numeric limit values
+    - Negative limit values
+    """
     # Arrange
-    event = api_event_factory("GET", f"/objects/{object_id}", {"limit": limit_value})
+    event = api_event_factory(
+        "GET", f"/objects/{test_object_id}", {"limit": limit_value}
+    )
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
@@ -262,17 +351,23 @@ def test_GET_object_handles_invalid_limit_parameter(
 
 
 def test_GET_object_handles_invalid_page_parameter(
-    lambda_context, api_event_factory, object_id, api_objects, invalid_page_value
+    lambda_context, api_event_factory, test_object_id, api_objects, invalid_page_value
 ):
-    """Tests handling of invalid page values"""
+    """
+    Verifies that a GET request with an invalid page parameter returns 400 Bad Request
+    with an appropriate error message.
+
+    Tests multiple types of invalid pagination tokens through the parameterized fixture.
+    """
     # Arrange
     event = api_event_factory(
-        "GET", f"/objects/{object_id}", {"page": invalid_page_value}
+        "GET", f"/objects/{test_object_id}", {"page": invalid_page_value}
     )
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
     response_body = json.loads(response["body"])
 
+    # Assert
     assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
     assert response_body.get("message") == "Invalid page parameter value"
