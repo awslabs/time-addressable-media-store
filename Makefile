@@ -4,7 +4,7 @@ SHELL := /bin/bash
 
 TAMS_REPO_PATH=https://github.com/bbc/tams
 STACK_NAME ?= tams
-AWS_REGION ?= us-east-1
+AWS_REGION ?= eu-west-1
 PROFILE ?= default
 OUTPUT_DIR ?= .aws-sam
 
