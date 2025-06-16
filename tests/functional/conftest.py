@@ -49,6 +49,14 @@ def mock_neptune_client():
     yield mock_client
 
 
+@pytest.fixture(autouse=True)
+# pylint: disable=redefined-outer-name
+def reset_mock_neptune_client(mock_neptune_client):
+    """Reset the Neptune mock before each test to ensure isolation"""
+    mock_neptune_client.execute_open_cypher_query.return_value = {"results": []}
+    yield
+
+
 @pytest.fixture
 def api_event_factory():
     """Factory fixture to create API Gateway events"""
@@ -74,6 +82,8 @@ def api_event_factory():
 
 @pytest.fixture
 def lambda_context():
+    """Provides a mock Lambda context object for testing Lambda functions."""
+
     class LambdaContext:
         def __init__(self):
             self.function_name = "test-func"
@@ -184,7 +194,15 @@ def ignore_warnings():
 
 
 def create_pagination_token(data):
-    """Create a base64 encoded dynamodb pagination token"""
+    """
+    Create a base64 encoded DynamoDB pagination token from the provided data.
+
+    Args:
+        data (dict): The data to encode as a pagination token
+
+    Returns:
+        str: Base64 encoded pagination token
+    """
     return base64.b64encode(json.dumps(data, default=int).encode("utf-8")).decode(
         "utf-8"
     )
