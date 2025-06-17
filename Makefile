@@ -6,6 +6,16 @@ TAMS_REPO_PATH=https://github.com/bbc/tams
 STACK_NAME ?= tams
 OUTPUT_DIR ?= .aws-sam
 
+ifndef TAMS_TAG
+TAMS_SPEC_ZIP_URL := $(TAMS_REPO_PATH)/archive/refs/heads/main.zip
+TAMS_SPEC_ZIP_FILE := api/build/tams-repo-main.zip
+TAMS_SPEC_ZIP_PATH := tams-main
+else
+TAMS_SPEC_ZIP_URL := $(TAMS_REPO_PATH)/archive/refs/tags/$(TAMS_TAG).zip
+TAMS_SPEC_ZIP_FILE := api/build/tams-repo-$(TAMS_TAG).zip
+TAMS_SPEC_ZIP_PATH := tams-$(TAMS_TAG)
+endif
+
 # Default target
 .DEFAULT_GOAL := help
 
@@ -37,27 +47,21 @@ help:
 	@echo "  FUNCTION_NAME      - Lambda function name for local-invoke"
 	@echo "  EVENT_FILE         - Event file for local-invoke"
 
-fetch-tams-repo:
-	@mkdir -p ./api/build
-	@if [ -z "$(TAMS_TAG)" ]; then \
-		echo "Downloading main branch..."; \
-		wget -O ./api/build/tams-repo-main.zip "$(TAMS_REPO_PATH)/archive/refs/heads/main.zip"; \
-	else \
-		echo "Downloading tag $(TAMS_TAG)..."; \
-		wget -O "./api/build/tams-repo-$(TAMS_TAG).zip" "$(TAMS_REPO_PATH)/archive/refs/tags/$(TAMS_TAG).zip"; \
-	fi
+api/build:
+	mkdir -p api/build
 
-api-spec:
-	@if [ ! -f ./api/build/tams-repo-*.zip ]; then \
-		$(MAKE) fetch-tams-repo; \
+api/build/tams-repo-%.zip: | api/build
+	wget -O "$@" "$(TAMS_SPEC_ZIP_URL)"
+
+api/build/tams: $(TAMS_SPEC_ZIP_FILE) | api/build
+	unzip -o "$(TAMS_SPEC_ZIP_FILE)" "$(TAMS_SPEC_ZIP_PATH)/api/*" -d api/build
+	@# Delete spec directory if it already exists, so it can be replaced in the following step
+	if [ -d "$@" ]; then \
+		rm -rf "$@"; \
 	fi
-	@if [ -z "$(TAMS_TAG)" ]; then \
-		unzip -o ./api/build/tams-repo-main.zip tams-main/api/* -d api/build; \
-		mv ./api/build/tams-main/ ./api/build/tams; \
-	else \
-		unzip -o "./api/build/tams-repo-$(TAMS_TAG).zip" "tams-$(TAMS_TAG)/api/*" -d api/build; \
-		mv "./api/build/tams-$(TAMS_TAG)/" ./api/build/tams; \
-	fi
+	mv "api/build/$(TAMS_SPEC_ZIP_PATH)" "$@"
+
+api-spec: api/build/tams
 	@echo "Generating API schema..."
 	poetry run python ./api/build/generate_spec.py
 	poetry run datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel --target-python-version 3.13 --use-schema-description --use-double-quotes
