@@ -15,9 +15,8 @@ The following dependencies must be installed. Please refer to your operating sys
 - [cfn-lint](https://github.com/aws-cloudformation/cfn-lint) - CloudFormation linting
 - [cfn-nag](https://github.com/stelligent/cfn_nag) - CloudFormation security scanning
 - [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) - Serverless Application Model CLI
-- [Docker](https://hub.docker.com/search/?type=edition&offering=community) - Required for local Lambda function testing
+- [Docker](https://hub.docker.com/search/?type=edition&offering=community) - Required for Lambda function builds and local Lambda function testing
 - [rain](https://github.com/aws-cloudformation/rain) - CloudFormation template formatting
-- [git-secrets](https://github.com/awslabs/git-secrets) - Prevents committing secrets
 
 ## Setting Up Your Development Environment
 

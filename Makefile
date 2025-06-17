@@ -1,11 +1,9 @@
 SHELL := /bin/bash
 
-.PHONY: help api-spec clean test test-unit test-functional test-acceptance test-all lint format cfn-lint cfn-nag cfn-format build deploy package validate local-api local-invoke
+.PHONY: help api-spec fetch-tams-repo clean test test-unit test-functional test-acceptance test-all lint format cfn-lint cfn-nag cfn-format build deploy package validate local-api local-invoke
 
 TAMS_REPO_PATH=https://github.com/bbc/tams
 STACK_NAME ?= tams
-AWS_REGION ?= eu-west-1
-PROFILE ?= default
 OUTPUT_DIR ?= .aws-sam
 
 # Default target
@@ -14,9 +12,10 @@ OUTPUT_DIR ?= .aws-sam
 help:
 	@echo "Available targets:"
 	@echo "  api-spec           - Generate API schema from TAMS repository"
+	@echo "  fetch-tams-repo    - Fetch TAMS repository as a zip file"
 	@echo "  build              - Build the SAM application"
 	@echo "  package            - Package the SAM application"
-	@echo "  deploy             - Deploy the SAM application (use STACK_NAME, AWS_REGION, PROFILE)"
+	@echo "  deploy             - Deploy the SAM application (use STACK_NAME)"
 	@echo "  validate           - Validate the SAM template"
 	@echo "  local-api          - Run API Gateway locally"
 	@echo "  local-invoke       - Invoke a Lambda function locally"
@@ -35,24 +34,29 @@ help:
 	@echo "Options:"
 	@echo "  TAMS_TAG           - Specify a tag for api-spec (e.g., make api-spec TAMS_TAG=v1.0.0)"
 	@echo "  STACK_NAME         - CloudFormation stack name (default: tams)"
-	@echo "  AWS_REGION         - AWS region (default: us-east-1)"
-	@echo "  PROFILE            - AWS profile (default: default)"
 	@echo "  FUNCTION_NAME      - Lambda function name for local-invoke"
 	@echo "  EVENT_FILE         - Event file for local-invoke"
 
-api-spec:
+fetch-tams-repo:
+	@mkdir -p ./api/build
 	@if [ -z "$(TAMS_TAG)" ]; then \
 		echo "Downloading main branch..."; \
-		wget -O ./api/build/tams-repo.zip $(TAMS_REPO_PATH)/archive/refs/heads/main.zip; \
-		unzip ./api/build/tams-repo.zip tams-main/api/* -d api/build; \
-		rm -f ./api/build/tams-repo.zip; \
-		mv ./api/build/tams-main/ ./api/build/tams; \
+		wget -O ./api/build/tams-repo-main.zip "$(TAMS_REPO_PATH)/archive/refs/heads/main.zip"; \
 	else \
 		echo "Downloading tag $(TAMS_TAG)..."; \
-		wget -O ./api/build/tams-repo.zip $(TAMS_REPO_PATH)/archive/refs/tags/$(TAMS_TAG).zip; \
-		unzip ./api/build/tams-repo.zip tams-$(TAMS_TAG)/api/* -d api/build; \
-		rm -f ./api/build/tams-repo.zip; \
-		mv ./api/build/tams-$(TAMS_TAG)/ ./api/build/tams; \
+		wget -O "./api/build/tams-repo-$(TAMS_TAG).zip" "$(TAMS_REPO_PATH)/archive/refs/tags/$(TAMS_TAG).zip"; \
+	fi
+
+api-spec:
+	@if [ ! -f ./api/build/tams-repo-*.zip ]; then \
+		$(MAKE) fetch-tams-repo; \
+	fi
+	@if [ -z "$(TAMS_TAG)" ]; then \
+		unzip -o ./api/build/tams-repo-main.zip tams-main/api/* -d api/build; \
+		mv ./api/build/tams-main/ ./api/build/tams; \
+	else \
+		unzip -o "./api/build/tams-repo-$(TAMS_TAG).zip" "tams-$(TAMS_TAG)/api/*" -d api/build; \
+		mv "./api/build/tams-$(TAMS_TAG)/" ./api/build/tams; \
 	fi
 	@echo "Generating API schema..."
 	poetry run python ./api/build/generate_spec.py
@@ -65,11 +69,11 @@ build: api-spec
 
 package: build
 	@echo "Packaging SAM application..."
-	sam package --output-template-file packaged.yaml --s3-bucket $(BUCKET_NAME)
+	sam package --output-template-file packaged.yaml --s3-bucket "$(BUCKET_NAME)"
 
 deploy: build
 	@echo "Deploying SAM application..."
-	sam deploy --stack-name $(STACK_NAME) --region $(AWS_REGION) --profile $(PROFILE) --capabilities CAPABILITY_IAM --guided
+	sam deploy --stack-name "$(STACK_NAME)" --capabilities CAPABILITY_IAM --guided
 
 validate:
 	@echo "Validating SAM template..."
@@ -89,7 +93,7 @@ local-invoke: build
 		exit 1; \
 	fi
 	@echo "Invoking $(FUNCTION_NAME) locally..."
-	sam local invoke $(FUNCTION_NAME) -e $(EVENT_FILE)
+	sam local invoke "$(FUNCTION_NAME)" -e "$(EVENT_FILE)"
 
 test-unit:
 	@echo "Running unit tests..."
@@ -110,34 +114,47 @@ test: test-all
 
 cfn-lint:
 	@echo "Running CloudFormation linting..."
-	cfn-lint *template.yaml
+	cfn-lint template.yaml ./templates/*.yaml
 
 cfn-nag:
 	@echo "Running CloudFormation security checks..."
 	cfn_nag_scan --input-path template.yaml
+	cfn_nag_scan --input-path ./templates
 
 cfn-format:
 	@echo "Formatting CloudFormation templates..."
-	rain fmt *template.yaml
+	rain fmt template.yaml
+	find ./templates -name "*.yaml" -exec rain fmt {} \;
 
 format:
 	@echo "Formatting code..."
 	poetry run black .
 	poetry run isort --profile black .
 
-lint: cfn-lint cfn-nag
-	@echo "Running Python linting checks..."
+lint-pylint:
+	@echo "Running pylint..."
 	poetry run pylint --errors-only --disable=E0401 functions/ layers/
+
+lint-bandit:
+	@echo "Running bandit..."
 	poetry run bandit -c pyproject.toml -r .
+
+lint: cfn-lint cfn-nag lint-pylint lint-bandit
+	@echo "Running Python linting checks..."
 
 clean:
 	@echo "Cleaning build artifacts..."
-	rm -rf $(OUTPUT_DIR)
-	rm -rf .aws-sam
-	rm -rf packaged.yaml
-	rm -rf ./api/build/tams
-	rm -f ./api/build/tams-repo.zip
-	rm -f ./api/build/openapi.yaml
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type d -name .pytest_cache -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
+	rm -rf \
+		"$(OUTPUT_DIR)" \
+		.aws-sam \
+		packaged.yaml \
+		./api/build/tams \
+		./api/build/tams-repo-*.zip \
+		./api/build/openapi.yaml \
+		;
+	find . \
+	\( -type d \
+		\( -name "__pycache__" -o -name ".pytest_cache" \) -exec rm -rf {} + \) \
+	-o \
+		\( -type f -name "*.pyc" -delete \) \
+	;
