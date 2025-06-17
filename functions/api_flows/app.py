@@ -767,8 +767,23 @@ def post_flow_storage_by_id(
     flow_storage_post: Flowstoragepost,
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
-    if flow_storage_post.limit is None:
+    if flow_storage_post.limit and flow_storage_post.object_ids:
+        raise BadRequestError(
+            "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
+        )  # 400
+    if flow_storage_post.limit is None and flow_storage_post.object_ids is None:
         flow_storage_post.limit = constants.DEFAULT_PUT_LIMIT
+    # Check if any object_ids already exist in the storage table
+    if flow_storage_post.object_ids:
+        for object_id in flow_storage_post.object_ids:
+            get_item = storage_table.get_item(
+                Key={"object_id": object_id, "flow_id": flow_id},
+                ProjectionExpression="object_id",
+            )
+            if get_item.get("Item"):
+                raise BadRequestError(
+                    "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
+                )  # 400
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
@@ -781,13 +796,20 @@ def post_flow_storage_by_id(
     flow: Flow = Flow(**item)
     if flow.root.container is None:
         raise BadRequestError(
-            "Bad request. Invalid flow storage request JSON or the flow 'container' is not set."
+            "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
         )  # 400
     flow_storage: Flowstorage = Flowstorage(
-        media_objects=[
-            get_presigned_put(flow.root.container)
-            for _ in range(flow_storage_post.limit)
-        ]
+        media_objects=(
+            [
+                get_presigned_put(flow.root.container, object_id)
+                for object_id in flow_storage_post.object_ids
+            ]
+            if flow_storage_post.object_ids
+            else [
+                get_presigned_put(flow.root.container)
+                for _ in range(flow_storage_post.limit)
+            ]
+        )
     )
     expire_at = int(
         (
@@ -820,8 +842,9 @@ def handle_validation_error(ex: RequestValidationError):
 
 
 @tracer.capture_method(capture_response=False)
-def get_presigned_put(content_type):
-    object_id = str(uuid.uuid4())
+def get_presigned_put(content_type, object_id=None):
+    if object_id is None:
+        object_id = str(uuid.uuid4())
     url = generate_presigned_url(
         "put_object",
         bucket,

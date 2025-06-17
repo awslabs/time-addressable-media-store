@@ -1798,10 +1798,17 @@ paths:
       requestBody:
         content:
           application/json:
+            examples:
+              limit:
+                summary: limit
+                value:
+                  $ref: examples/flow-storage-post.json
+              object_ids:
+                summary: object_ids
+                value:
+                  $ref: examples/flow-storage-post-object_ids.json
             schema:
               $ref: '#/components/schemas/flowstoragepost'
-            example:
-              $ref: examples/flow-storage-post.json
       responses:
         '201':
           description: Storage locations for writing media objects.
@@ -1812,7 +1819,7 @@ paths:
               example:
                 $ref: examples/flow-storage-post-201.json
         '400':
-          description: Bad request. Invalid flow storage request JSON or the flow 'container' is not set.
+          description: Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist.
         '403':
           description: Forbidden. You do not have permission to modify this flow. It may be marked read-only.
         '404':
@@ -2378,6 +2385,17 @@ components:
         limit:
           description: Limit the number of storage segments in each response page. Implementations may specify their own default and maximum for the limit
           type: integer
+        object_ids:
+          description: Array of object_ids to use. The supplied object_ids must be new and not already in use in this store. A 400 response will be returned if any supplied object_id already exists.
+          type: array
+          items:
+            type: string
+      not:
+        allOf:
+        - required:
+          - limit
+        - required:
+          - object_ids
     flowstorage:
       type: object
       title: Media Bucket Object Store

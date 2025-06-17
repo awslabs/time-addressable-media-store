@@ -872,6 +872,7 @@ Resources:
                 - !GetAtt FlowSegmentsTable.Arn
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:PutItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
