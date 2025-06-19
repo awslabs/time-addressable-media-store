@@ -43,11 +43,11 @@ from neptune import (
     validate_flow_collection,
 )
 from schema import (
-    Collectionitem,
     Contentformat,
     Deletionrequest,
     Flow,
     Flowcollection,
+    FlowcollectionItem,
     Flowstorage,
     Flowstoragepost,
     Httprequest,
@@ -527,7 +527,7 @@ def get_flow_flow_collection(
         return None, HTTPStatus.OK.value  # 200
     return (
         model_dump(
-            Flowcollection([Collectionitem(**item) for item in flow_collection])
+            Flowcollection([FlowcollectionItem(**item) for item in flow_collection])
         ),
         HTTPStatus.OK.value,
     )  # 200
