@@ -241,4 +241,4 @@ $RECYCLE.BIN/
 .aws-sam
 Flashpost-tests
 samconfig.toml
-api/build/tams
+api/build/tams*
