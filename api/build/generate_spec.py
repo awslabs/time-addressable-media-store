@@ -131,7 +131,9 @@ def main():
     essence_params = parse_essence_parameters(openapi_spec)
 
     with open("./layers/utils/params.py", "w", encoding="utf-8") as fw:
-        fw.write(f"essence_params = {json.dumps(essence_params, indent=4)}\n")
+        fw.write(
+            f"essence_params = {json.dumps(essence_params, indent=4, sort_keys=True)}\n"
+        )
 
 
 if __name__ == "__main__":
