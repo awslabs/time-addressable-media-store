@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import uuid
 import warnings
 from unittest.mock import MagicMock
 
@@ -16,6 +17,7 @@ os.environ["NEPTUNE_ENDPOINT"] = "example.com"
 os.environ["POWERTOOLS_LOG_LEVEL"] = "INFO"
 os.environ["POWERTOOLS_METRICS_NAMESPACE"] = "TAMS"
 os.environ["POWERTOOLS_SERVICE_NAME"] = "tams"
+os.environ["SERVICE_TABLE"] = "service-table"
 os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
 os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
@@ -77,11 +79,18 @@ def api_event_factory():
         function: A factory function that creates API Gateway event dictionaries
     """
 
-    def _create_event(http_method, path, query_params=None, json_body=None):
+    def _create_event(
+        http_method, path, webhooks_enabled="Yes", query_params=None, json_body=None
+    ):
         event = {
             "httpMethod": http_method,
             "path": path,
             "queryStringParameters": query_params,
+            "stageVariables": {
+                "api_version": "1.0",
+                "webhooks_enabled": webhooks_enabled,
+                "service_version": "aws.1.0",
+            },
             "requestContext": {
                 "httpMethod": http_method,
                 "domainName": "test.com",
@@ -154,6 +163,57 @@ def s3_bucket():
     client.delete_bucket(
         Bucket=os.environ["BUCKET"],
     )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def service_table():
+    """
+    Create and manage a test DynamoDB service table for the test module.
+
+    Creates a service table with appropriate schema before tests run and cleans it up afterward.
+
+    Returns:
+        Table: A DynamoDB table resource for test use
+    """
+    # Create DynamoDB table
+    client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    client.create_table(
+        TableName=os.environ["SERVICE_TABLE"],
+        KeySchema=[
+            {"AttributeName": "record_type", "KeyType": "HASH"},
+            {"AttributeName": "id", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "record_type", "AttributeType": "S"},
+            {"AttributeName": "id", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table = boto3.resource(
+        "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
+    ).Table(os.environ["SERVICE_TABLE"])
+    table.put_item(
+        Item={
+            "record_type": "service",
+            "id": "1",
+            "name": "Example TAMS",
+            "description": "An example Time Addressable Media Store",
+        }
+    )
+    table.put_item(
+        Item={
+            "record_type": "storage-backend",
+            "id": str(uuid.uuid4()),
+            "default_storage": True,
+            "label": os.environ["BUCKET"],
+            "provider": "aws",
+            "region": os.environ["BUCKET_REGION"],
+            "store_product": "s3",
+            "store_type": "http_object_store",
+        }
+    )
+    yield table
+    client.delete_table(TableName=os.environ["SERVICE_TABLE"])
 
 
 @pytest.fixture(scope="module", autouse=True)
