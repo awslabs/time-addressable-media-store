@@ -14,7 +14,6 @@ import boto3
 import constants
 from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
-from aws_lambda_powertools.utilities import parameters
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import (
     APIGatewayEventRequestContext,
@@ -37,9 +36,7 @@ s3 = boto3.client(
     # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 )
 idp = boto3.client("cognito-idp")
-ssm = boto3.client("ssm")
 user_pool_id = os.environ.get("USER_POOL_ID", "")
-info_param_name = os.environ.get("SERVICE_INFO_PARAMETER", "")
 cognito_lambda = os.environ.get("COGNITO_LAMBDA_NAME", "")
 
 
@@ -106,16 +103,6 @@ def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, s
         request_context.authorizer.claims.get("username", ""),
         request_context.authorizer.claims.get("client_id", ""),
     )
-
-
-@lru_cache()
-@tracer.capture_method(capture_response=False)
-def get_store_name() -> str:
-    """Parse store name from SSM parameter value or return default if not found"""
-    service_dict = parameters.get_parameter(info_param_name, transform="json")
-    if service_dict.get("name") is None:
-        return "tams"
-    return service_dict["name"]
 
 
 @lru_cache()

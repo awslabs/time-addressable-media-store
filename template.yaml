@@ -148,6 +148,13 @@ Resources:
           LoggingLevel: INFO
           MetricsEnabled: True
       StageName: Prod
+      AlwaysDeploy: True
+      Variables:
+        api_version: !FindInMap [Solution, Constants, ApiVersion]
+        service_version: !Sub
+          - aws.${ServiceVersion}
+          - ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
+        webhooks_enabled: !Ref EnableWebhooks
       Cors:
         AllowMethods: '''*'''
         AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
@@ -161,32 +168,29 @@ Resources:
             Identity:
               Header: Authorization
 
-  ServiceInformationParameter:
-    Type: AWS::SSM::Parameter
+  ServiceTable:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
+    Type: AWS::DynamoDB::Table
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W74
+            reason: Encryption not required
+          - id: W78
+            reason: Backup not required
     Properties:
-      Name: !Sub ${AWS::StackName}-service-information
-      Type: String
-      DataType: text
-      Description: The TAMS API Service Information
-      Value: !Sub
-        - |
-          {
-            "type": "urn:x-tams:service.example",
-            "api_version": "${ApiVersion}",
-            "service_version": "aws.${ServiceVersion}",
-            "media_store": {
-              "type": "http_object_store"
-            },
-            "event_stream_mechanisms": [${WebhooksEventStream}]
-          }
-        - ApiVersion: !FindInMap [Solution, Constants, ApiVersion]
-          ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
-          WebhooksEventStream: !If
-            - SupportWebhooks
-            - !Sub
-              - '{"name": "webhooks", "docs": "https://bbc.github.io/tams/${ApiVersion}/index.html#/operations/POST_webhooks"}'
-              - ApiVersion: !FindInMap [Solution, Constants, ApiVersion]
-            - ""
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: record_type
+          AttributeType: S
+        - AttributeName: id
+          AttributeType: "N"
+      KeySchema:
+        - AttributeName: record_type
+          KeyType: HASH
+        - AttributeName: id
+          KeyType: RANGE
 
   FlowSegmentsTable:
     DeletionPolicy: RetainExceptOnCreate
@@ -430,23 +434,22 @@ Resources:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-service
           POWERTOOLS_METRICS_NAMESPACE: TAMS
-          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+          SERVICE_TABLE: !Ref ServiceTable
           WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
+          BUCKET: !Ref MediaStorageBucket
+          BUCKET_REGION: !Ref AWS::Region
+          STACK_UUID: !Select [2, !Split [/, !Ref 'AWS::StackId']]
       Policies:
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
-                - ssm:DescribeParameters
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:PutItem
               Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:*
-            - Effect: Allow
-              Action:
-                - ssm:GetParameter
-                - ssm:PutParameter
-              Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
+                - !GetAtt ServiceTable.Arn
       Events:
         headRoot:
           Type: Api
@@ -1315,6 +1318,7 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
+          SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
           BUCKET: !Ref MediaStorageBucket
@@ -1322,7 +1326,6 @@ Resources:
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
-          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1370,9 +1373,9 @@ Resources:
                   neptune-db:QueryLanguage: OpenCypher
             - Effect: Allow
               Action:
-                - ssm:GetParameter
+                - dynamodb:GetItem
               Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
+                - !GetAtt ServiceTable.Arn
       Events:
         headFlowsFlowidSegments:
           Type: Api
@@ -1578,10 +1581,10 @@ Resources:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-webhooks
           POWERTOOLS_METRICS_NAMESPACE: TAMS
+          SERVICE_TABLE: !Ref ServiceTable
           WEBHOOKS_TABLE: !Ref WebhooksTable
           BUCKET: !Ref MediaStorageBucket
           BUCKET_REGION: !Ref AWS::Region
-          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
           WEBHOOKS_QUEUE_URL: !Ref WebhooksDeliveryQueue
       Policies:
         - Version: "2012-10-17"
@@ -1593,9 +1596,9 @@ Resources:
                 - !GetAtt WebhooksTable.Arn
             - Effect: Allow
               Action:
-                - ssm:GetParameter
+                - dynamodb:GetItem
               Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
+                - !GetAtt ServiceTable.Arn
             - Effect: Allow
               Action:
                 - s3:GetObject

@@ -25,8 +25,10 @@ from utils import pop_outliers, publish_event, put_message, put_message_batches
 tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
-segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
-storage_table = dynamodb.Table(os.environ["STORAGE_TABLE"])
+service_table = dynamodb.Table(os.environ.get("SERVICE_TABLE", ""))
+segments_table = dynamodb.Table(os.environ.get("SEGMENTS_TABLE", ""))
+storage_table = dynamodb.Table(os.environ.get("STORAGE_TABLE", ""))
+webhooks_table = dynamodb.Table(os.environ.get("WEBHOOKS_TABLE", ""))
 
 
 class TimeRangeBoundary(Enum):
@@ -352,3 +354,11 @@ def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
             raise BadRequestError("Invalid page parameter value")  # 400
         kwargs["ExclusiveStartKey"] = exclusive_start_key
     return kwargs
+
+
+@tracer.capture_method(capture_response=False)
+def get_store_name() -> str:
+    get_item = service_table.get_item(Key={"record_type": "service", "id": 1})
+    if get_item["Item"].get("name") is None:
+        return "tams"
+    return get_item["Item"]["name"]

@@ -2,22 +2,20 @@ import os
 from collections import defaultdict
 from functools import reduce
 
-import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
     EventBridgeEvent,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key, Or
+from dynamodb import get_store_name, webhooks_table
 from schema import Webhook
-from utils import generate_presigned_url, get_store_name, model_dump, put_message
+from utils import generate_presigned_url, model_dump, put_message
 
 tracer = Tracer()
 logger = Logger()
 metrics = Metrics()
 
-dynamodb = boto3.resource("dynamodb")
-webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
 bucket = os.environ["BUCKET"]
 bucket_region = os.environ["BUCKET_REGION"]
 webhooks_queue = os.environ["WEBHOOKS_QUEUE_URL"]
