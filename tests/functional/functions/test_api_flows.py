@@ -120,8 +120,8 @@ def test_POST_storage_returns_201_with_storage_objects_when_flow_exists(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        body_value,
+        query_params=None,
+        json_body=body_value,
     )
 
     # Act
@@ -174,8 +174,8 @@ def test_POST_storage_returns_404_when_flow_not_exists(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {},
+        query_params=None,
+        json_body={},
     )
 
     # Act
@@ -218,8 +218,8 @@ def test_POST_storage_returns_403_when_flow_is_readonly(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {},
+        query_params=None,
+        json_body={},
     )
 
     # Act
@@ -265,8 +265,8 @@ def test_POST_storage_returns_400_when_requested_object_id_already_exists(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {"object_ids": [existing_object_id, str(uuid.uuid4())]},
+        query_params=None,
+        json_body={"object_ids": [existing_object_id, str(uuid.uuid4())]},
     )
 
     # Act
@@ -332,8 +332,8 @@ def test_POST_storage_returns_400_with_validation_errors_for_invalid_body_parame
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        body_value,
+        query_params=None,
+        json_body=body_value,
     )
 
     # Act
@@ -374,8 +374,8 @@ def test_POST_storage_returns_400_when_flow_missing_required_container_attribute
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {},
+        query_params=None,
+        json_body={},
     )
 
     # Act

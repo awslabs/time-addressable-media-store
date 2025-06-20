@@ -202,7 +202,9 @@ def test_GET_object_returns_limited_flow_references_with_pagination_headers_when
     3. The expected object metadata
     """
     # Arrange
-    event = api_event_factory("GET", f"/objects/{test_object_id}", {"limit": "1"})
+    event = api_event_factory(
+        "GET", f"/objects/{test_object_id}", query_params={"limit": "1"}
+    )
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
@@ -239,7 +241,7 @@ def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_p
     event = api_event_factory(
         "GET",
         f"/objects/{test_object_id}",
-        {
+        query_params={
             "limit": "1",
             "page": create_pagination_token(
                 {
@@ -296,7 +298,9 @@ def test_GET_object_handles_maximum_limit_parameter(
     is handled correctly by capping the limit at the maximum allowed value.
     """
     # Arrange
-    event = api_event_factory("GET", f"/objects/{test_object_id}", {"limit": "1000"})
+    event = api_event_factory(
+        "GET", f"/objects/{test_object_id}", query_params={"limit": "1000"}
+    )
 
     # Act
     response = api_objects.lambda_handler(event, lambda_context)
@@ -336,7 +340,7 @@ def test_GET_object_handles_invalid_limit_parameter(
     """
     # Arrange
     event = api_event_factory(
-        "GET", f"/objects/{test_object_id}", {"limit": limit_value}
+        "GET", f"/objects/{test_object_id}", query_params={"limit": limit_value}
     )
 
     # Act
@@ -361,7 +365,7 @@ def test_GET_object_handles_invalid_page_parameter(
     """
     # Arrange
     event = api_event_factory(
-        "GET", f"/objects/{test_object_id}", {"page": invalid_page_value}
+        "GET", f"/objects/{test_object_id}", query_params={"page": invalid_page_value}
     )
 
     # Act
