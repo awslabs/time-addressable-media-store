@@ -41,6 +41,7 @@ def get_root():
         "service",
         "flows",
         "sources",
+        "objects",
         "flow-delete-requests",
     ], HTTPStatus.OK.value  # 200
 

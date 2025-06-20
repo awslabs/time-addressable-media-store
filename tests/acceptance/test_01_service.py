@@ -51,9 +51,9 @@ def test_List_Root_Endpoints_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert set(["service", "flows", "sources", "flow-delete-requests"]) == set(
-        response.json()
-    )
+    assert set(
+        ["service", "flows", "sources", "objects", "flow-delete-requests"]
+    ) == set(response.json())
 
 
 def test_Service_Information_HEAD_200(api_client_cognito):
