@@ -212,6 +212,17 @@ def service_table():
             "store_type": "http_object_store",
         }
     )
+    table.put_item(
+        Item={
+            "record_type": "storage-backend",
+            "id": str(uuid.uuid4()),
+            "label": "alternative-storage",
+            "provider": "aws",
+            "region": "alternative-region",
+            "store_product": "s3",
+            "store_type": "http_object_store",
+        }
+    )
     yield table
     client.delete_table(TableName=os.environ["SERVICE_TABLE"])
 
