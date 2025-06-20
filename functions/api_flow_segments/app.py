@@ -42,7 +42,14 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, GetUrl, Timerange, Uuid
+from schema import (
+    Deletionrequest,
+    Flowsegment,
+    Flowsegmentpost,
+    GetUrl,
+    Timerange,
+    Uuid,
+)
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
@@ -83,9 +90,20 @@ def get_flow_segments_by_id(
         Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
     ] = None,
     param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    param_verbose_storage: Annotated[
+        Optional[bool], Query(alias="verbose_storage")
+    ] = None,
     param_accept_get_urls: Annotated[
         Optional[str], Query(alias="accept_get_urls", pattern=r"^([^,]+(,[^,]+)*)?$")
     ] = None,
+    param_accept_storage_ids: Annotated[
+        Optional[str],
+        Query(
+            alias="accept_storage_ids",
+            pattern=r"^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$",
+        ),
+    ] = None,
+    param_presigned: Annotated[Optional[bool], Query(alias="presigned")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
@@ -160,7 +178,7 @@ def get_flow_segments_by_id(
 @app.post("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(
-    flow_segment: Annotated[Union[Flowsegment, List[Flowsegment]], Body()],
+    flow_segment: Annotated[Union[Flowsegmentpost, List[Flowsegmentpost]], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -349,7 +367,7 @@ def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
+def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
     if not flow_segment.get_urls and not validate_object_id(

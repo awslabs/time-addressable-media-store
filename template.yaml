@@ -185,7 +185,7 @@ Resources:
         - AttributeName: record_type
           AttributeType: S
         - AttributeName: id
-          AttributeType: "N"
+          AttributeType: S
       KeySchema:
         - AttributeName: record_type
           KeyType: HASH
@@ -437,9 +437,6 @@ Resources:
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SERVICE_TABLE: !Ref ServiceTable
           WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
-          BUCKET: !Ref MediaStorageBucket
-          BUCKET_REGION: !Ref AWS::Region
-          STACK_UUID: !Select [2, !Split [/, !Ref 'AWS::StackId']]
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -539,6 +536,28 @@ Resources:
               AuthorizationScopes:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Post]
+        headStorageBackends:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/storage-backends
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+        getStorageBackends:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/storage-backends
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         anyRoot:
           Type: Api
           Properties:
@@ -1992,3 +2011,18 @@ Outputs:
 
   UtilsLayerArn:
     Value: !Ref UtilsLayer
+
+  DefaultStorageBackend:
+    Value: !Sub
+      - |-
+        {
+          "record_type": "storage-backend",
+          "id": "${id}",
+          "default_storage": true,
+          "label": "${MediaStorageBucket}",
+          "provider": "aws",
+          "region": "${AWS::Region}",
+          "store_product": "s3",
+          "store_type": "http_object_store"
+        }
+      - id: !Select [2, !Split [/, !Ref 'AWS::StackId']]

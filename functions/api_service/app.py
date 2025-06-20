@@ -15,7 +15,15 @@ from aws_lambda_powertools.event_handler.openapi.params import Body
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
-from schema import Eventstreamcommon, Service, Servicepost, Webhook, Webhookpost
+from schema import (
+    Eventstreamcommon,
+    Service,
+    Servicepost,
+    Storagebackendslist,
+    StoragebackendslistItem,
+    Webhook,
+    Webhookpost,
+)
 from typing_extensions import Annotated
 from utils import filter_dict, model_dump
 
@@ -50,7 +58,7 @@ def get_root():
 @app.get("/service")
 @tracer.capture_method(capture_response=False)
 def get_service():
-    get_item = service_table.get_item(Key={"record_type": "service", "id": 1})
+    get_item = service_table.get_item(Key={"record_type": "service", "id": "1"})
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
     stage_variables = app.current_event.stage_variables
@@ -69,8 +77,8 @@ def get_service():
 @app.post("/service")
 @tracer.capture_method(capture_response=False)
 def post_service(service_post: Annotated[Servicepost, Body()]):
-    get_item = service_table.get_item(Key={"record_type": "service", "id": 1})
-    service_record = get_item.get("Item", {"record_type": "service", "id": 1})
+    get_item = service_table.get_item(Key={"record_type": "service", "id": "1"})
+    service_record = get_item.get("Item", {"record_type": "service", "id": "1"})
     if service_post.name == "":
         del service_record["name"]
     if service_post.description == "":
@@ -142,6 +150,24 @@ def post_webhooks(webhook: Annotated[Webhookpost, Body()]):
     if len(webhook.events) == 0:
         return None, HTTPStatus.NO_CONTENT.value  # 204
     return item_dict, HTTPStatus.CREATED.value  # 201
+
+
+@app.head("/service/storage-backends")
+@app.get("/service/storage-backends")
+@tracer.capture_method(capture_response=False)
+def get_storage_backends():
+    args = {"KeyConditionExpression": Key("record_type").eq("storage-backend")}
+    query = service_table.query(**args)
+    items = query["Items"]
+    while "LastEvaluatedKey" in query:
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = service_table.query(**args)
+        items.extend(query["Items"])
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return model_dump(
+        Storagebackendslist([StoragebackendslistItem(**item) for item in items])
+    )
 
 
 @logger.inject_lambda_context(
