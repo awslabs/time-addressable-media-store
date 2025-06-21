@@ -871,6 +871,7 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
+          SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
@@ -890,10 +891,16 @@ Resources:
               Action:
                 - dynamodb:Query
               Resource:
+                - !GetAtt ServiceTable.Arn
                 - !GetAtt FlowSegmentsTable.Arn
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
+                - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
                 - dynamodb:PutItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
