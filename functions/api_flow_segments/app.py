@@ -378,7 +378,7 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             "Bad request. The object id is not valid to be used for the flow id supplied.",
         )
-    # If get_urls is supplied then not need to check if item exists in S3
+    # If get_urls is supplied then no need to check if item exists in S3
     if not flow_segment.get_urls and not check_object_exists(
         bucket, flow_segment.object_id
     ):
