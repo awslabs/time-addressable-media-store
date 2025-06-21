@@ -20,6 +20,7 @@ from neptune import (
     merge_delete_request,
     update_flow_segments_updated,
 )
+from schema import Storagebackend
 from utils import pop_outliers, publish_event, put_message, put_message_batches
 
 tracer = Tracer()
@@ -362,3 +363,25 @@ def get_store_name() -> str:
     if get_item["Item"].get("name") is None:
         return "tams"
     return get_item["Item"]["name"]
+
+
+@tracer.capture_method(capture_response=False)
+def get_default_storage_backend() -> Storagebackend:
+    query = service_table.query(
+        KeyConditionExpression=Key("record_type").eq("storage-backend"),
+        FilterExpression=Attr("default_storage").eq(True),
+    )
+    items = query["Items"]
+    if len(items) == 0:
+        raise BadRequestError("No default storage backend found")  # 404
+    return Storagebackend(**items[0])
+
+
+@tracer.capture_method(capture_response=False)
+def get_storage_backend(storage_id: str) -> Storagebackend:
+    get_item = service_table.get_item(
+        Key={"record_type": "storage-backend", "id": storage_id}
+    )
+    if not get_item.get("Item"):
+        raise BadRequestError("Invalid storage backend identifier")  # 404
+    return Storagebackend(**get_item["Item"])

@@ -24,7 +24,12 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.params import Body, Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from dynamodb import get_flow_timerange, storage_table
+from dynamodb import (
+    get_default_storage_backend,
+    get_flow_timerange,
+    get_storage_backend,
+    storage_table,
+)
 from mediatimestamp.immutable import TimeRange
 from neptune import (
     check_delete_source,
@@ -78,7 +83,6 @@ app = APIGatewayRestResolver(
 metrics = Metrics()
 
 record_type = "flow"
-bucket = os.environ["BUCKET"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
@@ -771,6 +775,10 @@ def post_flow_storage_by_id(
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
         )  # 400
+    if flow_storage_post.storage_id:
+        storage_backend = get_storage_backend(flow_storage_post.storage_id)
+    else:
+        storage_backend = get_default_storage_backend()
     if flow_storage_post.limit is None and flow_storage_post.object_ids is None:
         flow_storage_post.limit = constants.DEFAULT_PUT_LIMIT
     # Check if any object_ids already exist in the storage table
@@ -801,12 +809,12 @@ def post_flow_storage_by_id(
     flow_storage: Flowstorage = Flowstorage(
         media_objects=(
             [
-                get_presigned_put(flow.root.container, object_id)
+                get_presigned_put(flow.root.container, storage_backend.label, object_id)
                 for object_id in flow_storage_post.object_ids
             ]
             if flow_storage_post.object_ids
             else [
-                get_presigned_put(flow.root.container)
+                get_presigned_put(flow.root.container, storage_backend.label)
                 for _ in range(flow_storage_post.limit)
             ]
         )
@@ -822,6 +830,7 @@ def post_flow_storage_by_id(
                 "object_id": media_object.object_id,
                 "flow_id": flow_id,
                 "expire_at": expire_at,
+                "storage_ids": [storage_backend.id],
             }
         )
     return model_dump(flow_storage), HTTPStatus.CREATED.value  # 201
@@ -842,7 +851,7 @@ def handle_validation_error(ex: RequestValidationError):
 
 
 @tracer.capture_method(capture_response=False)
-def get_presigned_put(content_type, object_id=None):
+def get_presigned_put(content_type, bucket, object_id=None):
     if object_id is None:
         object_id = str(uuid.uuid4())
     url = generate_presigned_url(

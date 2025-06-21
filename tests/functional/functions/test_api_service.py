@@ -32,7 +32,7 @@ def api_service():
 
 
 # pylint: disable=redefined-outer-name
-def test_GET_storage_backends_returns_200_with_default_storage_backend(
+def test_GET_storage_backends_returns_200_with_storage_backends(
     lambda_context, api_event_factory, api_service
 ):
     """
@@ -50,10 +50,9 @@ def test_GET_storage_backends_returns_200_with_default_storage_backend(
     # Assert
     assert response["statusCode"] == HTTPStatus.OK.value
     assert response_headers.get("Content-Type")[0] == "application/json"
-    assert len(response_body) == 1
+    assert len(response_body) == 2
     for field in [
         "id",
-        "default_storage",
         "label",
         "provider",
         "region",

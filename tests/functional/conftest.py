@@ -2,7 +2,6 @@ import base64
 import json
 import logging
 import os
-import uuid
 import warnings
 from unittest.mock import MagicMock
 
@@ -198,29 +197,6 @@ def service_table():
             "id": "1",
             "name": "Example TAMS",
             "description": "An example Time Addressable Media Store",
-        }
-    )
-    table.put_item(
-        Item={
-            "record_type": "storage-backend",
-            "id": str(uuid.uuid4()),
-            "default_storage": True,
-            "label": os.environ["BUCKET"],
-            "provider": "aws",
-            "region": os.environ["BUCKET_REGION"],
-            "store_product": "s3",
-            "store_type": "http_object_store",
-        }
-    )
-    table.put_item(
-        Item={
-            "record_type": "storage-backend",
-            "id": str(uuid.uuid4()),
-            "label": "alternative-storage",
-            "provider": "aws",
-            "region": "alternative-region",
-            "store_product": "s3",
-            "store_type": "http_object_store",
         }
     )
     yield table

@@ -874,7 +874,6 @@ Resources:
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
-          BUCKET: !Ref MediaStorageBucket
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
       Policies:
         - Version: "2012-10-17"
