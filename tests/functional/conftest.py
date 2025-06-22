@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import uuid
 import warnings
 from unittest.mock import MagicMock
 
@@ -20,6 +21,7 @@ os.environ["SERVICE_TABLE"] = "service-table"
 os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
 os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
+os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,28 @@ logger = logging.getLogger(__name__)
 ############
 # FIXTURES #
 ############
+
+
+@pytest.fixture(scope="session")
+def default_storage_id():
+    """
+    Provides a default unique backend storage ID for testing.
+
+    Returns:
+        str: A UUID string representing a backend storage ID
+    """
+    yield str(uuid.uuid4())
+
+
+@pytest.fixture(scope="session")
+def alternative_storage_id():
+    """
+    Provides an alternative unique backend storage ID for testing.
+
+    Returns:
+        str: A UUID string representing a backend storage ID
+    """
+    yield str(uuid.uuid4())
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -164,8 +188,9 @@ def s3_bucket():
     )
 
 
-@pytest.fixture(scope="module", autouse=True)
-def service_table():
+@pytest.fixture(scope="session", autouse=True)
+# pylint: disable=redefined-outer-name
+def service_table(default_storage_id, alternative_storage_id):
     """
     Create and manage a test DynamoDB service table for the test module.
 
@@ -197,6 +222,29 @@ def service_table():
             "id": "1",
             "name": "Example TAMS",
             "description": "An example Time Addressable Media Store",
+        }
+    )
+    table.put_item(
+        Item={
+            "record_type": "storage-backend",
+            "id": default_storage_id,
+            "label": os.environ["BUCKET"],
+            "provider": "aws",
+            "region": os.environ["BUCKET_REGION"],
+            "store_product": "s3",
+            "store_type": "http_object_store",
+            "default_storage": True,
+        }
+    )
+    table.put_item(
+        Item={
+            "record_type": "storage-backend",
+            "id": alternative_storage_id,
+            "label": "alternative-storage",
+            "provider": "aws",
+            "region": "alternative-region",
+            "store_product": "s3",
+            "store_type": "http_object_store",
         }
     )
     yield table

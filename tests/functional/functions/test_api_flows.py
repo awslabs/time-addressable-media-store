@@ -37,37 +37,12 @@ def sample_flow_id():
     yield str(uuid.uuid4())
 
 
-@pytest.fixture(scope="module")
-def default_storage_id():
-    """
-    Provides a default unique backend storage ID for testing.
-
-    Returns:
-        str: A UUID string representing a backend storage ID
-    """
-    yield str(uuid.uuid4())
-
-
-@pytest.fixture(scope="module")
-def alternative_storage_id():
-    """
-    Provides an alternative unique backend storage ID for testing.
-
-    Returns:
-        str: A UUID string representing a backend storage ID
-    """
-    yield str(uuid.uuid4())
-
-
 @pytest.fixture(scope="module", autouse=True)
 # pylint: disable=redefined-outer-name
 def aws_setup(
     storage_table,
     existing_object_id,
     sample_flow_id,
-    default_storage_id,
-    alternative_storage_id,
-    service_table,
 ):
     """
     Sets up test data in AWS resources before tests run.
@@ -84,30 +59,6 @@ def aws_setup(
             "object_id": existing_object_id,
             "flow_id": sample_flow_id,
             "expire_at": None,
-        }
-    )
-
-    service_table.put_item(
-        Item={
-            "record_type": "storage-backend",
-            "id": default_storage_id,
-            "label": os.environ["BUCKET"],
-            "provider": "aws",
-            "region": os.environ["BUCKET_REGION"],
-            "store_product": "s3",
-            "store_type": "http_object_store",
-            "default_storage": True,
-        }
-    )
-    service_table.put_item(
-        Item={
-            "record_type": "storage-backend",
-            "id": alternative_storage_id,
-            "label": "alternative-storage",
-            "provider": "aws",
-            "region": "alternative-region",
-            "store_product": "s3",
-            "store_type": "http_object_store",
         }
     )
     yield
