@@ -286,13 +286,13 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 
 
 @tracer.capture_method(capture_response=False)
-def validate_object_id(object_id: str, flow_id: str) -> bool:
-    """Check supplied object_id can be used for the supplied flow_id"""
+def validate_object_id(object_id: str, flow_id: str) -> tuple[bool, list]:
+    """Check supplied object_id can be used for the supplied flow_id, returns storage_ids if valid"""
     query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
     items = query["Items"]
     if len(items) == 0:
         # No matching object_id found so must be invalid
-        return False
+        return False, []
     object_item = items[0]
     if object_item["flow_id"] == flow_id:
         if object_item.get("expire_at"):
@@ -305,12 +305,12 @@ def validate_object_id(object_id: str, flow_id: str) -> bool:
                 AttributeUpdates={"expire_at": {"Action": "DELETE"}},
             )
         # flow_id matches so is a valida object_id
-        return True
+        return True, object_item.get("storage_ids", [])
     if object_item.get("expire_at") is None:
         # object_id already used therefore can be re-used by any flow_id
-        return True
+        return True, object_item.get("storage_ids", [])
     # All other options are invalid
-    return False
+    return False, []
 
 
 @tracer.capture_method(capture_response=False)
