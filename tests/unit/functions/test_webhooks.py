@@ -20,7 +20,7 @@ pytestmark = [
 
 with patch("boto3.client"):
     with patch("boto3.resource"):
-        with patch("utils.get_store_name", lambda: "tams"):
+        with patch("dynamodb.get_store_name", lambda: "tams"):
             from webhooks import app
 
 
