@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  FlowsFunctionRole:
+    Type: String
+
+  FlowSegmentsFunctionRole:
+    Type: String
+
+  ObjectsFunctionRole:
+    Type: String
+
+  WebhooksFunctionRole:
+    Type: String
+
+  SqsObjectCleanupFunctionRole:
+    Type: String
+
+Resources:
+  MediaStorageBucket:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
+    Type: AWS::S3::Bucket
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: Access logging not required
+          - id: W51
+            reason: Bucket policy not required
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+            AllowedOrigins:
+              - "*"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: False
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  PutObjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref FlowsFunctionRole
+      PolicyName: !Sub ${AWS::StackName}-PutObject
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub ${MediaStorageBucket.Arn}/*
+
+  GetObjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref FlowSegmentsFunctionRole
+        - !Ref ObjectsFunctionRole
+        - !Ref WebhooksFunctionRole
+      PolicyName: !Sub ${AWS::StackName}-GetObject
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub ${MediaStorageBucket.Arn}/*
+
+  DeleteObjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref SqsObjectCleanupFunctionRole
+      PolicyName: !Sub ${AWS::StackName}-DeleteObject
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
+            Resource:
+              - !Sub ${MediaStorageBucket.Arn}/*
+
+Outputs:
+  MediaStorageBucket:
+    Value: !Ref MediaStorageBucket
+
+  StorageBackend:
+    Value: !Sub
+      - |-
+        {
+          "record_type": "storage-backend",
+          "id": "${id}",
+          "default_storage": false,
+          "bucket_name": "${MediaStorageBucket}",
+          "provider": "aws",
+          "region": "${AWS::Region}",
+          "store_product": "s3",
+          "store_type": "http_object_store"
+        }
+      - id: !Select [2, !Split [/, !Ref "AWS::StackId"]]
