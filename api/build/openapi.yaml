@@ -2509,6 +2509,10 @@ components:
               required:
               - url
               properties:
+                storage_id:
+                  description: Storage backend identifier
+                  type: string
+                  pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
                 url:
                   description: A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint
                   type: string
@@ -2732,6 +2736,13 @@ components:
           - id
         - type: object
           properties:
+            id:
+              description: Storage backend identifier
+              type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            label:
+              description: Freeform string label for a storage backend.
+              type: string
             default_storage:
               description: If set to `true`, this is the default storage backend. The default storage backend will be used if the client does not specify a storage backend id when requesting the allocation of storage. If this parameter is not set, assume `false`. Instances may either set one storage backend as default, or none - indicating that clients must always specify a storage backend.
               type: boolean
@@ -3329,13 +3340,6 @@ components:
       description: Provides technical, and logic metadata about a storage backend
       title: Storage Backend
       properties:
-        id:
-          description: Storage backend identifier
-          type: string
-          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
-        label:
-          description: Freeform string label for a storage backend.
-          type: string
         store_type:
           description: The generic store type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.
           type: string

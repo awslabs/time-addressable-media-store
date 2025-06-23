@@ -2025,7 +2025,7 @@ Outputs:
           "record_type": "storage-backend",
           "id": "${id}",
           "default_storage": true,
-          "label": "${MediaStorageBucket}",
+          "bucket_name": "${MediaStorageBucket}",
           "provider": "aws",
           "region": "${AWS::Region}",
           "store_product": "s3",
