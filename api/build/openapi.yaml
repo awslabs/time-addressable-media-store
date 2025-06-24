@@ -2831,6 +2831,9 @@ components:
         presigned:
           description: Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.
           type: boolean
+        verbose_storage:
+          description: Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.
+          type: boolean
     webhook:
       title: Register Webhook
       description: Register to receive updates via webhook
@@ -2890,6 +2893,9 @@ components:
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         presigned:
           description: Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.
+          type: boolean
+        verbose_storage:
+          description: Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.
           type: boolean
     collectionitem:
       type: object

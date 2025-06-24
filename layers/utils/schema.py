@@ -243,6 +243,10 @@ class Webhookpost(BaseModel):
         None,
         description="Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.",
     )
+    verbose_storage: Optional[bool] = Field(
+        None,
+        description="Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.",
+    )
 
 
 class Webhook(BaseModel):
@@ -318,6 +322,10 @@ class Webhook(BaseModel):
     presigned: Optional[bool] = Field(
         None,
         description="Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.",
+    )
+    verbose_storage: Optional[bool] = Field(
+        None,
+        description="Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.",
     )
 
 
