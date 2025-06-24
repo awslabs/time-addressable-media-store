@@ -485,10 +485,9 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
         Item={**item_dict, "flow_id": flow["id"]}, ReturnValues="ALL_OLD"
     )
     update_flow_segments_updated(flow["id"])
-    schema_item = Flowsegment(**item_dict)
     publish_event(
         "flows/segments_added",
-        {"flow_id": flow["id"], "segments": [model_dump(schema_item)]},
+        {"flow_id": flow["id"], "segments": [item_dict]},
         enhance_resources(
             [
                 f'tams:flow:{flow["id"]}',
