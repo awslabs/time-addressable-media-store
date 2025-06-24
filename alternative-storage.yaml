@@ -100,7 +100,6 @@ Outputs:
         {
           "record_type": "storage-backend",
           "id": "${id}",
-          "default_storage": false,
           "bucket_name": "${MediaStorageBucket}",
           "provider": "aws",
           "region": "${AWS::Region}",
