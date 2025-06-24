@@ -68,6 +68,7 @@ def post_event(event, item, get_urls=None):
 @metrics.log_metrics(capture_cold_start_metric=True)
 # pylint: disable=unused-argument
 def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
+    event = EventBridgeEvent(event)
     schema_items = get_matching_webhooks(event)
     if event.detail_type == "flows/segments_added":
         need_presigned_urls = any(
