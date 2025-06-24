@@ -15,6 +15,7 @@ from aws_lambda_powertools.event_handler.openapi.params import Body
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
+from dynamodb import get_storage_backend_dict, get_store_name
 from schema import (
     Eventstreamcommon,
     Service,
@@ -165,8 +166,14 @@ def get_storage_backends():
         items.extend(query["Items"])
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
+    store_name = get_store_name()
     return model_dump(
-        Storagebackendslist([StoragebackendslistItem(**item) for item in items])
+        Storagebackendslist(
+            [
+                StoragebackendslistItem(**get_storage_backend_dict(item, store_name))
+                for item in items
+            ]
+        )
     )
 
 

@@ -1398,6 +1398,7 @@ Resources:
                   neptune-db:QueryLanguage: OpenCypher
             - Effect: Allow
               Action:
+                - dynamodb:Query
                 - dynamodb:GetItem
               Resource:
                 - !GetAtt ServiceTable.Arn
