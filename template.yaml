@@ -1346,8 +1346,6 @@ Resources:
           SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
-          BUCKET: !Ref MediaStorageBucket
-          BUCKET_REGION: !Ref AWS::Region
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction

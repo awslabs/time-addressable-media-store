@@ -63,8 +63,6 @@ app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
 metrics = Metrics()
-BUCKET = os.environ["BUCKET"]
-BUCKET_REGION = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
 store_name = get_store_name()
