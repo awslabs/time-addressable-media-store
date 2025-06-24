@@ -809,12 +809,14 @@ def post_flow_storage_by_id(
     flow_storage: Flowstorage = Flowstorage(
         media_objects=(
             [
-                get_presigned_put(flow.root.container, storage_backend.label, object_id)
+                get_presigned_put(
+                    flow.root.container, storage_backend["bucket_name"], object_id
+                )
                 for object_id in flow_storage_post.object_ids
             ]
             if flow_storage_post.object_ids
             else [
-                get_presigned_put(flow.root.container, storage_backend.label)
+                get_presigned_put(flow.root.container, storage_backend["bucket_name"])
                 for _ in range(flow_storage_post.limit)
             ]
         )
@@ -830,7 +832,7 @@ def post_flow_storage_by_id(
                 "object_id": media_object.object_id,
                 "flow_id": flow_id,
                 "expire_at": expire_at,
-                "storage_ids": [storage_backend.id],
+                "storage_ids": [storage_backend["id"]],
             }
         )
     return model_dump(flow_storage), HTTPStatus.CREATED.value  # 201
