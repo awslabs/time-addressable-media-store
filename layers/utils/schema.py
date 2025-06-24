@@ -781,14 +781,6 @@ class Storagebackend(BaseModel):
     Provides technical, and logic metadata about a storage backend
     """
 
-    id: Optional[
-        constr(
-            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        )
-    ] = Field(None, description="Storage backend identifier")
-    label: Optional[str] = Field(
-        None, description="Freeform string label for a storage backend."
-    )
     store_type: Optional[StoreType] = Field(
         None,
         description="The generic store type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.",
@@ -950,6 +942,11 @@ class Flowsegmentpost(BaseModel):
 
 
 class GetUrl1(Storagebackend):
+    storage_id: Optional[
+        constr(
+            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        )
+    ] = Field(None, description="Storage backend identifier")
     url: str = Field(
         ...,
         description="A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
@@ -1129,6 +1126,12 @@ class Source(BaseModel):
 
 
 class StoragebackendslistItem(Storagebackend):
+    id: constr(
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    ) = Field(..., description="Storage backend identifier")
+    label: Optional[str] = Field(
+        None, description="Freeform string label for a storage backend."
+    )
     default_storage: Optional[bool] = Field(
         None,
         description="If set to `true`, this is the default storage backend. The default storage backend will be used if the client does not specify a storage backend id when requesting the allocation of storage. If this parameter is not set, assume `false`. Instances may either set one storage backend as default, or none - indicating that clients must always specify a storage backend.",

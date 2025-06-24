@@ -110,7 +110,7 @@ paths:
     head:
       summary: Storage Backend Information
       description: Return storage backends path headers
-      operationId: HEAD_storage_backends
+      operationId: HEAD_storage-backends
       tags:
       - Service
       responses:
@@ -119,7 +119,7 @@ paths:
     get:
       summary: Storage Backend Information
       description: Provide information about the storage backends available on this service instance. These are populated on deployment of the service instance.
-      operationId: GET_storage_backends
+      operationId: GET_storage-backends
       tags:
       - Service
       responses:
