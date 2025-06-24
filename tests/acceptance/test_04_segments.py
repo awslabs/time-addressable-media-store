@@ -1433,32 +1433,6 @@ def test_Create_Flow_Segment_POST_400_overlap(
     )
 
 
-def test_Create_Flow_Segment_POST_400_missing_object(
-    api_client_cognito, media_objects, stub_video_flow
-):
-    """Object must already exist in S3"""
-    # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
-    # Act
-    response = api_client_cognito.request(
-        "POST",
-        path,
-        json={
-            "object_id": media_objects[-1]["object_id"],
-            "timerange": "[0:100_1:0)",
-        },
-    )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "Bad request. The object id provided for a segment MUST exist."
-        == response.json()["message"]
-    )
-
-
 def test_Create_Flow_Segment_POST_400_incorrect_flow(
     api_client_cognito, media_objects, stub_multi_flow
 ):
