@@ -228,7 +228,7 @@ def service_table(default_storage_id, alternative_storage_id):
         Item={
             "record_type": "storage-backend",
             "id": default_storage_id,
-            "label": os.environ["BUCKET"],
+            "bucket_name": os.environ["BUCKET"],
             "provider": "aws",
             "region": os.environ["BUCKET_REGION"],
             "store_product": "s3",
@@ -240,7 +240,7 @@ def service_table(default_storage_id, alternative_storage_id):
         Item={
             "record_type": "storage-backend",
             "id": alternative_storage_id,
-            "label": "alternative-storage",
+            "bucket_name": "alternative-storage",
             "provider": "aws",
             "region": "alternative-region",
             "store_product": "s3",
