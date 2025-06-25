@@ -1,9 +1,7 @@
-import concurrent.futures
 import json
 import os
 from http import HTTPStatus
 from typing import List, Optional, Union
-from urllib.parse import urlparse
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -27,11 +25,8 @@ from boto3.dynamodb.conditions import And, Attr, Key
 from dynamodb import (
     TimeRangeBoundary,
     delete_flow_segments,
-    get_default_storage_backend,
     get_flow_timerange,
     get_key_and_args,
-    get_storage_backend,
-    get_store_name,
     get_timerange_expression,
     segments_table,
     validate_object_id,
@@ -46,12 +41,12 @@ from neptune import (
 )
 from pydantic import ValidationError
 from schema import Deletionrequest, Flowsegment, Flowsegmentpost, Timerange, Uuid
+from segment_get_urls import populate_get_urls
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
     generate_failed_segment,
     generate_link_url,
-    generate_presigned_url,
     model_dump,
     publish_event,
     put_message,
@@ -65,8 +60,6 @@ app = APIGatewayRestResolver(
 metrics = Metrics()
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
-store_name = get_store_name()
-default_storage_backend = get_default_storage_backend()
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 TIMERANGE_PATTERN = Timerange.model_fields["root"].metadata[0].pattern
@@ -302,156 +295,6 @@ def check_overlapping_segments(flow_id, segment_timerange):
         query = segments_table.query(**args)
         items.extend(query["Items"])
     return len(items) > 0
-
-
-@tracer.capture_method(capture_response=False)
-def get_presigned_url(raw_url):
-    url_parse = urlparse(raw_url)
-    url = generate_presigned_url(
-        "get_object", url_parse.netloc.split(".")[0], url_parse.path.split("/", 1)[1]
-    )
-    return (raw_url, url)
-
-
-@tracer.capture_method(capture_response=False)
-def get_nonsigned_url(object_id, storage_backend):
-    return {
-        "label": f'aws.{storage_backend["region"]}:s3:{store_name}',
-        "url": f'https://{storage_backend["bucket_name"]}.s3.{storage_backend["region"]}.amazonaws.com/{object_id}',
-    }
-
-
-@tracer.capture_method(capture_response=False)
-def generate_urls_parallel(urls):
-    # Asynchronous call to pre-signed url API
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = []
-        for raw_url in urls:
-            futures.append(executor.submit(get_presigned_url, raw_url))
-    # Build dict of returned urls
-    urls = {}
-    for future in futures:
-        key, url = future.result()
-        urls[key] = url
-    return urls
-
-
-@tracer.capture_method(capture_response=False)
-def get_storage_backends(accept_storage_ids, segments):
-    filter_ids = accept_storage_ids.split(",") if accept_storage_ids else None
-    distinct_storage_ids = set(
-        storage_id
-        for segment in segments
-        for storage_id in segment.get("storage_ids", [])
-    )
-    filtered_storage_ids = (
-        [storage_id for storage_id in distinct_storage_ids if storage_id in filter_ids]
-        if filter_ids
-        else distinct_storage_ids
-    )
-    return {
-        storage_id: get_storage_backend(storage_id)
-        for storage_id in filtered_storage_ids
-    }
-
-
-@tracer.capture_method(capture_response=False)
-def generate_controlled_get_urls(
-    segment, storage_backend, generate_presigned_urls, verbose_storage
-):
-    non_signed_url = get_nonsigned_url(segment["object_id"], storage_backend)
-    if verbose_storage:
-        non_signed_url = {
-            **non_signed_url,
-            **storage_backend,
-            "controlled": True,
-        }
-    get_urls = [non_signed_url]
-    if generate_presigned_urls:
-        empty_signed_url = non_signed_url.copy()
-        empty_signed_url["label"] = empty_signed_url["label"].replace(
-            ":s3:", ":s3.presigned:"
-        )
-        empty_signed_url["presigned"] = True
-        get_urls.append(empty_signed_url)
-    return get_urls
-
-
-@tracer.capture_method(capture_response=False)
-def populate_get_urls(
-    segments: list,
-    accept_get_urls: str,
-    verbose_storage: bool,
-    accept_storage_ids: str,
-    presigned: bool,
-) -> None:
-    """Populate the object get_urls based on the supplied parameters."""
-    # Early return if no urls are requested
-    if accept_get_urls == "":
-        for segment in segments:
-            segment["get_urls"] = []
-        return
-    generate_presigned_urls = (presigned or presigned is None) and (
-        accept_get_urls is None or ":s3.presigned:" in accept_get_urls
-    )
-    filter_labels = (
-        None if accept_get_urls is None else accept_get_urls.split(",")
-    )  # Test explictly for None as empty string has special meaning but would be falsey
-    storage_backends = get_storage_backends(accept_storage_ids, segments)
-    default_storage_available = (
-        storage_backends.get(default_storage_backend["id"]) is not None
-    )
-    # Keep track of unique needed presigned urls during the loop
-    presigned_needed_urls = set()
-    for segment in segments:
-        storage_ids = segment.get("storage_ids", [])
-        get_urls = [] if accept_storage_ids else segment.get("get_urls", [])
-        if not storage_ids and not segment.get("get_urls"):
-            if default_storage_available:
-                get_urls.extend(
-                    generate_controlled_get_urls(
-                        segment,
-                        default_storage_backend,
-                        generate_presigned_urls,
-                        verbose_storage,
-                    )
-                )
-        for storage_id in storage_ids:
-            if storage_backends.get(storage_id):
-                get_urls.extend(
-                    generate_controlled_get_urls(
-                        segment,
-                        storage_backends[storage_id],
-                        generate_presigned_urls,
-                        verbose_storage,
-                    )
-                )
-        if filter_labels:
-            get_urls = [
-                get_url for get_url in get_urls if get_url["label"] in filter_labels
-            ]
-        if presigned is not None:
-            get_urls = [
-                get_url
-                for get_url in get_urls
-                if get_url.get("presigned", False) == presigned
-            ]
-        # Add needed presigned urls to set for later parallel processing
-        presigned_needed_urls.update(
-            get_url["url"] for get_url in get_urls if get_url.get("presigned", False)
-        )
-        segment["get_urls"] = get_urls
-    # Generate presigned urls for all unique urls needed
-    presigned_urls = generate_urls_parallel(presigned_needed_urls)
-    # Update the url for the presigned get_urls present
-    for segment in segments:
-        get_urls = []
-        for get_url in segment["get_urls"]:
-            if get_url.get("presigned", False):
-                get_urls.append({**get_url, "url": presigned_urls[get_url["url"]]})
-            else:
-                get_urls.append(get_url)
-        segment["get_urls"] = get_urls
 
 
 @tracer.capture_method(capture_response=False)
