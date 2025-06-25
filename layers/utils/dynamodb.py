@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime
 from enum import Enum
+from functools import lru_cache
 from typing import Type
 
 import boto3
@@ -356,6 +357,7 @@ def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
     return kwargs
 
 
+@lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_store_name() -> str:
     get_item = service_table.get_item(Key={"record_type": "service", "id": "1"})
@@ -373,6 +375,7 @@ def get_storage_backend_dict(item, store_name) -> dict:
     }
 
 
+@lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_default_storage_backend() -> dict:
     query = service_table.query(
@@ -382,9 +385,10 @@ def get_default_storage_backend() -> dict:
     items = query["Items"]
     if len(items) == 0:
         raise BadRequestError("No default storage backend found")  # 404
-    return get_storage_backend_dict(items[0], get_store_name())
+    return dict(get_storage_backend_dict(items[0], get_store_name()))
 
 
+@lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_storage_backend(storage_id: str) -> dict:
     get_item = service_table.get_item(
@@ -392,4 +396,4 @@ def get_storage_backend(storage_id: str) -> dict:
     )
     if not get_item.get("Item"):
         raise BadRequestError("Invalid storage backend identifier")  # 404
-    return get_storage_backend_dict(get_item["Item"], get_store_name())
+    return dict(get_storage_backend_dict(get_item["Item"], get_store_name()))
