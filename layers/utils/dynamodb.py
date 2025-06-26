@@ -52,7 +52,7 @@ def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None
                 ReturnValues="ALL_OLD",
             )
             if "Attributes" in delete_item:
-                object_ids.add(item["object_id"])
+                object_ids.add((item["object_id"], tuple(item.get("storage_ids", []))))
                 publish_event(
                     "flows/segments_deleted",
                     {"flow_id": item["flow_id"], "timerange": item["timerange"]},

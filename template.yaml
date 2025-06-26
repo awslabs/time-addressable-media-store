@@ -1469,7 +1469,6 @@ Resources:
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
-          BUCKET: !Ref MediaStorageBucket
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1479,11 +1478,6 @@ Resources:
               Resource:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
                 - !GetAtt FlowStorageTable.Arn
-            - Effect: Allow
-              Action:
-                - s3:GetObject
-              Resource:
-                - !Sub ${MediaStorageBucket.Arn}/*
       Events:
         headMediaObjectInformation:
           Type: Api
@@ -1758,9 +1752,9 @@ Resources:
           POWERTOOLS_SERVICE_NAME: tams-cleanup
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+          SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
-          BUCKET: !Ref MediaStorageBucket
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1775,6 +1769,12 @@ Resources:
                 - dynamodb:DeleteItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
             - Effect: Allow
               Action:
                 - s3:DeleteObject
