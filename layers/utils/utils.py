@@ -315,17 +315,9 @@ def put_message(queue: str, item: dict) -> None:
     )
 
 
-@tracer.capture_method(capture_response=False)
-def check_object_exists(bucket, object_id: str) -> bool:
-    """Checks whether the specified object_id (as key) currently exists in the specified S3 Bucket"""
-    try:
-        s3.head_object(Bucket=bucket, Key=object_id)
-        return True
-    except ClientError:
-        return False
+tracer.capture_method(capture_response=False)
 
 
-@tracer.capture_method(capture_response=False)
 def generate_presigned_url(
     method: str, bucket: str, key: str, **kwargs: None | dict
 ) -> str:
