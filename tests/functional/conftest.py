@@ -20,6 +20,7 @@ os.environ["POWERTOOLS_SERVICE_NAME"] = "tams"
 os.environ["SERVICE_TABLE"] = "service-table"
 os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
+os.environ["WEBHOOKS_TABLE"] = "webhooks-table"
 os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
 os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
@@ -320,6 +321,64 @@ def storage_table():
         "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
     ).Table(os.environ["STORAGE_TABLE"])
     client.delete_table(TableName=os.environ["STORAGE_TABLE"])
+
+
+@pytest.fixture(scope="module", autouse=True)
+def webhooks_table():
+    """
+    Create and manage a test DynamoDB webhooks table for the test module.
+
+    Creates a webhooks table with appropriate schema before tests run and cleans it up afterward.
+
+    Returns:
+        Table: A DynamoDB table resource for test use
+    """
+    # Create DynamoDB table
+    client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    client.create_table(
+        TableName=os.environ["WEBHOOKS_TABLE"],
+        KeySchema=[
+            {"AttributeName": "event", "KeyType": "HASH"},
+            {"AttributeName": "url", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "event", "AttributeType": "S"},
+            {"AttributeName": "url", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "url-index",
+                "KeySchema": [
+                    {"AttributeName": "url", "KeyType": "HASH"},
+                    {"AttributeName": "event", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "KEYS_ONLY"},
+            }
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    yield boto3.resource(
+        "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
+    ).Table(os.environ["WEBHOOKS_TABLE"])
+    client.delete_table(TableName=os.environ["WEBHOOKS_TABLE"])
+
+
+@pytest.fixture(scope="module", autouse=True)
+def webhooks_queue():
+    """
+    Create and manage a test SQS Queue for webhooks.
+
+    Creates a webhooks SQS Queue before tests run and cleans it up afterward.
+
+    Returns:
+        Table: A DynamoDB table resource for test use
+    """
+    # Create SQS Queue
+    client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
+    response = client.create_queue(QueueName="webhooks-queue")
+    os.environ["WEBHOOKS_QUEUE_URL"] = response["QueueUrl"]
+    yield
+    client.delete_queue(QueueUrl=response["QueueUrl"])
 
 
 @pytest.fixture(autouse=True)
