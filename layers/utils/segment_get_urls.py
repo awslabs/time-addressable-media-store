@@ -28,7 +28,7 @@ def create_presigned_get_url(s3_url: str) -> Tuple[str, str]:
 
 @tracer.capture_method(capture_response=False)
 def create_direct_s3_get_url(
-    object_id: str, storage_backend: Dict[str, str]
+    object_id: str, storage_backend: Dict[str, str], include_storage_id: bool
 ) -> Dict[str, str]:
     """Generate a non-signed S3 URL for object access.
 
@@ -40,10 +40,13 @@ def create_direct_s3_get_url(
         Dict containing label and URL
     """
     store_name = get_store_name()
-    return {
+    get_url = {
         "label": f'aws.{storage_backend["region"]}:s3:{store_name}',
         "url": f'https://{storage_backend["bucket_name"]}.s3.{storage_backend["region"]}.amazonaws.com/{object_id}',
     }
+    if include_storage_id:
+        get_url["storage_id"] = storage_backend["id"]
+    return get_url
 
 
 @tracer.capture_method(capture_response=False)
@@ -105,6 +108,7 @@ def create_segment_access_urls(
     storage_backend: Dict,
     generate_presigned_urls: bool,
     verbose_storage: bool,
+    include_storage_id: bool,
 ) -> List[Dict]:
     """Generate controlled access URLs for a segment.
 
@@ -117,7 +121,9 @@ def create_segment_access_urls(
     Returns:
         List of URL dictionaries with labels and URLs
     """
-    direct_url = create_direct_s3_get_url(segment["object_id"], storage_backend)
+    direct_url = create_direct_s3_get_url(
+        segment["object_id"], storage_backend, include_storage_id
+    )
     if verbose_storage:
         direct_url = {
             **direct_url,
@@ -138,10 +144,11 @@ def create_segment_access_urls(
 @tracer.capture_method(capture_response=False)
 def populate_get_urls(
     segments: List[Dict],
-    accept_get_urls: Optional[str],
-    verbose_storage: Optional[bool],
-    accept_storage_ids: Optional[str],
-    presigned: Optional[bool],
+    accept_get_urls: Optional[str] = None,
+    verbose_storage: Optional[bool] = None,
+    accept_storage_ids: Optional[str] = None,
+    presigned: Optional[bool] = None,
+    include_storage_id: Optional[bool] = False,
 ) -> None:
     """Populate the object get_urls based on the supplied parameters.
 
@@ -181,6 +188,7 @@ def populate_get_urls(
                         default_storage_backend,
                         should_create_presigned_urls,
                         verbose_storage,
+                        include_storage_id,
                     )
                 )
         for storage_id in storage_ids:
@@ -191,6 +199,7 @@ def populate_get_urls(
                         storage_backends[storage_id],
                         should_create_presigned_urls,
                         verbose_storage,
+                        include_storage_id,
                     )
                 )
         if filter_labels:
