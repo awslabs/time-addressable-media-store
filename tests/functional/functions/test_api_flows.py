@@ -56,7 +56,7 @@ def aws_setup(
     """
     storage_table.put_item(
         Item={
-            "object_id": existing_object_id,
+            "id": existing_object_id,
             "flow_id": sample_flow_id,
             "expire_at": None,
         }
@@ -156,7 +156,7 @@ def test_POST_storage_returns_201_with_default_storage_objects_when_flow_exists(
         assert media_object.get("object_id")
         # Check expected items are present in the storage_table
         item = storage_table.get_item(
-            Key={"object_id": media_object["object_id"], "flow_id": sample_flow_id}
+            Key={"id": media_object["object_id"], "flow_id": sample_flow_id}
         )["Item"]
         assert item is not None
         assert item.get("expire_at")
@@ -216,7 +216,7 @@ def test_POST_storage_returns_201_with_alternative_storage_objects_when_flow_exi
         assert media_object.get("object_id")
         # Check expected items are present in the storage_table
         item = storage_table.get_item(
-            Key={"object_id": media_object["object_id"], "flow_id": sample_flow_id}
+            Key={"id": media_object["object_id"], "flow_id": sample_flow_id}
         )["Item"]
         assert item is not None
         assert item.get("expire_at")

@@ -2609,10 +2609,10 @@ components:
       description: Describes a media object in the store.
       title: Object
       required:
-      - object_id
+      - id
       - referenced_by_flows
       properties:
-        object_id:
+        id:
           description: The media object identifier.
           type: string
         referenced_by_flows:

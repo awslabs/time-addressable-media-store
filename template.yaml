@@ -277,12 +277,12 @@ Resources:
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: object_id
+        - AttributeName: id
           AttributeType: S
         - AttributeName: flow_id
           AttributeType: S
       KeySchema:
-        - AttributeName: object_id
+        - AttributeName: id
           KeyType: HASH
         - AttributeName: flow_id
           KeyType: RANGE
@@ -1607,8 +1607,6 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           SERVICE_TABLE: !Ref ServiceTable
           WEBHOOKS_TABLE: !Ref WebhooksTable
-          BUCKET: !Ref MediaStorageBucket
-          BUCKET_REGION: !Ref AWS::Region
           WEBHOOKS_QUEUE_URL: !Ref WebhooksDeliveryQueue
       Policies:
         - Version: "2012-10-17"
@@ -1620,6 +1618,7 @@ Resources:
                 - !GetAtt WebhooksTable.Arn
             - Effect: Allow
               Action:
+                - dynamodb:Query
                 - dynamodb:GetItem
               Resource:
                 - !GetAtt ServiceTable.Arn
@@ -1990,6 +1989,9 @@ Outputs:
 
   FlowSegmentsTable:
     Value: !Ref FlowSegmentsTable
+
+  FlowStorageTable:
+    Value: !Ref FlowStorageTable
 
   WebhooksTable:
     Value: !If [SupportWebhooks, !Ref WebhooksTable, ""]

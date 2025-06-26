@@ -1613,7 +1613,7 @@ def test_Get_Media_Object_Information_GET_200(
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert object_id == response_json["object_id"]
+    assert object_id == response_json["id"]
     assert 2 == len(response_json["referenced_by_flows"])
     assert stub_video_flow["id"] == response_json["first_referenced_by_flow"]
 

@@ -83,7 +83,7 @@ def aws_setup(
         )
     storage_table.put_item(
         Item={
-            "object_id": test_object_id,
+            "id": test_object_id,
             "flow_id": multiple_flow_ids[0],
             "expire_at": None,
         }
@@ -137,7 +137,7 @@ def invalid_page_value(request, test_object_id):
     elif param_type == "non_json":
         return create_pagination_token("invalid token")
     elif param_type == "missing_fields":
-        return create_pagination_token({"object_id": test_object_id})
+        return create_pagination_token({"id": test_object_id})
 
 
 #########
@@ -186,7 +186,7 @@ def test_GET_object_returns_200_with_complete_flow_references_when_object_exists
     # Assert
     assert response["statusCode"] == HTTPStatus.OK.value
     assert response_headers.get("Content-Type")[0] == "application/json"
-    assert response_body.get("object_id") == test_object_id
+    assert response_body.get("id") == test_object_id
     assert set(response_body.get("referenced_by_flows")) == set(multiple_flow_ids)
     assert response_body.get("first_referenced_by_flow") == multiple_flow_ids[0]
 
@@ -216,7 +216,7 @@ def test_GET_object_returns_limited_flow_references_with_pagination_headers_when
     assert response_headers.get("Content-Type")[0] == "application/json"
     assert len(response_headers.get("Link")) == 1
     assert len(response_headers.get("X-Paging-NextKey")) == 1
-    assert response_body.get("object_id") == test_object_id
+    assert response_body.get("id") == test_object_id
     assert len(response_body.get("referenced_by_flows")) == 1
     assert response_body.get("referenced_by_flows")[0] == multiple_flow_ids[0]
     assert response_body.get("first_referenced_by_flow") == multiple_flow_ids[0]
@@ -263,7 +263,7 @@ def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_p
     assert response_headers.get("Content-Type")[0] == "application/json"
     assert response_headers.get("Link") is None
     assert response_headers.get("X-Paging-NextKey") is None
-    assert response_body.get("object_id") == test_object_id
+    assert response_body.get("id") == test_object_id
     assert len(response_body.get("referenced_by_flows")) == 1
     assert response_body.get("referenced_by_flows")[0] == multiple_flow_ids[1]
     assert response_body.get("first_referenced_by_flow") == multiple_flow_ids[0]

@@ -785,8 +785,8 @@ def post_flow_storage_by_id(
     if flow_storage_post.object_ids:
         for object_id in flow_storage_post.object_ids:
             get_item = storage_table.get_item(
-                Key={"object_id": object_id, "flow_id": flow_id},
-                ProjectionExpression="object_id",
+                Key={"id": object_id, "flow_id": flow_id},
+                ProjectionExpression="id",
             )
             if get_item.get("Item"):
                 raise BadRequestError(
@@ -829,7 +829,7 @@ def post_flow_storage_by_id(
     for media_object in flow_storage.media_objects:
         storage_table.put_item(
             Item={
-                "object_id": media_object.object_id,
+                "id": media_object.object_id,
                 "flow_id": flow_id,
                 "expire_at": expire_at,
                 "storage_ids": [storage_backend["id"]],

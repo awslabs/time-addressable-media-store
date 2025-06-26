@@ -483,7 +483,7 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123", "expire_at": 12345},
+                {"id": "abc", "flow_id": "123", "expire_at": 12345},
             ]
         }
         mock_storage_table.query.return_value = return_items
@@ -502,7 +502,7 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123"},
+                {"id": "abc", "flow_id": "123"},
             ]
         }
         mock_storage_table.query.return_value = return_items
@@ -521,7 +521,7 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123", "expire_at": 12345},
+                {"id": "abc", "flow_id": "123", "expire_at": 12345},
             ]
         }
         mock_storage_table.query.return_value = return_items
@@ -540,7 +540,7 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123"},
+                {"id": "abc", "flow_id": "123"},
             ]
         }
         mock_storage_table.query.return_value = return_items
@@ -556,7 +556,7 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123"},
+                {"id": "abc", "flow_id": "123"},
             ]
         }
         mock_storage_table.query.return_value = return_items

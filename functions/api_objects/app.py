@@ -76,9 +76,7 @@ def get_objects_by_id(
             body=None,
             headers=custom_headers,
         )
-    object_query = storage_table.query(
-        KeyConditionExpression=Key("object_id").eq(object_id)
-    )
+    object_query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
     valid_object_items = [
         item for item in object_query["Items"] if item.get("expire_at") is None
     ]
@@ -87,7 +85,7 @@ def get_objects_by_id(
     )
     schema_item = Object(
         **{
-            "object_id": object_id,
+            "id": object_id,
             "referenced_by_flows": set([item["flow_id"] for item in items]),
             "first_referenced_by_flow": first_referenced_by_flow,
         }

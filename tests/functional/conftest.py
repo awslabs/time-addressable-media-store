@@ -308,11 +308,11 @@ def storage_table():
     client.create_table(
         TableName=os.environ["STORAGE_TABLE"],
         KeySchema=[
-            {"AttributeName": "object_id", "KeyType": "HASH"},
+            {"AttributeName": "id", "KeyType": "HASH"},
             {"AttributeName": "flow_id", "KeyType": "RANGE"},
         ],
         AttributeDefinitions=[
-            {"AttributeName": "object_id", "AttributeType": "S"},
+            {"AttributeName": "id", "AttributeType": "S"},
             {"AttributeName": "flow_id", "AttributeType": "S"},
         ],
         BillingMode="PAY_PER_REQUEST",

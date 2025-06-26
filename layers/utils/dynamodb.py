@@ -288,7 +288,7 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 @tracer.capture_method(capture_response=False)
 def validate_object_id(object_id: str, flow_id: str) -> tuple[bool, list]:
     """Check supplied object_id can be used for the supplied flow_id, returns storage_ids if valid"""
-    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
     items = query["Items"]
     if len(items) == 0:
         # No matching object_id found so must be invalid
@@ -299,7 +299,7 @@ def validate_object_id(object_id: str, flow_id: str) -> tuple[bool, list]:
             # expire_at exists so this is first time use and needs updating to prevent TTL deletion
             storage_table.update_item(
                 Key={
-                    "object_id": object_id,
+                    "id": object_id,
                     "flow_id": flow_id,
                 },
                 AttributeUpdates={"expire_at": {"Action": "DELETE"}},
@@ -316,11 +316,11 @@ def validate_object_id(object_id: str, flow_id: str) -> tuple[bool, list]:
 @tracer.capture_method(capture_response=False)
 def delete_flow_storage_record(object_id: str) -> None:
     """Delete the DDB record associated with the supplied object_id"""
-    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
     for item in query["Items"]:
         storage_table.delete_item(
             Key={
-                "object_id": item["object_id"],
+                "id": item["id"],
                 "flow_id": item["flow_id"],
             },
         )

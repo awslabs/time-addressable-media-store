@@ -102,7 +102,7 @@ class Object(BaseModel):
     Describes a media object in the store.
     """
 
-    object_id: str = Field(..., description="The media object identifier.")
+    id: str = Field(..., description="The media object identifier.")
     referenced_by_flows: List[
         constr(
             pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
