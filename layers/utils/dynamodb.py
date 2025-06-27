@@ -369,9 +369,9 @@ def get_store_name() -> str:
 @tracer.capture_method(capture_response=False)
 def get_storage_backend_dict(item, store_name) -> dict:
     return {
-        **item,
         "storage_id": item["id"],
         "label": f'aws.{item["region"]}:s3:{store_name}',
+        **item,
     }
 
 

@@ -48,5 +48,4 @@ def delete(event, context):
 
 
 def lambda_handler(event, context):
-    print(event)
     helper(event, context)

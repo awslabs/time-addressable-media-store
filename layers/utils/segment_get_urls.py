@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 from aws_lambda_powertools import Tracer
-from dynamodb import get_default_storage_backend, get_storage_backend, get_store_name
+from dynamodb import get_default_storage_backend, get_storage_backend
 from utils import generate_presigned_url
 
 tracer = Tracer()
@@ -39,9 +39,8 @@ def create_direct_s3_get_url(
     Returns:
         Dict containing label and URL
     """
-    store_name = get_store_name()
     get_url = {
-        "label": f'aws.{storage_backend["region"]}:s3:{store_name}',
+        "label": storage_backend["label"],
         "url": f'https://{storage_backend["bucket_name"]}.s3.{storage_backend["region"]}.amazonaws.com/{object_id}',
     }
     if include_storage_id:
