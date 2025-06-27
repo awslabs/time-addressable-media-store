@@ -316,6 +316,38 @@ Resources:
             ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  CrStorageBackendFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/cr_storage_backend/
+      Environment:
+        Variables:
+          SERVICE_TABLE: !Ref ServiceTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
+
+  StorageBackend:
+    Type: Custom::StorageBackend
+    Properties:
+      ServiceToken: !GetAtt CrStorageBackendFunction.Arn
+      default_storage: True
+      bucket_name: !Ref MediaStorageBucket
+      region: !Ref AWS::Region
+
   DeleteRequestQueue:
     Type: AWS::SQS::Queue
     Metadata:
