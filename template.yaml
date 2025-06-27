@@ -2051,17 +2051,32 @@ Outputs:
   UtilsLayerArn:
     Value: !Ref UtilsLayer
 
-  DefaultStorageBackend:
-    Value: !Sub
-      - |-
-        {
-          "record_type": "storage-backend",
-          "id": "${id}",
-          "default_storage": true,
-          "bucket_name": "${MediaStorageBucket}",
-          "provider": "aws",
-          "region": "${AWS::Region}",
-          "store_product": "s3",
-          "store_type": "http_object_store"
-        }
-      - id: !Select [2, !Split [/, !Ref 'AWS::StackId']]
+  AdditionalStorageCrStorageBackendFunctionArn:
+    Value: !GetAtt CrStorageBackendFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-CrStorageBackendFunctionArn
+
+  AdditionalStorageFlowsFunctionRole:
+    Value: !Ref FlowsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-FlowsFunctionRole
+
+  AdditionalStorageFlowSegmentsFunctionRole:
+    Value: !Ref FlowSegmentsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-FlowSegmentsFunctionRole
+
+  AdditionalStorageObjectsFunctionRole:
+    Value: !Ref ObjectsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-ObjectsFunctionRole
+
+  AdditionalStorageWebhooksFunctionRole:
+    Value: !If [SupportWebhooks, !Ref WebhooksFunctionRole, ""]
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-WebhooksFunctionRole
+
+  AdditionalStorageSqsObjectCleanupFunctionRole:
+    Value: !Ref SqsObjectCleanupFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-SqsObjectCleanupFunctionRole

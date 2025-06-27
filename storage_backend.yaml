@@ -1,19 +1,18 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Configuration
+        Parameters:
+          - ApiStackName
+    ParameterLabels:
+      ApiStackName:
+        default: The name of the CloudFormation stack that Deployed the TAMS API
+
 Parameters:
-  FlowsFunctionRole:
-    Type: String
-
-  FlowSegmentsFunctionRole:
-    Type: String
-
-  ObjectsFunctionRole:
-    Type: String
-
-  WebhooksFunctionRole:
-    Type: String
-
-  SqsObjectCleanupFunctionRole:
+  ApiStackName:
     Type: String
 
 Resources:
@@ -43,11 +42,21 @@ Resources:
             ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  StorageBackend:
+    Type: Custom::StorageBackend
+    Properties:
+      ServiceToken: !ImportValue
+        Fn::Sub: ${ApiStackName}-AdditionalStorage-CrStorageBackendFunctionArn
+      default_storage: False
+      bucket_name: !Ref MediaStorageBucket
+      region: !Ref AWS::Region
+
   PutObjectPolicy:
     Type: AWS::IAM::Policy
     Properties:
       Roles:
-        - !Ref FlowsFunctionRole
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-FlowsFunctionRole
       PolicyName: !Sub ${AWS::StackName}-PutObject
       PolicyDocument:
         Version: "2012-10-17"
@@ -62,9 +71,12 @@ Resources:
     Type: AWS::IAM::Policy
     Properties:
       Roles:
-        - !Ref FlowSegmentsFunctionRole
-        - !Ref ObjectsFunctionRole
-        - !Ref WebhooksFunctionRole
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-FlowSegmentsFunctionRole
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-ObjectsFunctionRole
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-WebhooksFunctionRole
       PolicyName: !Sub ${AWS::StackName}-GetObject
       PolicyDocument:
         Version: "2012-10-17"
@@ -79,7 +91,8 @@ Resources:
     Type: AWS::IAM::Policy
     Properties:
       Roles:
-        - !Ref SqsObjectCleanupFunctionRole
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-SqsObjectCleanupFunctionRole
       PolicyName: !Sub ${AWS::StackName}-DeleteObject
       PolicyDocument:
         Version: "2012-10-17"
