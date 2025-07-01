@@ -361,6 +361,8 @@ def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
 @tracer.capture_method(capture_response=False)
 def get_store_name() -> str:
     get_item = service_table.get_item(Key={"record_type": "service", "id": "1"})
+    if not get_item.get("Item"):
+        return "tams"
     if get_item["Item"].get("name") is None:
         return "tams"
     return get_item["Item"]["name"]
