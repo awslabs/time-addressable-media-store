@@ -73,13 +73,16 @@ def create_presigned_urls_parallel(url_set: Set[str]) -> Dict[str, str]:
 
 @tracer.capture_method(capture_response=False)
 def get_storage_backends(
-    accept_storage_ids: Optional[str], segments: List[Dict]
+    accept_storage_ids: Optional[str],
+    segments: List[Dict],
+    default_storage_backend_id: str,
 ) -> Dict[str, Dict]:
     """Get storage backend configurations for segments.
 
     Args:
         accept_storage_ids: Comma-separated storage IDs to filter by
         segments: List of segment dictionaries
+        default_storage_backend_id: The id of the default storage backend
 
     Returns:
         Dict mapping storage IDs to their backend configurations
@@ -88,7 +91,7 @@ def get_storage_backends(
     distinct_storage_ids = set(
         storage_id
         for segment in segments
-        for storage_id in segment.get("storage_ids", [])
+        for storage_id in segment.get("storage_ids", [default_storage_backend_id])
     )
     filtered_storage_ids = (
         [storage_id for storage_id in distinct_storage_ids if storage_id in filter_ids]
@@ -169,8 +172,10 @@ def populate_get_urls(
     filter_labels = (
         None if accept_get_urls is None else accept_get_urls.split(",")
     )  # Test explictly for None as empty string has special meaning but would be falsey
-    storage_backends = get_storage_backends(accept_storage_ids, segments)
     default_storage_backend = get_default_storage_backend()
+    storage_backends = get_storage_backends(
+        accept_storage_ids, segments, default_storage_backend["id"]
+    )
     default_storage_available = (
         storage_backends.get(default_storage_backend["id"]) is not None
     )
