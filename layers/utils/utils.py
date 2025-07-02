@@ -315,9 +315,7 @@ def put_message(queue: str, item: dict) -> None:
     )
 
 
-tracer.capture_method(capture_response=False)
-
-
+@tracer.capture_method(capture_response=False)
 def generate_presigned_url(
     method: str, bucket: str, key: str, **kwargs: None | dict
 ) -> str:
