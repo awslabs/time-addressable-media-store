@@ -19,3 +19,4 @@ RETURN_LITERAL = {
     "delete_request": "delete_request {.*, error: CASE WHEN e.type IS NULL THEN NULL ELSE e {.*} END}",
 }
 PRESIGNED_URL_EXPIRES_IN = 3600
+SERVICE_INFO_ID = "1"
