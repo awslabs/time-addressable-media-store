@@ -559,6 +559,19 @@ def test_FlowSegments_Table_Empty(session, region, stack):
     assert 0 == scan["Count"]
 
 
+def test_FlowStorage_Table_Empty(session, region, stack):
+    # Arrange
+    dynamodb = session.resource("dynamodb", region_name=region)
+    storage_table = dynamodb.Table(stack["outputs"]["FlowStorageTable"])
+    # Act
+    scan = storage_table.scan(ProjectionExpression="id,flow_id")
+    # Assert
+    assert 4 == len(scan["Items"])
+    with storage_table.batch_writer() as batch:
+        for item in scan["Items"]:
+            batch.delete_item(Key=item)
+
+
 def test_S3_Bucket_Empty(session, region, stack):
     # Arrange
     sqs = session.client("sqs", region_name=region)

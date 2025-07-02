@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import os
+import uuid
 import warnings
 from unittest.mock import MagicMock
 
@@ -16,9 +17,12 @@ os.environ["NEPTUNE_ENDPOINT"] = "example.com"
 os.environ["POWERTOOLS_LOG_LEVEL"] = "INFO"
 os.environ["POWERTOOLS_METRICS_NAMESPACE"] = "TAMS"
 os.environ["POWERTOOLS_SERVICE_NAME"] = "tams"
+os.environ["SERVICE_TABLE"] = "service-table"
 os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
+os.environ["WEBHOOKS_TABLE"] = "webhooks-table"
 os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
+os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,28 @@ logger = logging.getLogger(__name__)
 ############
 # FIXTURES #
 ############
+
+
+@pytest.fixture(scope="session")
+def default_storage_id():
+    """
+    Provides a default unique backend storage ID for testing.
+
+    Returns:
+        str: A UUID string representing a backend storage ID
+    """
+    yield str(uuid.uuid4())
+
+
+@pytest.fixture(scope="session")
+def alternative_storage_id():
+    """
+    Provides an alternative unique backend storage ID for testing.
+
+    Returns:
+        str: A UUID string representing a backend storage ID
+    """
+    yield str(uuid.uuid4())
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -77,11 +103,18 @@ def api_event_factory():
         function: A factory function that creates API Gateway event dictionaries
     """
 
-    def _create_event(http_method, path, query_params=None, json_body=None):
+    def _create_event(
+        http_method, path, webhooks_enabled="Yes", query_params=None, json_body=None
+    ):
         event = {
             "httpMethod": http_method,
             "path": path,
             "queryStringParameters": query_params,
+            "stageVariables": {
+                "api_version": "1.0",
+                "webhooks_enabled": webhooks_enabled,
+                "service_version": "aws.1.0",
+            },
             "requestContext": {
                 "httpMethod": http_method,
                 "domainName": "test.com",
@@ -156,6 +189,69 @@ def s3_bucket():
     )
 
 
+@pytest.fixture(scope="session", autouse=True)
+# pylint: disable=redefined-outer-name
+def service_table(default_storage_id, alternative_storage_id):
+    """
+    Create and manage a test DynamoDB service table for the test module.
+
+    Creates a service table with appropriate schema before tests run and cleans it up afterward.
+
+    Returns:
+        Table: A DynamoDB table resource for test use
+    """
+    # Create DynamoDB table
+    client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    client.create_table(
+        TableName=os.environ["SERVICE_TABLE"],
+        KeySchema=[
+            {"AttributeName": "record_type", "KeyType": "HASH"},
+            {"AttributeName": "id", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "record_type", "AttributeType": "S"},
+            {"AttributeName": "id", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table = boto3.resource(
+        "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
+    ).Table(os.environ["SERVICE_TABLE"])
+    table.put_item(
+        Item={
+            "record_type": "service",
+            "id": "1",
+            "name": "Example TAMS",
+            "description": "An example Time Addressable Media Store",
+        }
+    )
+    table.put_item(
+        Item={
+            "record_type": "storage-backend",
+            "id": default_storage_id,
+            "bucket_name": os.environ["BUCKET"],
+            "provider": "aws",
+            "region": os.environ["BUCKET_REGION"],
+            "store_product": "s3",
+            "store_type": "http_object_store",
+            "default_storage": True,
+        }
+    )
+    table.put_item(
+        Item={
+            "record_type": "storage-backend",
+            "id": alternative_storage_id,
+            "bucket_name": "alternative-storage",
+            "provider": "aws",
+            "region": "alternative-region",
+            "store_product": "s3",
+            "store_type": "http_object_store",
+        }
+    )
+    yield table
+    client.delete_table(TableName=os.environ["SERVICE_TABLE"])
+
+
 @pytest.fixture(scope="module", autouse=True)
 def segments_table():
     """
@@ -212,11 +308,11 @@ def storage_table():
     client.create_table(
         TableName=os.environ["STORAGE_TABLE"],
         KeySchema=[
-            {"AttributeName": "object_id", "KeyType": "HASH"},
+            {"AttributeName": "id", "KeyType": "HASH"},
             {"AttributeName": "flow_id", "KeyType": "RANGE"},
         ],
         AttributeDefinitions=[
-            {"AttributeName": "object_id", "AttributeType": "S"},
+            {"AttributeName": "id", "AttributeType": "S"},
             {"AttributeName": "flow_id", "AttributeType": "S"},
         ],
         BillingMode="PAY_PER_REQUEST",
@@ -225,6 +321,64 @@ def storage_table():
         "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
     ).Table(os.environ["STORAGE_TABLE"])
     client.delete_table(TableName=os.environ["STORAGE_TABLE"])
+
+
+@pytest.fixture(scope="module", autouse=True)
+def webhooks_table():
+    """
+    Create and manage a test DynamoDB webhooks table for the test module.
+
+    Creates a webhooks table with appropriate schema before tests run and cleans it up afterward.
+
+    Returns:
+        Table: A DynamoDB table resource for test use
+    """
+    # Create DynamoDB table
+    client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
+    client.create_table(
+        TableName=os.environ["WEBHOOKS_TABLE"],
+        KeySchema=[
+            {"AttributeName": "event", "KeyType": "HASH"},
+            {"AttributeName": "url", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "event", "AttributeType": "S"},
+            {"AttributeName": "url", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "url-index",
+                "KeySchema": [
+                    {"AttributeName": "url", "KeyType": "HASH"},
+                    {"AttributeName": "event", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "KEYS_ONLY"},
+            }
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    yield boto3.resource(
+        "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
+    ).Table(os.environ["WEBHOOKS_TABLE"])
+    client.delete_table(TableName=os.environ["WEBHOOKS_TABLE"])
+
+
+@pytest.fixture(scope="module", autouse=True)
+def webhooks_queue():
+    """
+    Create and manage a test SQS Queue for webhooks.
+
+    Creates a webhooks SQS Queue before tests run and cleans it up afterward.
+
+    Returns:
+        Table: A DynamoDB table resource for test use
+    """
+    # Create SQS Queue
+    client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
+    response = client.create_queue(QueueName="webhooks-queue")
+    os.environ["WEBHOOKS_QUEUE_URL"] = response["QueueUrl"]
+    yield
+    client.delete_queue(QueueUrl=response["QueueUrl"])
 
 
 @pytest.fixture(autouse=True)

@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from http import HTTPStatus
 
@@ -38,7 +39,11 @@ def sample_flow_id():
 
 @pytest.fixture(scope="module", autouse=True)
 # pylint: disable=redefined-outer-name
-def aws_setup(storage_table, existing_object_id, sample_flow_id):
+def aws_setup(
+    storage_table,
+    existing_object_id,
+    sample_flow_id,
+):
     """
     Sets up test data in AWS resources before tests run.
 
@@ -51,7 +56,7 @@ def aws_setup(storage_table, existing_object_id, sample_flow_id):
     """
     storage_table.put_item(
         Item={
-            "object_id": existing_object_id,
+            "id": existing_object_id,
             "flow_id": sample_flow_id,
             "expire_at": None,
         }
@@ -87,19 +92,20 @@ def api_flows():
     ],
 )
 # pylint: disable=redefined-outer-name
-def test_POST_storage_returns_201_with_storage_objects_when_flow_exists(
+def test_POST_storage_returns_201_with_default_storage_objects_when_flow_exists(
     lambda_context,
     api_event_factory,
     api_flows,
     mock_neptune_client,
     storage_table,
     sample_flow_id,
+    default_storage_id,
     body_value,
     media_objects_length,
 ):
     """
     Verifies that a POST request to the storage endpoint returns 201 Created
-    with the expected storage objects when the flow exists and all parameters are valid.
+    with the expected default storage objects when the flow exists and all parameters are valid.
 
     Tests various combinations of request body parameters including default limit,
     custom limit, and specific object IDs.
@@ -120,8 +126,8 @@ def test_POST_storage_returns_201_with_storage_objects_when_flow_exists(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        body_value,
+        query_params=None,
+        json_body=body_value,
     )
 
     # Act
@@ -144,17 +150,166 @@ def test_POST_storage_returns_201_with_storage_objects_when_flow_exists(
         assert put_url
         assert isinstance(put_url, dict)
         assert put_url.get("url")
-        assert put_url["url"].startswith("https://")
-        assert ".s3." in put_url["url"]
+        assert put_url["url"].startswith(f"https://{os.environ["BUCKET"]}.s3.")
         assert "x-amz-security-token=" in put_url["url"]
         assert put_url.get("content-type")
         assert media_object.get("object_id")
         # Check expected items are present in the storage_table
         item = storage_table.get_item(
-            Key={"object_id": media_object["object_id"], "flow_id": sample_flow_id}
+            Key={"id": media_object["object_id"], "flow_id": sample_flow_id}
         )["Item"]
         assert item is not None
         assert item.get("expire_at")
+        assert item["storage_ids"] == [default_storage_id]
+
+
+# pylint: disable=redefined-outer-name
+def test_POST_storage_returns_201_with_alternative_storage_objects_when_flow_exists(
+    lambda_context,
+    api_event_factory,
+    api_flows,
+    mock_neptune_client,
+    storage_table,
+    sample_flow_id,
+    alternative_storage_id,
+):
+    """
+    Verifies that a POST request to the storage endpoint returns 201 Created
+    with the expected alternative storage objects when the flow exists and all parameters are valid.
+    """
+    # Arrange
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [
+            {
+                "flow": {
+                    "id": sample_flow_id,
+                    "source_id": str(uuid.uuid4()),
+                    "format": "urn:x-nmos:format:multi",
+                    "container": "video/mp2t",
+                }
+            }
+        ]
+    }
+    event = api_event_factory(
+        "POST",
+        f"/flows/{sample_flow_id}/storage",
+        query_params=None,
+        json_body={"limit": 1, "storage_id": alternative_storage_id},
+    )
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
+    media_objects = response_body["media_objects"]
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.CREATED.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert len(media_objects) == 1
+    for media_object in media_objects:
+        put_url = media_object.get("put_url")
+        assert put_url
+        assert isinstance(put_url, dict)
+        assert put_url.get("url")
+        assert put_url["url"].startswith("https://alternative-storage.s3.")
+        assert media_object.get("object_id")
+        # Check expected items are present in the storage_table
+        item = storage_table.get_item(
+            Key={"id": media_object["object_id"], "flow_id": sample_flow_id}
+        )["Item"]
+        assert item is not None
+        assert item.get("expire_at")
+        assert item["storage_ids"] == [alternative_storage_id]
+
+
+# pylint: disable=redefined-outer-name
+def test_POST_storage_returns_400_with_storage_id_not_exists(
+    lambda_context,
+    api_event_factory,
+    api_flows,
+    mock_neptune_client,
+    sample_flow_id,
+):
+    """
+    Verifies that a POST request to the storage endpoint returns 400 Bad Request
+    when the supplied storage_id does not exist.
+    """
+    # Arrange
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [
+            {
+                "flow": {
+                    "id": sample_flow_id,
+                    "source_id": str(uuid.uuid4()),
+                    "format": "urn:x-nmos:format:multi",
+                    "container": "video/mp2t",
+                }
+            }
+        ]
+    }
+    event = api_event_factory(
+        "POST",
+        f"/flows/{sample_flow_id}/storage",
+        query_params=None,
+        json_body={"limit": 1, "storage_id": "90000000-0000-1000-8000-000000000000"},
+    )
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert response_body["message"] == "Invalid storage backend identifier"
+
+
+# pylint: disable=redefined-outer-name
+def test_POST_storage_returns_400_with_invalid_storage_id(
+    lambda_context,
+    api_event_factory,
+    api_flows,
+    mock_neptune_client,
+    sample_flow_id,
+):
+    """
+    Verifies that a POST request to the storage endpoint returns 400 Bad Request
+    when the supplied storage_id is not valid.
+    """
+    # Arrange
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [
+            {
+                "flow": {
+                    "id": sample_flow_id,
+                    "source_id": str(uuid.uuid4()),
+                    "format": "urn:x-nmos:format:multi",
+                    "container": "video/mp2t",
+                }
+            }
+        ]
+    }
+    event = api_event_factory(
+        "POST",
+        f"/flows/{sample_flow_id}/storage",
+        query_params=None,
+        json_body={"limit": 1, "storage_id": "invalid"},
+    )
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
+    assert response_headers.get("Content-Type")[0] == "application/json"
+    assert (
+        response_body.get("message")[0]["msg"]
+        == "String should match pattern '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'"
+    )
 
 
 # pylint: disable=redefined-outer-name
@@ -174,8 +329,8 @@ def test_POST_storage_returns_404_when_flow_not_exists(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {},
+        query_params=None,
+        json_body={},
     )
 
     # Act
@@ -218,8 +373,8 @@ def test_POST_storage_returns_403_when_flow_is_readonly(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {},
+        query_params=None,
+        json_body={},
     )
 
     # Act
@@ -265,8 +420,8 @@ def test_POST_storage_returns_400_when_requested_object_id_already_exists(
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {"object_ids": [existing_object_id, str(uuid.uuid4())]},
+        query_params=None,
+        json_body={"object_ids": [existing_object_id, str(uuid.uuid4())]},
     )
 
     # Act
@@ -332,8 +487,8 @@ def test_POST_storage_returns_400_with_validation_errors_for_invalid_body_parame
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        body_value,
+        query_params=None,
+        json_body=body_value,
     )
 
     # Act
@@ -374,8 +529,8 @@ def test_POST_storage_returns_400_when_flow_missing_required_container_attribute
     event = api_event_factory(
         "POST",
         f"/flows/{sample_flow_id}/storage",
-        None,
-        {},
+        query_params=None,
+        json_body={},
     )
 
     # Act

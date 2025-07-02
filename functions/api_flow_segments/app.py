@@ -1,4 +1,3 @@
-import concurrent.futures
 import json
 import os
 from http import HTTPStatus
@@ -41,15 +40,13 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, GetUrl, Timerange, Uuid
+from schema import Deletionrequest, Flowsegment, Flowsegmentpost, Timerange, Uuid
+from segment_get_urls import populate_get_urls
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
-    check_object_exists,
     generate_failed_segment,
     generate_link_url,
-    generate_presigned_url,
-    get_store_name,
     model_dump,
     publish_event,
     put_message,
@@ -61,11 +58,8 @@ app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
 metrics = Metrics()
-bucket = os.environ["BUCKET"]
-bucket_region = os.environ["BUCKET_REGION"]
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
-store_name = get_store_name()
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 TIMERANGE_PATTERN = Timerange.model_fields["root"].metadata[0].pattern
@@ -83,9 +77,20 @@ def get_flow_segments_by_id(
         Optional[str], Query(alias="timerange", pattern=TIMERANGE_PATTERN)
     ] = None,
     param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    param_verbose_storage: Annotated[
+        Optional[bool], Query(alias="verbose_storage")
+    ] = None,
     param_accept_get_urls: Annotated[
         Optional[str], Query(alias="accept_get_urls", pattern=r"^([^,]+(,[^,]+)*)?$")
     ] = None,
+    param_accept_storage_ids: Annotated[
+        Optional[str],
+        Query(
+            alias="accept_storage_ids",
+            pattern=r"^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$",
+        ),
+    ] = None,
+    param_presigned: Annotated[Optional[bool], Query(alias="presigned")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
@@ -147,8 +152,14 @@ def get_flow_segments_by_id(
             body=None,
             headers=custom_headers,
         )
+    populate_get_urls(
+        items,
+        param_accept_get_urls,
+        param_verbose_storage,
+        param_accept_storage_ids,
+        param_presigned,
+    )
     schema_items = [Flowsegment(**item) for item in items]
-    filter_object_urls(schema_items, param_accept_get_urls)
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
@@ -160,7 +171,7 @@ def get_flow_segments_by_id(
 @app.post("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(
-    flow_segment: Annotated[Union[Flowsegment, List[Flowsegment]], Body()],
+    flow_segment: Annotated[Union[Flowsegmentpost, List[Flowsegmentpost]], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -287,87 +298,17 @@ def check_overlapping_segments(flow_id, segment_timerange):
 
 
 @tracer.capture_method(capture_response=False)
-def get_presigned_url(key):
-    url = generate_presigned_url("get_object", bucket, key)
-    return (key, url)
-
-
-@tracer.capture_method(capture_response=False)
-def get_nonsigned_url(key):
-    return GetUrl(
-        label=f"aws.{bucket_region}:s3:{store_name}",
-        url=f"https://{bucket}.s3.{bucket_region}.amazonaws.com/{key}",
-    )
-
-
-@tracer.capture_method(capture_response=False)
-def generate_urls_parallel(keys):
-    # Asynchronous call to pre-signed url API
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = []
-        for object_id in keys:
-            futures.append(executor.submit(get_presigned_url, object_id))
-    # Build dict of returned urls
-    urls = {}
-    for future in futures:
-        key, url = future.result()
-        urls[key] = url
-    return urls
-
-
-@tracer.capture_method(capture_response=False)
-def filter_object_urls(schema_items: list, accept_get_urls: str) -> None:
-    """Filter the object urls in the schema items based on the accept_get_urls parameter."""
-    presigned_urls = {}
-    # Get presigned URLs only if required
-    if accept_get_urls is None or ":s3.presigned:" in accept_get_urls:
-        presigned_urls = generate_urls_parallel(
-            set(item.object_id for item in schema_items)
-        )
-    # Add url to items
-    for item in schema_items:
-        if accept_get_urls == "":
-            item.get_urls = None
-            continue
-        get_url = get_nonsigned_url(item.object_id)
-        item.get_urls = [*item.get_urls, get_url] if item.get_urls else [get_url]
-        # Add pre-signed urls where supplied
-        if item.object_id in presigned_urls:
-            presigned_get_url = GetUrl(
-                label=f"aws.{bucket_region}:s3.presigned:{store_name}",
-                url=presigned_urls[item.object_id],
-            )
-            item.get_urls.append(presigned_get_url)
-        # Filter returned get_urls when specified
-        if accept_get_urls:
-            get_url_labels = [
-                label for label in accept_get_urls.split(",") if label.strip()
-            ]
-            item.get_urls = [
-                get_url for get_url in item.get_urls if get_url.label in get_url_labels
-            ]
-
-
-@tracer.capture_method(capture_response=False)
-def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
+def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
-    if not flow_segment.get_urls and not validate_object_id(
+    valid_object_id, storage_ids = validate_object_id(
         flow_segment.object_id, flow["id"]
-    ):
+    )
+    if not flow_segment.get_urls and not valid_object_id:
         return generate_failed_segment(
             flow_segment.object_id,
             item_dict["timerange"],
             "Bad request. The object id is not valid to be used for the flow id supplied.",
-        )
-    # If get_urls is supplied then not need to check if item exists in S3
-    if not flow_segment.get_urls and not check_object_exists(
-        bucket, flow_segment.object_id
-    ):
-        return generate_failed_segment(
-            flow_segment.object_id,
-            item_dict["timerange"],
-            "Bad request. The object id provided for a segment MUST exist.",
         )
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
@@ -382,34 +323,14 @@ def process_single_segment(flow: dict, flow_segment: Flowsegment) -> None:
     item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
         0 if segment_timerange.includes_end() else 1
     )
-    # Remove get_url if the url matches the one for this store, this allows registering of existing S3 objects
-    default_get_url = get_nonsigned_url(flow_segment.object_id)
-    if item_dict.get("get_urls"):
-        other_get_urls = [
-            get_url
-            for get_url in item_dict["get_urls"]
-            if not (
-                get_url["label"] == default_get_url.label
-                and get_url["url"] == default_get_url.url
-            )
-        ]
-        if len(other_get_urls) == 0:
-            del item_dict["get_urls"]
-        else:
-            item_dict["get_urls"] = other_get_urls
+    item_dict["storage_ids"] = storage_ids
     segments_table.put_item(
         Item={**item_dict, "flow_id": flow["id"]}, ReturnValues="ALL_OLD"
     )
     update_flow_segments_updated(flow["id"])
-    schema_item = Flowsegment(**item_dict)
-    get_url = get_nonsigned_url(schema_item.object_id)
-    if schema_item.get_urls:
-        schema_item.get_urls.append(get_url)
-    else:
-        schema_item.get_urls = [get_url]
     publish_event(
         "flows/segments_added",
-        {"flow_id": flow["id"], "segments": [model_dump(schema_item)]},
+        {"flow_id": flow["id"], "segments": [item_dict]},
         enhance_resources(
             [
                 f'tams:flow:{flow["id"]}',

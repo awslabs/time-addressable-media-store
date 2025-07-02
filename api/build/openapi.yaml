@@ -13,7 +13,7 @@ info:
     could for example be implemented using an AWS S3 compatible store using presigned URLs or by
     a simple file system storage with an HTTP frontend. Clients should parse the /service endpoint
     and handle the media store type in use appropriately.
-  version: '6.0'
+  version: '7.0'
   contact:
     name: BBC R&D - Cloud-Fit Production Team
     email: cloudfit-opensource@rd.bbc.co.uk
@@ -29,11 +29,11 @@ servers:
   variables:
     version:
       description: API version
-      default: v6.0
+      default: v7.0
 security:
-- {}
-- basic_auth: []
 - bearer_token_auth: []
+- url_token_auth: []
+- basic_auth: []
 paths:
   /:
     head:
@@ -74,7 +74,7 @@ paths:
           $ref: '#/components/responses/trait_resource_listing_head_200'
     get:
       summary: Service Information
-      description: Provide information about the service, including the media store in use.
+      description: Provide information about the service.
       operationId: GET_service
       tags:
       - Service
@@ -106,6 +106,31 @@ paths:
           description: Success. The service info has been updated.
         '400':
           description: Bad request. Invalid service JSON.
+  /service/storage-backends:
+    head:
+      summary: Storage Backend Information
+      description: Return storage backends path headers
+      operationId: HEAD_storage-backends
+      tags:
+      - Service
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_listing_head_200'
+    get:
+      summary: Storage Backend Information
+      description: Provide information about the storage backends available on this service instance. These are populated on deployment of the service instance.
+      operationId: GET_storage-backends
+      tags:
+      - Service
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/storagebackendslist'
+              example:
+                $ref: examples/storage-backends-get-200.json
   /service/webhooks:
     head:
       summary: List Webhook URLs
@@ -1507,18 +1532,49 @@ paths:
         schema:
           default: false
           type: boolean
+      - name: verbose_storage
+        in: query
+        description: |
+          Include storage metadata in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+        schema:
+          default: false
+          type: boolean
       - name: accept_get_urls
         in: query
         description: |
           A comma separated list of labels of flow segment `get_urls` to include in the response.
-          Omitting `accept_get_urls` will result in all `get_urls` returned.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
           An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
-          Flow segment `get_urls` with no label cannot be filtered for; they will only be returned if `accept_get_urls` is omitted.
+          Flow segment `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
           Without `get_urls`, the response from the service could be substantially faster if it is not required to
           generate a large number of pre-signed URLs for example.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
         schema:
           type: string
           pattern: ^([^,]+(,[^,]+)*)?$
+      - name: accept_storage_ids
+        in: query
+        description: |
+          A comma separated list of `storage_id`s of flow segment `get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
+          Flow segment `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
+          A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: string
+          pattern: ^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$
+      - name: presigned
+        in: query
+        description: |
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls`.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If omitted, both presigned and non-presigned URLs will be returned.
+          If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1563,7 +1619,7 @@ paths:
         Returns the flow segments.
 
         The flow segment provides information about the media object. The media store type, which is
-        indicated in the /service resource, determines the information that is included to allow the
+        indicated in the /service/storage-backends resource, determines the information that is included to allow the
         flow segment's media object to be downloaded. The examples provided here are for the
         "http_object_store" media store type which MUST include a `get_urls` property that contains the
         HTTP URLs for downloading the media object - server implementations should generate this internally.
@@ -1609,18 +1665,49 @@ paths:
         schema:
           default: false
           type: boolean
+      - name: verbose_storage
+        in: query
+        description: |
+          Include storage metadata in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+        schema:
+          default: false
+          type: boolean
       - name: accept_get_urls
         in: query
         description: |
           A comma separated list of labels of flow segment `get_urls` to include in the response.
-          Omitting `accept_get_urls` will result in all `get_urls` returned.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
           An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
-          Flow segment `get_urls` with no label cannot be filtered for; they will only be returned if `accept_get_urls` is omitted.
+          Flow segment `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
           Without `get_urls`, the response from the service could be substantially faster if it is not required to
           generate a large number of pre-signed URLs for example.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
         schema:
           type: string
           pattern: ^([^,]+(,[^,]+)*)?$
+      - name: accept_storage_ids
+        in: query
+        description: |
+          A comma separated list of `storage_id`s of flow segment `get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
+          Flow segment `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
+          A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: string
+          pattern: ^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$
+      - name: presigned
+        in: query
+        description: |
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls`.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If omitted, both presigned and non-presigned URLs will be returned.
+          If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1697,10 +1784,10 @@ paths:
               $ref: examples/flow-segment-post.json
             schema:
               oneOf:
-              - $ref: '#/components/schemas/flowsegment'
+              - $ref: '#/components/schemas/flowsegmentpost'
               - type: array
                 items:
-                  $ref: '#/components/schemas/flowsegment'
+                  $ref: '#/components/schemas/flowsegmentpost'
         required: true
       responses:
         '200':
@@ -2307,7 +2394,15 @@ components:
       title: Flow Collection
       type: array
       items:
-        $ref: '#/components/schemas/collectionitem'
+        type: object
+        title: Flow Collection Item
+        allOf:
+        - $ref: '#/components/schemas/collectionitem'
+        - type: object
+          properties:
+            container_mapping:
+              description: Describes the mapping of the Flow essence from this Flow collection's container
+              $ref: '#/components/schemas/containermapping'
     flowsegmentbulkfailure:
       title: Failed segments
       description: List of segments that have failed to register
@@ -2333,6 +2428,49 @@ components:
               error:
                 description: Provides more information for the error status, as described by the [Error](../schemas/error#top) type
                 $ref: '#/components/schemas/error'
+    flowsegmentpost:
+      type: object
+      description: Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
+      title: Flow Segment
+      required:
+      - object_id
+      - timerange
+      properties:
+        object_id:
+          description: The object store identifier for the media object.
+          type: string
+        ts_offset:
+          description: The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative
+          $ref: '#/components/schemas/timestamp'
+        timerange:
+          description: The timerange for the samples contained in the segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.
+          $ref: '#/components/schemas/timerange'
+        last_duration:
+          description: The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative
+          $ref: '#/components/schemas/timestamp'
+        sample_offset:
+          description: The start of the segment represented as a count of samples from the start of the object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set.
+          type: integer
+        sample_count:
+          description: The count of samples in the segment (which may be fewer than in the object). The count could be less than expected given the segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples
+          type: integer
+        get_urls:
+          description: A list of URLs to which a GET request can be made to directly retrieve the contents of the segment. This is required by the `http_object_store` media store type, which is the only one currently described. Clients may choose any URL in the list and treat them as identical, however servers may sort the list such that the preferred URL is first. `get_urls` should only be used to add uncontrolled URLs. URLs for the provided object_id controlled by the service instance will be populated automatically by the service instance.
+          type: array
+          items:
+            type: object
+            required:
+            - url
+            properties:
+              url:
+                description: A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint
+                type: string
+              label:
+                description: Label identifying this URL. Service implementations should reject any requests using labels that are already associated with Storage Backends. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.
+                type: string
+        key_frame_count:
+          description: The number of key frames in the segment. This should be set greater than zero when the segment contains key frames that serve as a stream access point
+          type: integer
     flowsegment:
       type: object
       description: Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
@@ -2360,20 +2498,33 @@ components:
           description: The count of samples in the segment (which may be fewer than in the object). The count could be less than expected given the segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples
           type: integer
         get_urls:
-          description: A list of URLs to which a GET request can be made to directly retrieve the contents of the segment. This is required by the `http_object_store` media store type, which is the only one currently described. Clients may choose any URL in the list and treat them as identical, however servers may sort the list such that the preferred URL is first.
+          description: A list of URLs to which a GET request can be made to directly retrieve the contents of the segment. This is required by the `http_object_store` media store type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage backend metadata for controlled URLs should be populated by the TAMS instance based on the storage backend the object copy resides in.
           type: array
           items:
             type: object
-            required:
-            - url
-            properties:
-              label:
-                description: Label identifying this URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.
-                type: string
-              url:
-                description: A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint
-                type: string
-            additionalProperties: false
+            unevaluatedProperties: false
+            allOf:
+            - $ref: '#/components/schemas/storagebackend'
+            - type: object
+              required:
+              - url
+              properties:
+                storage_id:
+                  description: Storage backend identifier
+                  type: string
+                  pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+                url:
+                  description: A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint
+                  type: string
+                presigned:
+                  description: If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed.
+                  type: boolean
+                label:
+                  description: Label identifying this URL. If the URL is controlled by the service instance, this is the Storage Backend's label. If the URL is uncontrolled, this is the label provided when a client registered the URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.
+                  type: string
+                controlled:
+                  description: If `true`, this URL is on a storage backend controlled by this service instance. If `false`, this URL is uncontrolled and does not have it's lifecycle managed by this instance. If this parameter is unset, assume `true`.
+                  type: boolean
         key_frame_count:
           description: The number of key frames in the segment. This should be set greater than zero when the segment contains key frames that serve as a stream access point
           type: integer
@@ -2390,6 +2541,10 @@ components:
           type: array
           items:
             type: string
+        storage_id:
+          description: The storage backend to allocate storage in. A storage backend identifier as advertised at the `/service` endpoint. If not set the default, as advertised at the `/service` endpoint, will be used if available. An invalid storage backend identifier will result in a 400 error.
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
       not:
         allOf:
         - required:
@@ -2454,10 +2609,10 @@ components:
       description: Describes a media object in the store.
       title: Object
       required:
-      - object_id
+      - id
       - referenced_by_flows
       properties:
-        object_id:
+        id:
           description: The media object identifier.
           type: string
         referenced_by_flows:
@@ -2488,7 +2643,6 @@ components:
       required:
       - type
       - api_version
-      - media_store
       properties:
         name:
           description: The service instance name
@@ -2506,17 +2660,6 @@ components:
         service_version:
           description: 'The version of software providing this service. Note: Different implementations and software houses may use different conventions for their version identification. As such, this field is intentionally permissive and intended to be informative only. Implementations should avoid using this field to determine compatibility.'
           type: string
-        media_store:
-          type: object
-          description: Provide information about the media store for this service
-          required:
-          - type
-          properties:
-            type:
-              description: The type of the media store. This determines the endpoints for reading and writing media
-              type: string
-              enum:
-              - http_object_store
         event_stream_mechanisms:
           type: array
           description: List the types of event stream that this implementation supports
@@ -2580,6 +2723,30 @@ components:
           items:
             type: string
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    storagebackendslist:
+      type: array
+      description: Information about the storage backends available on this service instance.
+      items:
+        allOf:
+        - $ref: '#/components/schemas/storagebackend'
+        - required:
+          - store_type
+          - provider
+          - store_product
+          - id
+        - type: object
+          properties:
+            id:
+              description: Storage backend identifier
+              type: string
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+            label:
+              description: Freeform string label for a storage backend.
+              type: string
+            default_storage:
+              description: If set to `true`, this is the default storage backend. The default storage backend will be used if the client does not specify a storage backend id when requesting the allocation of storage. If this parameter is not set, assume `false`. Instances may either set one storage backend as default, or none - indicating that clients must always specify a storage backend.
+              type: boolean
+      additionalProperties: false
     tags:
       title: Tags
       description: Key value is a freeform string.
@@ -2651,10 +2818,22 @@ components:
             type: string
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         accept_get_urls:
-          description: List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.
+          description: List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.
           type: array
           items:
             type: string
+        accept_storage_ids:
+          description: List of labels of `storage_id`s to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_storage_ids` query parameter for the /flows/{flowId}/segments API endpoint, except that the IDs are represented using a JSON array rather than a (comma separated list) string.
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        presigned:
+          description: Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.
+          type: boolean
+        verbose_storage:
+          description: Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.
+          type: boolean
     webhook:
       title: Register Webhook
       description: Register to receive updates via webhook
@@ -2702,10 +2881,22 @@ components:
             type: string
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         accept_get_urls:
-          description: List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.
+          description: List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.
           type: array
           items:
             type: string
+        accept_storage_ids:
+          description: List of labels of `storage_id`s to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_storage_ids` query parameter for the /flows/{flowId}/segments API endpoint, except that the IDs are represented using a JSON array rather than a (comma separated list) string.
+          type: array
+          items:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+        presigned:
+          description: Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.
+          type: boolean
+        verbose_storage:
+          description: Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.
+          type: boolean
     collectionitem:
       type: object
       description: Describes how an object (Source or Flow) is collected into another object of the same type
@@ -2721,9 +2912,59 @@ components:
         role:
           description: A human-readable role of the element in this collection (e.g. 'R' to denote a right audio channel in a collection of mono audio Sources)
           type: string
-        container_mapping:
-          description: Describes the mapping of the Flow essence from this Flow collection's container
-          $ref: '#/components/schemas/containermapping'
+    containermapping:
+      type: object
+      description: Defines the location of Flow essence data in a container track
+      title: Container Mapping
+      properties:
+        track_index:
+          description: A zero-based and sequential track index in the container. This assumes a reliable ordering of tracks
+          type: integer
+          minimum: 0
+        format_track_index:
+          description: A zero-based and sequential track index in the container for a particular Flow format. A container with a video and 2 audio tracks would have a format_track_index 0 for the video Flow and format_track_index 0 and 1 for the audio Flows. This assumes a reliable ordering of tracks for each Flow format
+          type: integer
+          minimum: 0
+        audio_track:
+          description: Mapping for channels in audio tracks to the Flow channels
+          type: object
+          properties:
+            channel_numbers:
+              description: Array of (zero-based) container channel numbers in Flow order
+              type: array
+              minItems: 1
+              items:
+                type: integer
+                minimum: 0
+            channel_range:
+              description: Inclusive range of (zero-based) container channel numbers
+              type: string
+              pattern: ^[0-9]+_[0-9]+$
+        mp2ts_container:
+          description: Mapping to MPEG-2 Transport Stream containers, ISO/IEC 13818-1 or ITU-T Recommendation H.222.0
+          type: object
+          properties:
+            pid:
+              description: The packet ID for the elementary stream packets
+              type: integer
+        mxf_container:
+          description: Mapping to Material Exchange Format containers, SMPTE ST 377-1
+          type: object
+          properties:
+            package_uid:
+              description: The package UID. Either a SMPTE UMID URN or UUID URN
+              type: string
+              pattern: ^urn:smpte:umid:[0-9a-fA-F]{8}(.[0-9a-fA-F]{8}){7}$|^urn:uuid:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+            track_id:
+              description: The track ID in the package
+              type: integer
+        isobmff_container:
+          description: Mapping to ISO Base Media File Format (e.g. MP4 and MOV) containers, ISO/IEC 14496-12
+          type: object
+          properties:
+            track_id:
+              description: The track ID
+              type: integer
     error:
       description: Provides more information for the error status.
       type: object
@@ -3100,6 +3341,28 @@ components:
           additionalProperties:
             type: string
       additionalProperties: true
+    storagebackend:
+      type: object
+      description: Provides technical, and logic metadata about a storage backend
+      title: Storage Backend
+      properties:
+        store_type:
+          description: The generic store type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.
+          type: string
+          enum:
+          - http_object_store
+        provider:
+          description: The cloud (or other) provider of the storage
+          type: string
+        region:
+          description: The region in the cloud this storage backend resides
+          type: string
+        availability_zone:
+          description: The availability zone in the cloud region this storage backend resides. Note that many cloud providers randomize availability zone identifiers such that they are consistent within a cloud account, but not necessarily between accounts. Caution should be exercised when using this parameter.
+          type: string
+        store_product:
+          description: The storage product name.
+          type: string
     timestamp:
       title: Timestamp
       description: |
@@ -3113,59 +3376,6 @@ components:
         Details of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.
       type: string
       pattern: ^-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8})$
-    containermapping:
-      type: object
-      description: Defines the location of Flow essence data in a container track
-      title: Container Mapping
-      properties:
-        track_index:
-          description: A zero-based and sequential track index in the container. This assumes a reliable ordering of tracks
-          type: integer
-          minimum: 0
-        format_track_index:
-          description: A zero-based and sequential track index in the container for a particular Flow format. A container with a video and 2 audio tracks would have a format_track_index 0 for the video Flow and format_track_index 0 and 1 for the audio Flows. This assumes a reliable ordering of tracks for each Flow format
-          type: integer
-          minimum: 0
-        audio_track:
-          description: Mapping for channels in audio tracks to the Flow channels
-          type: object
-          properties:
-            channel_numbers:
-              description: Array of (zero-based) container channel numbers in Flow order
-              type: array
-              minItems: 1
-              items:
-                type: integer
-                minimum: 0
-            channel_range:
-              description: Inclusive range of (zero-based) container channel numbers
-              type: string
-              pattern: ^[0-9]+_[0-9]+$
-        mp2ts_container:
-          description: Mapping to MPEG-2 Transport Stream containers, ISO/IEC 13818-1 or ITU-T Recommendation H.222.0
-          type: object
-          properties:
-            pid:
-              description: The packet ID for the elementary stream packets
-              type: integer
-        mxf_container:
-          description: Mapping to Material Exchange Format containers, SMPTE ST 377-1
-          type: object
-          properties:
-            package_uid:
-              description: The package UID. Either a SMPTE UMID URN or UUID URN
-              type: string
-              pattern: ^urn:smpte:umid:[0-9a-fA-F]{8}(.[0-9a-fA-F]{8}){7}$|^urn:uuid:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
-            track_id:
-              description: The track ID in the package
-              type: integer
-        isobmff_container:
-          description: Mapping to ISO Base Media File Format (e.g. MP4 and MOV) containers, ISO/IEC 14496-12
-          type: object
-          properties:
-            track_id:
-              description: The track ID
-              type: integer
     flowcore:
       type: object
       description: Describes a Flow (common properties to all Flows, imported by type-specific specifications)
@@ -3298,11 +3508,39 @@ components:
     basic_auth:
       type: http
       scheme: basic
-      description: HTTP basic authentication
+      description: |
+        HTTP basic authentication using a username and password.
+
+        This option should only be used in constrained cases where Bearer tokens are impractical, since the password is
+        intrinsically long-lived, and managing user credentials across systems is difficult compared to using
+        centralised auth (e.g. via OAuth2) with Bearer tokens
     bearer_token_auth:
       type: http
       scheme: bearer
-      description: HTTP bearer token authentication
+      bearerFormat: JWT
+      description: |
+        HTTP bearer token authentication.
+
+        The method through which a client should acquire a bearer token is assumed to be an OAuth2 grant (either the
+        Authorization Code or Client Credentials grant), however the OpenAPI `OAuth Flow` object cannot be used because
+        it requires that the relevant URLs are known in advance.
+
+        Clients should provide options to allow one (or both) grant types to be configured, as appropriate.
+
+        Where tokens are not JWTs, or are acquired through some other mechanism, the API key method should be used
+        instead.
+    url_token_auth:
+      type: apiKey
+      name: access_token
+      in: query
+      description: |
+        URL token authentication.
+
+        The method through which a client should acquire the token is not specified: it is assumed this takes place in
+        another way, and a TAMS client may well be passed a URL to a store including the token.
+
+        Clients should retain the token in the `access_token` query string parameter, and use it for subsequent store
+        requests in the same session.
 tags:
 - name: Service
   description: The service root and documentation about the service itself

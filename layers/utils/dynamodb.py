@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime
 from enum import Enum
+from functools import lru_cache
 from typing import Type
 
 import boto3
@@ -25,8 +26,10 @@ from utils import pop_outliers, publish_event, put_message, put_message_batches
 tracer = Tracer()
 
 dynamodb = boto3.resource("dynamodb")
-segments_table = dynamodb.Table(os.environ["SEGMENTS_TABLE"])
-storage_table = dynamodb.Table(os.environ["STORAGE_TABLE"])
+service_table = dynamodb.Table(os.environ.get("SERVICE_TABLE", ""))
+segments_table = dynamodb.Table(os.environ.get("SEGMENTS_TABLE", ""))
+storage_table = dynamodb.Table(os.environ.get("STORAGE_TABLE", ""))
+webhooks_table = dynamodb.Table(os.environ.get("WEBHOOKS_TABLE", ""))
 
 
 class TimeRangeBoundary(Enum):
@@ -49,7 +52,7 @@ def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None
                 ReturnValues="ALL_OLD",
             )
             if "Attributes" in delete_item:
-                object_ids.add(item["object_id"])
+                object_ids.add((item["object_id"], tuple(item.get("storage_ids", []))))
                 publish_event(
                     "flows/segments_deleted",
                     {"flow_id": item["flow_id"], "timerange": item["timerange"]},
@@ -283,41 +286,41 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 
 
 @tracer.capture_method(capture_response=False)
-def validate_object_id(object_id: str, flow_id: str) -> bool:
-    """Check supplied object_id can be used for the supplied flow_id"""
-    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+def validate_object_id(object_id: str, flow_id: str) -> tuple[bool, list]:
+    """Check supplied object_id can be used for the supplied flow_id, returns storage_ids if valid"""
+    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
     items = query["Items"]
     if len(items) == 0:
         # No matching object_id found so must be invalid
-        return False
+        return False, []
     object_item = items[0]
     if object_item["flow_id"] == flow_id:
         if object_item.get("expire_at"):
             # expire_at exists so this is first time use and needs updating to prevent TTL deletion
             storage_table.update_item(
                 Key={
-                    "object_id": object_id,
+                    "id": object_id,
                     "flow_id": flow_id,
                 },
                 AttributeUpdates={"expire_at": {"Action": "DELETE"}},
             )
         # flow_id matches so is a valida object_id
-        return True
+        return True, object_item.get("storage_ids", [])
     if object_item.get("expire_at") is None:
         # object_id already used therefore can be re-used by any flow_id
-        return True
+        return True, object_item.get("storage_ids", [])
     # All other options are invalid
-    return False
+    return False, []
 
 
 @tracer.capture_method(capture_response=False)
 def delete_flow_storage_record(object_id: str) -> None:
     """Delete the DDB record associated with the supplied object_id"""
-    query = storage_table.query(KeyConditionExpression=Key("object_id").eq(object_id))
+    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
     for item in query["Items"]:
         storage_table.delete_item(
             Key={
-                "object_id": item["object_id"],
+                "id": item["id"],
                 "flow_id": item["flow_id"],
             },
         )
@@ -352,3 +355,49 @@ def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
             raise BadRequestError("Invalid page parameter value")  # 400
         kwargs["ExclusiveStartKey"] = exclusive_start_key
     return kwargs
+
+
+@lru_cache()
+@tracer.capture_method(capture_response=False)
+def get_store_name() -> str:
+    get_item = service_table.get_item(
+        Key={"record_type": "service", "id": constants.SERVICE_INFO_ID}
+    )
+    if not get_item.get("Item"):
+        return "tams"
+    if get_item["Item"].get("name") is None:
+        return "tams"
+    return get_item["Item"]["name"]
+
+
+@tracer.capture_method(capture_response=False)
+def get_storage_backend_dict(item, store_name) -> dict:
+    return {
+        "storage_id": item["id"],
+        "label": f'aws.{item["region"]}:s3:{store_name}',
+        **item,
+    }
+
+
+@lru_cache()
+@tracer.capture_method(capture_response=False)
+def get_default_storage_backend() -> dict:
+    query = service_table.query(
+        KeyConditionExpression=Key("record_type").eq("storage-backend"),
+        FilterExpression=Attr("default_storage").eq(True),
+    )
+    items = query["Items"]
+    if len(items) == 0:
+        raise BadRequestError("No default storage backend found")  # 404
+    return dict(get_storage_backend_dict(items[0], get_store_name()))
+
+
+@lru_cache()
+@tracer.capture_method(capture_response=False)
+def get_storage_backend(storage_id: str) -> dict:
+    get_item = service_table.get_item(
+        Key={"record_type": "storage-backend", "id": storage_id}
+    )
+    if not get_item.get("Item"):
+        raise BadRequestError("Invalid storage backend identifier")  # 404
+    return dict(get_storage_backend_dict(get_item["Item"], get_store_name()))

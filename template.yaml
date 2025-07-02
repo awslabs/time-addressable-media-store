@@ -46,8 +46,8 @@ Parameters:
 Mappings:
   Solution:
     Constants:
-      ApiVersion: "6.0"
-      ServiceVersion: "3.1"
+      ApiVersion: "7.0"
+      ServiceVersion: "4.0"
 
   OAuth:
     Scopes:
@@ -148,6 +148,13 @@ Resources:
           LoggingLevel: INFO
           MetricsEnabled: True
       StageName: Prod
+      AlwaysDeploy: True
+      Variables:
+        api_version: !FindInMap [Solution, Constants, ApiVersion]
+        service_version: !Sub
+          - aws.${ServiceVersion}
+          - ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
+        webhooks_enabled: !Ref EnableWebhooks
       Cors:
         AllowMethods: '''*'''
         AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
@@ -161,32 +168,29 @@ Resources:
             Identity:
               Header: Authorization
 
-  ServiceInformationParameter:
-    Type: AWS::SSM::Parameter
+  ServiceTable:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
+    Type: AWS::DynamoDB::Table
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W74
+            reason: Encryption not required
+          - id: W78
+            reason: Backup not required
     Properties:
-      Name: !Sub ${AWS::StackName}-service-information
-      Type: String
-      DataType: text
-      Description: The TAMS API Service Information
-      Value: !Sub
-        - |
-          {
-            "type": "urn:x-tams:service.example",
-            "api_version": "${ApiVersion}",
-            "service_version": "aws.${ServiceVersion}",
-            "media_store": {
-              "type": "http_object_store"
-            },
-            "event_stream_mechanisms": [${WebhooksEventStream}]
-          }
-        - ApiVersion: !FindInMap [Solution, Constants, ApiVersion]
-          ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
-          WebhooksEventStream: !If
-            - SupportWebhooks
-            - !Sub
-              - '{"name": "webhooks", "docs": "https://bbc.github.io/tams/${ApiVersion}/index.html#/operations/POST_webhooks"}'
-              - ApiVersion: !FindInMap [Solution, Constants, ApiVersion]
-            - ""
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: record_type
+          AttributeType: S
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: record_type
+          KeyType: HASH
+        - AttributeName: id
+          KeyType: RANGE
 
   FlowSegmentsTable:
     DeletionPolicy: RetainExceptOnCreate
@@ -273,12 +277,12 @@ Resources:
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: object_id
+        - AttributeName: id
           AttributeType: S
         - AttributeName: flow_id
           AttributeType: S
       KeySchema:
-        - AttributeName: object_id
+        - AttributeName: id
           KeyType: HASH
         - AttributeName: flow_id
           KeyType: RANGE
@@ -311,6 +315,38 @@ Resources:
           - BucketKeyEnabled: False
             ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+
+  CrStorageBackendFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/cr_storage_backend/
+      Environment:
+        Variables:
+          SERVICE_TABLE: !Ref ServiceTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
+
+  StorageBackend:
+    Type: Custom::StorageBackend
+    Properties:
+      ServiceToken: !GetAtt CrStorageBackendFunction.Arn
+      default_storage: True
+      bucket_name: !Ref MediaStorageBucket
+      region: !Ref AWS::Region
 
   DeleteRequestQueue:
     Type: AWS::SQS::Queue
@@ -423,30 +459,26 @@ Resources:
     Properties:
       CodeUri: functions/api_service/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-service
           POWERTOOLS_METRICS_NAMESPACE: TAMS
-          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+          SERVICE_TABLE: !Ref ServiceTable
           WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
       Policies:
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
-                - ssm:DescribeParameters
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:PutItem
               Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:*
-            - Effect: Allow
-              Action:
-                - ssm:GetParameter
-                - ssm:PutParameter
-              Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
+                - !GetAtt ServiceTable.Arn
       Events:
         headRoot:
           Type: Api
@@ -536,6 +568,28 @@ Resources:
               AuthorizationScopes:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Post]
+        headStorageBackends:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/storage-backends
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+        getStorageBackends:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/storage-backends
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
         anyRoot:
           Type: Api
           Properties:
@@ -597,7 +651,7 @@ Resources:
     Properties:
       CodeUri: functions/api_sources/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -840,7 +894,7 @@ Resources:
     Properties:
       CodeUri: functions/api_flows/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -849,10 +903,10 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
+          SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
-          BUCKET: !Ref MediaStorageBucket
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
       Policies:
         - Version: "2012-10-17"
@@ -869,10 +923,16 @@ Resources:
               Action:
                 - dynamodb:Query
               Resource:
+                - !GetAtt ServiceTable.Arn
                 - !GetAtt FlowSegmentsTable.Arn
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
+                - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
                 - dynamodb:PutItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
@@ -1306,7 +1366,7 @@ Resources:
     Properties:
       CodeUri: functions/api_flow_segments/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1315,14 +1375,12 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           EVENT_BUS: !Ref EventBus
+          SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
-          BUCKET: !Ref MediaStorageBucket
-          BUCKET_REGION: !Ref AWS::Region
           S3_QUEUE_URL: !Ref CleanupS3Queue
           DELETE_QUEUE_URL: !Ref DeleteRequestQueue
           COGNITO_LAMBDA_NAME: !Ref CognitoUtilsFunction
-          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1370,9 +1428,10 @@ Resources:
                   neptune-db:QueryLanguage: OpenCypher
             - Effect: Allow
               Action:
-                - ssm:GetParameter
+                - dynamodb:Query
+                - dynamodb:GetItem
               Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
+                - !GetAtt ServiceTable.Arn
       Events:
         headFlowsFlowidSegments:
           Type: Api
@@ -1432,7 +1491,7 @@ Resources:
     Properties:
       CodeUri: functions/api_objects/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1442,7 +1501,6 @@ Resources:
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
-          BUCKET: !Ref MediaStorageBucket
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1452,11 +1510,6 @@ Resources:
               Resource:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
                 - !GetAtt FlowStorageTable.Arn
-            - Effect: Allow
-              Action:
-                - s3:GetObject
-              Resource:
-                - !Sub ${MediaStorageBucket.Arn}/*
       Events:
         headMediaObjectInformation:
           Type: Api
@@ -1493,7 +1546,7 @@ Resources:
     Properties:
       CodeUri: functions/api_flow_delete_requests/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1571,17 +1624,15 @@ Resources:
     Properties:
       CodeUri: functions/webhooks/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-webhooks
           POWERTOOLS_METRICS_NAMESPACE: TAMS
+          SERVICE_TABLE: !Ref ServiceTable
           WEBHOOKS_TABLE: !Ref WebhooksTable
-          BUCKET: !Ref MediaStorageBucket
-          BUCKET_REGION: !Ref AWS::Region
-          SERVICE_INFO_PARAMETER: !Ref ServiceInformationParameter
           WEBHOOKS_QUEUE_URL: !Ref WebhooksDeliveryQueue
       Policies:
         - Version: "2012-10-17"
@@ -1593,9 +1644,10 @@ Resources:
                 - !GetAtt WebhooksTable.Arn
             - Effect: Allow
               Action:
-                - ssm:GetParameter
+                - dynamodb:Query
+                - dynamodb:GetItem
               Resource:
-                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceInformationParameter}
+                - !GetAtt ServiceTable.Arn
             - Effect: Allow
               Action:
                 - s3:GetObject
@@ -1630,7 +1682,7 @@ Resources:
       VpcConfig: !Ref AWS::NoValue
       CodeUri: functions/webhooks_delivery/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1660,7 +1712,7 @@ Resources:
     Properties:
       CodeUri: functions/sqs_delete_requests/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Timeout: 900
       Environment:
@@ -1723,7 +1775,7 @@ Resources:
     Properties:
       CodeUri: functions/sqs_object_cleanup/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:7
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
       Timeout: 900
       Environment:
@@ -1732,9 +1784,9 @@ Resources:
           POWERTOOLS_SERVICE_NAME: tams-cleanup
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+          SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
-          BUCKET: !Ref MediaStorageBucket
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1749,6 +1801,12 @@ Resources:
                 - dynamodb:DeleteItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
             - Effect: Allow
               Action:
                 - s3:DeleteObject
@@ -1964,6 +2022,9 @@ Outputs:
   FlowSegmentsTable:
     Value: !Ref FlowSegmentsTable
 
+  FlowStorageTable:
+    Value: !Ref FlowStorageTable
+
   WebhooksTable:
     Value: !If [SupportWebhooks, !Ref WebhooksTable, ""]
 
@@ -1989,3 +2050,33 @@ Outputs:
 
   UtilsLayerArn:
     Value: !Ref UtilsLayer
+
+  AdditionalStorageCrStorageBackendFunctionArn:
+    Value: !GetAtt CrStorageBackendFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-CrStorageBackendFunctionArn
+
+  AdditionalStorageFlowsFunctionRole:
+    Value: !Ref FlowsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-FlowsFunctionRole
+
+  AdditionalStorageFlowSegmentsFunctionRole:
+    Value: !Ref FlowSegmentsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-FlowSegmentsFunctionRole
+
+  AdditionalStorageObjectsFunctionRole:
+    Value: !Ref ObjectsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-ObjectsFunctionRole
+
+  AdditionalStorageWebhooksFunctionRole:
+    Value: !If [SupportWebhooks, !Ref WebhooksFunctionRole, ""]
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-WebhooksFunctionRole
+
+  AdditionalStorageSqsObjectCleanupFunctionRole:
+    Value: !Ref SqsObjectCleanupFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-SqsObjectCleanupFunctionRole

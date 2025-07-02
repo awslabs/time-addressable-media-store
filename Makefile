@@ -64,7 +64,7 @@ api/build/tams: $(TAMS_SPEC_ZIP_FILE) | api/build
 api-spec: api/build/tams
 	@echo "Generating API schema..."
 	poetry run python ./api/build/generate_spec.py
-	poetry run datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel --target-python-version 3.13 --use-schema-description --use-double-quotes
+	poetry run datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel  --disable-timestamp --target-python-version 3.13 --use-schema-description --use-double-quotes
 	rm -rf ./api/build/tams
 
 build: api-spec

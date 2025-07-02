@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Configuration
+        Parameters:
+          - ApiStackName
+    ParameterLabels:
+      ApiStackName:
+        default: The name of the CloudFormation stack that Deployed the TAMS API
+
+Parameters:
+  ApiStackName:
+    Type: String
+
+Resources:
+  MediaStorageBucket:
+    DeletionPolicy: RetainExceptOnCreate
+    UpdateReplacePolicy: Retain
+    Type: AWS::S3::Bucket
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: Access logging not required
+          - id: W51
+            reason: Bucket policy not required
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+            AllowedOrigins:
+              - "*"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: False
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  StorageBackend:
+    Type: Custom::StorageBackend
+    Properties:
+      ServiceToken: !ImportValue
+        Fn::Sub: ${ApiStackName}-AdditionalStorage-CrStorageBackendFunctionArn
+      default_storage: False
+      bucket_name: !Ref MediaStorageBucket
+      region: !Ref AWS::Region
+
+  PutObjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-FlowsFunctionRole
+      PolicyName: !Sub ${AWS::StackName}-PutObject
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub ${MediaStorageBucket.Arn}/*
+
+  GetObjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-FlowSegmentsFunctionRole
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-ObjectsFunctionRole
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-WebhooksFunctionRole
+      PolicyName: !Sub ${AWS::StackName}-GetObject
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub ${MediaStorageBucket.Arn}/*
+
+  DeleteObjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !ImportValue
+            Fn::Sub: ${ApiStackName}-AdditionalStorage-SqsObjectCleanupFunctionRole
+      PolicyName: !Sub ${AWS::StackName}-DeleteObject
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
+            Resource:
+              - !Sub ${MediaStorageBucket.Arn}/*
+
+Outputs:
+  MediaStorageBucket:
+    Value: !Ref MediaStorageBucket
+
+  StorageBackend:
+    Value: !Sub
+      - |-
+        {
+          "record_type": "storage-backend",
+          "id": "${id}",
+          "bucket_name": "${MediaStorageBucket}",
+          "provider": "aws",
+          "region": "${AWS::Region}",
+          "store_product": "s3",
+          "store_type": "http_object_store"
+        }
+      - id: !Select [2, !Split [/, !Ref "AWS::StackId"]]

@@ -469,7 +469,7 @@ class TestDynamoDB:
 
         mock_storage_table.query.return_value = return_items
 
-        result = dynamodb.validate_object_id(object_id, flow_id)
+        result, _ = dynamodb.validate_object_id(object_id, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert not result
@@ -483,12 +483,12 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123", "expire_at": 12345},
+                {"id": "abc", "flow_id": "123", "expire_at": 12345},
             ]
         }
         mock_storage_table.query.return_value = return_items
 
-        result = dynamodb.validate_object_id(object_id, flow_id)
+        result, _ = dynamodb.validate_object_id(object_id, flow_id)
 
         assert 1 == mock_storage_table.update_item.call_count
         assert result
@@ -502,12 +502,12 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123"},
+                {"id": "abc", "flow_id": "123"},
             ]
         }
         mock_storage_table.query.return_value = return_items
 
-        result = dynamodb.validate_object_id(object_id, flow_id)
+        result, _ = dynamodb.validate_object_id(object_id, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert result
@@ -521,12 +521,12 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123", "expire_at": 12345},
+                {"id": "abc", "flow_id": "123", "expire_at": 12345},
             ]
         }
         mock_storage_table.query.return_value = return_items
 
-        result = dynamodb.validate_object_id(object_id, flow_id)
+        result, _ = dynamodb.validate_object_id(object_id, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert not result
@@ -540,12 +540,12 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123"},
+                {"id": "abc", "flow_id": "123"},
             ]
         }
         mock_storage_table.query.return_value = return_items
 
-        result = dynamodb.validate_object_id(object_id, flow_id)
+        result, _ = dynamodb.validate_object_id(object_id, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert result
@@ -556,7 +556,7 @@ class TestDynamoDB:
 
         return_items = {
             "Items": [
-                {"object_id": "abc", "flow_id": "123"},
+                {"id": "abc", "flow_id": "123"},
             ]
         }
         mock_storage_table.query.return_value = return_items

@@ -17,6 +17,8 @@ pytestmark = [
         ("/service/webhooks", "GET"),
         ("/service/webhooks", "HEAD"),
         ("/service/webhooks", "POST"),
+        ("/service/storage-backends", "GET"),
+        ("/service/storage-backends", "HEAD"),
     ],
 )
 def test_auth_401(verb, path, api_endpoint):
@@ -51,9 +53,9 @@ def test_List_Root_Endpoints_GET_200(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert set(["service", "flows", "sources", "flow-delete-requests"]) == set(
-        response.json()
-    )
+    assert set(
+        ["service", "flows", "sources", "objects", "flow-delete-requests"]
+    ) == set(response.json())
 
 
 def test_Service_Information_HEAD_200(api_client_cognito):
@@ -81,7 +83,6 @@ def test_Service_Information_GET_200(api_client_cognito, webhooks_enabled):
     assert "type" in response.json()
     assert "api_version" in response.json()
     assert "service_version" in response.json()
-    assert "media_store" in response.json()
     if webhooks_enabled:
         assert "event_stream_mechanisms" in response.json()
     else:
@@ -316,3 +317,28 @@ def test_Register_Webhook_URL_POST_204(api_client_cognito, webhooks_enabled):
         assert "content-type" in response_headers_lower
         assert "application/json" == response_headers_lower["content-type"]
         assert "" == response.content.decode("utf-8")
+
+
+def test_Service_StorageBackends_HEAD_200(api_client_cognito):
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request("HEAD", path)
+    # Assert
+    assert 200 == response.status_code
+
+
+def test_Service_StorageBackends_GET_200(api_client_cognito):
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert isinstance(response.json(), list)

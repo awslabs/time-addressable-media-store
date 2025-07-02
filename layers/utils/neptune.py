@@ -25,7 +25,7 @@ tracer = Tracer()
 neptune = boto3.client(
     "neptunedata",
     region_name=os.environ["AWS_REGION"],
-    endpoint_url=f'https://{os.environ["NEPTUNE_ENDPOINT"]}:8182',
+    endpoint_url=f'https://{os.environ.get("NEPTUNE_ENDPOINT", "localhost")}:8182',
 )
 qb = QueryBuilder()
 

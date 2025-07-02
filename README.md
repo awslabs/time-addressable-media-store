@@ -100,6 +100,16 @@ This request will return JSON that will contain the `access_token`. Take the val
 
 Currently Authorization is purely handled by which OAuth scopes are assigned to the App Client within Cognito. Creating a new client with only `tams-api/read` will result in "read only" access to the API.
 
+### Addtional Storage
+
+[Version 7](https://github.com/bbc/tams/releases/tag/7.0) of the TAMS API specification introduced new functionality that allows the client to choose between different "storage backends" where available.
+
+This solution deploys with a default storage backend using a dedicated S3 bucket.
+
+If desired, addtional S3 buckets can be deployed as separate TAMS storage backends. This is done by deploying separate Cloudformation Stacks with [this](storage_backend.yaml) template. It only takes a single parameter and that is the name of the main TAMS API stack.
+
+> **Note:** This template does NOT require the SAM cli to deploy it. It can be done directly in the Cloudformation Console or via any other Cloudformation create stack option.
+
 ## Architecture Diagram
 
 ![Architecture Diagram](docs/images/architecture.png)

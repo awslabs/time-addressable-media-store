@@ -19,6 +19,7 @@ mediatimestamp = "^5.2.0"
 cymple = "^0.12.0"
 moto = "^5.1.5"
 datamodel-code-generator = "^0.31.0"
+pytest-lazy-fixtures = "^1.1.4"
 
 [project]
 name = "time-addressable-media-store"

@@ -25,7 +25,7 @@ from boto3.dynamodb.conditions import Key
 from dynamodb import get_object_id_query_kwargs, segments_table, storage_table
 from schema import Object
 from typing_extensions import Annotated
-from utils import check_object_exists, generate_link_url, model_dump
+from utils import generate_link_url, model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -33,7 +33,6 @@ app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
 metrics = Metrics()
-bucket = os.environ["BUCKET"]
 
 
 @app.head("/objects/<objectId>")
@@ -44,8 +43,6 @@ def get_objects_by_id(
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
-    if not check_object_exists(bucket, object_id):
-        raise NotFoundError("The requested media object does not exist.")  # 404
     args = get_object_id_query_kwargs(
         object_id,
         {
@@ -55,6 +52,8 @@ def get_objects_by_id(
     )
     query = segments_table.query(**args)
     items = query["Items"]
+    if len(items) == 0 and param_page is None:
+        raise NotFoundError("The requested media object does not exist.")  # 404
     custom_headers = {}
     while "LastEvaluatedKey" in query and len(items) < args["Limit"]:
         args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
@@ -76,9 +75,7 @@ def get_objects_by_id(
             body=None,
             headers=custom_headers,
         )
-    object_query = storage_table.query(
-        KeyConditionExpression=Key("object_id").eq(object_id)
-    )
+    object_query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
     valid_object_items = [
         item for item in object_query["Items"] if item.get("expire_at") is None
     ]
@@ -87,7 +84,7 @@ def get_objects_by_id(
     )
     schema_item = Object(
         **{
-            "object_id": object_id,
+            "id": object_id,
             "referenced_by_flows": set([item["flow_id"] for item in items]),
             "first_referenced_by_flow": first_referenced_by_flow,
         }

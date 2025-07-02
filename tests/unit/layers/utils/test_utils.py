@@ -298,24 +298,6 @@ class TestUtils:
         assert result == {"b": 2}
 
     @patch("utils.s3")
-    def test_check_object_exists(self, mock_s3):
-        mock_s3.head_object.return_value = {}
-        result = utils.check_object_exists("bucket", "key")
-
-        assert mock_s3.head_object.call_count == 1
-        assert result
-
-    @patch("utils.s3")
-    def test_check_object_does_not_exist(self, mock_s3):
-        mock_s3.head_object.side_effect = ClientError(
-            {"Error": {"Code": "404"}}, "head_object"
-        )
-        result = utils.check_object_exists("bucket", "key1")
-
-        assert mock_s3.head_object.call_count == 1
-        assert not result
-
-    @patch("utils.s3")
     def test_get_presigned_url(self, mock_s3):
         expected = "https://example.com"
         mock_s3.generate_presigned_url.return_value = expected
