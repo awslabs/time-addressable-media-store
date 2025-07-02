@@ -102,7 +102,7 @@ Currently Authorization is purely handled by which OAuth scopes are assigned to 
 
 ### Addtional Storage
 
-[Version 7](https://github.com/bbc/tams/releases/tag/7.0) of the TAMS API specification introduced new functionality that allows client to choose between different "storage backends" wher available.
+[Version 7](https://github.com/bbc/tams/releases/tag/7.0) of the TAMS API specification introduced new functionality that allows the client to choose between different "storage backends" where available.
 
 This solution deploys with a default storage backend using a dedicated S3 bucket.
 
