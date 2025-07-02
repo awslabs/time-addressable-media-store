@@ -60,11 +60,11 @@ def get_root():
 @app.get("/service")
 @tracer.capture_method(capture_response=False)
 def get_service():
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
     get_item = service_table.get_item(
         Key={"record_type": "service", "id": constants.SERVICE_INFO_ID}
     )
-    if app.current_event.request_context.http_method == "HEAD":
-        return None, HTTPStatus.OK.value  # 200
     stage_variables = app.current_event.stage_variables
     webhooks_enabled = stage_variables.get("webhooks_enabled", "false").lower() == "yes"
     service = Service(

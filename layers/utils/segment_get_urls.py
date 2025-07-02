@@ -87,16 +87,14 @@ def get_storage_backends(
     Returns:
         Dict mapping storage IDs to their backend configurations
     """
-    filter_ids = accept_storage_ids.split(",") if accept_storage_ids else None
+    filter_ids = set(accept_storage_ids.split(",")) if accept_storage_ids else None
     distinct_storage_ids = set(
         storage_id
         for segment in segments
         for storage_id in segment.get("storage_ids", [default_storage_backend_id])
     )
     filtered_storage_ids = (
-        [storage_id for storage_id in distinct_storage_ids if storage_id in filter_ids]
-        if filter_ids
-        else distinct_storage_ids
+        distinct_storage_ids & filter_ids if filter_ids else distinct_storage_ids
     )
     return {
         storage_id: get_storage_backend(storage_id)
