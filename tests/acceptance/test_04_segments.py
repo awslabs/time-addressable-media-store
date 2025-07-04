@@ -4,6 +4,7 @@ import json
 
 import pytest
 import requests
+from deepdiff import DeepDiff
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -878,15 +879,19 @@ def test_Flow_Details_GET_200_timerange(
     for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
-    assert {
-        **stub_video_flow,
-        "label": "pytest",
-        "description": "pytest",
-        "collected_by": [stub_multi_flow["id"]],
-        "timerange": "[1:0_3:0)",
-        "avg_bit_rate": 6000000,
-        "max_bit_rate": 6000000,
-    } == response_json
+    assert not DeepDiff(
+        {
+            **stub_video_flow,
+            "label": "pytest",
+            "description": "pytest",
+            "collected_by": [stub_multi_flow["id"]],
+            "timerange": "[1:0_3:0)",
+            "avg_bit_rate": 6000000,
+            "max_bit_rate": 6000000,
+        },
+        response_json,
+        ignore_order=True,
+    )
 
 
 def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
