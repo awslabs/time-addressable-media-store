@@ -20,12 +20,22 @@ Parameters:
     Description: Lambda Security Group ID
     Type: AWS::EC2::SecurityGroup::Id
 
+  DBInstanceClass:
+    Description: The DBInstanceClass to be used for the Neptune Database
+    Type: String
+    Default: db.serverless
+    AllowedPattern: ^db\.(serverless|[a-z0-9]+\.[a-z0-9]+)$
+
   ServerlessScalingConfiguration:
     Description: Neptune Serverless Scaling Configuration.
     Type: String
     ConstraintDescription: "ServerlessScalingConfiguration must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1-128."
     AllowedPattern: (12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9]),(12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9])
     Default: 1,128
+
+Conditions:
+
+  CreateServerless: !Equals [!Ref DBInstanceClass, "db.serverless"]
 
 Resources:
 
@@ -63,14 +73,16 @@ Resources:
       StorageEncrypted: True
       VpcSecurityGroupIds:
         - !Ref NeptuneSecurityGroup
-      ServerlessScalingConfiguration:
-        MinCapacity: !Select [0, !Split [",", !Ref ServerlessScalingConfiguration]]
-        MaxCapacity: !Select [1, !Split [",", !Ref ServerlessScalingConfiguration]]
+      ServerlessScalingConfiguration: !If
+        - CreateServerless
+        - MinCapacity: !Select [0, !Split [",", !Ref ServerlessScalingConfiguration]]
+          MaxCapacity: !Select [1, !Split [",", !Ref ServerlessScalingConfiguration]]
+        - !Ref AWS::NoValue
 
   TAMSNeptuneInstance:
     Type: AWS::Neptune::DBInstance
     Properties:
-      DBInstanceClass: db.serverless
+      DBInstanceClass: !Ref DBInstanceClass
       DBClusterIdentifier: !Ref TAMSNeptuneCluster
 
 Outputs:

@@ -56,6 +56,7 @@ The first command will build the source of your application. The second command 
 - **VpcId**: Specify an existing VPC Id, leave blank to have one created.
 - **VpcAZs**: Specify a comma-separated list of availability zones (for example `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds. Leave blank if VPC being created.
 - **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC.
+- **NeptuneDBInstanceClass**: Neptune Cluster Instance class, for example `db.serverless` or `db.r7g.large`
 - **NeptuneServerlessConfiguration**: Neptune Serverless Scaling Configuration. Must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1–128.
 - **DeployWaf**: Specify whether you want the solution behind a WAF.
 - **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
