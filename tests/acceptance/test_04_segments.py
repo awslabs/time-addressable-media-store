@@ -4,7 +4,7 @@ import json
 
 import pytest
 import requests
-from deepdiff import DeepDiff
+from conftest import assert_equal_unordered
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -879,7 +879,7 @@ def test_Flow_Details_GET_200_timerange(
     for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
-    assert not DeepDiff(
+    assert_equal_unordered(
         {
             **stub_video_flow,
             "label": "pytest",
@@ -890,7 +890,6 @@ def test_Flow_Details_GET_200_timerange(
             "max_bit_rate": 6000000,
         },
         response_json,
-        ignore_order=True,
     )
 
 

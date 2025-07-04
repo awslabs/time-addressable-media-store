@@ -1,7 +1,7 @@
 # pylint: disable=too-many-lines
 import pytest
 import requests
-from deepdiff import DeepDiff
+from conftest import assert_equal_unordered
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -84,7 +84,7 @@ def test_Create_or_Replace_Flow_PUT_201_VIDEO(api_client_cognito, stub_video_flo
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert not DeepDiff(stub_video_flow, response_json, ignore_order=True)
+    assert_equal_unordered(stub_video_flow, response_json)
 
 
 def test_Create_or_Replace_Flow_PUT_201_AUDIO(api_client_cognito, stub_audio_flow):
@@ -105,7 +105,7 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(api_client_cognito, stub_audio_flo
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert not DeepDiff(stub_audio_flow, response_json, ignore_order=True)
+    assert_equal_unordered(stub_audio_flow, response_json)
 
 
 def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito, stub_data_flow):
@@ -126,7 +126,7 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito, stub_data_flow)
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert not DeepDiff(stub_data_flow, response_json, ignore_order=True)
+    assert_equal_unordered(stub_data_flow, response_json)
 
 
 def test_Create_or_Replace_Flow_PUT_201_IMAGE(api_client_cognito, stub_image_flow):
@@ -147,7 +147,7 @@ def test_Create_or_Replace_Flow_PUT_201_IMAGE(api_client_cognito, stub_image_flo
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert not DeepDiff(stub_image_flow, response_json, ignore_order=True)
+    assert_equal_unordered(stub_image_flow, response_json)
 
 
 def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito, stub_multi_flow):
@@ -168,7 +168,7 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito, stub_multi_flo
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
-    assert not DeepDiff(stub_multi_flow, response_json, ignore_order=True)
+    assert_equal_unordered(stub_multi_flow, response_json)
 
 
 def test_Create_or_Replace_Flow_PUT_204(api_client_cognito, stub_multi_flow):
@@ -649,10 +649,8 @@ def test_List_Flows_GET_200_codec(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert not DeepDiff(
-        [{**stub_audio_flow, "collected_by": [stub_multi_flow["id"]]}],
-        response_json,
-        ignore_order=True,
+    assert_equal_unordered(
+        [{**stub_audio_flow, "collected_by": [stub_multi_flow["id"]]}], response_json
     )
 
 
@@ -677,10 +675,8 @@ def test_List_Flows_GET_200_format(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert not DeepDiff(
-        [{**stub_data_flow, "collected_by": [stub_multi_flow["id"]]}],
-        response_json,
-        ignore_order=True,
+    assert_equal_unordered(
+        [{**stub_data_flow, "collected_by": [stub_multi_flow["id"]]}], response_json
     )
 
 
@@ -703,10 +699,8 @@ def test_List_Flows_GET_200_frame_height(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert not DeepDiff(
-        [{**stub_video_flow, "collected_by": [stub_multi_flow["id"]]}],
-        response_json,
-        ignore_order=True,
+    assert_equal_unordered(
+        [{**stub_video_flow, "collected_by": [stub_multi_flow["id"]]}], response_json
     )
 
 
@@ -729,10 +723,8 @@ def test_List_Flows_GET_200_frame_width(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert not DeepDiff(
-        [{**stub_video_flow, "collected_by": [stub_multi_flow["id"]]}],
-        response_json,
-        ignore_order=True,
+    assert_equal_unordered(
+        [{**stub_video_flow, "collected_by": [stub_multi_flow["id"]]}], response_json
     )
 
 
@@ -758,11 +750,7 @@ def test_List_Flows_GET_200_label(api_client_cognito, dynamic_props, stub_multi_
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert not DeepDiff(
-        [stub_multi_flow],
-        response_json,
-        ignore_order=True,
-    )
+    assert_equal_unordered([stub_multi_flow], response_json)
 
 
 def test_List_Flows_GET_200_limit(api_client_cognito):
@@ -817,10 +805,8 @@ def test_List_Flows_GET_200_source_id(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert not DeepDiff(
-        [{**stub_data_flow, "collected_by": [stub_multi_flow["id"]]}],
-        response_json,
-        ignore_order=True,
+    assert_equal_unordered(
+        [{**stub_data_flow, "collected_by": [stub_multi_flow["id"]]}], response_json
     )
 
 
@@ -848,11 +834,7 @@ def test_List_Flows_GET_200_tag_name(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert not DeepDiff(
-        [stub_multi_flow],
-        response_json,
-        ignore_order=True,
-    )
+    assert_equal_unordered([stub_multi_flow], response_json)
 
 
 def test_List_Flows_GET_200_tag_exists_name(api_client_cognito):
@@ -1240,10 +1222,8 @@ def test_Flow_Details_GET_200(
     for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
-    assert not DeepDiff(
-        {**stub_data_flow, "collected_by": [stub_multi_flow["id"]]},
-        response_json,
-        ignore_order=True,
+    assert_equal_unordered(
+        {**stub_data_flow, "collected_by": [stub_multi_flow["id"]]}, response_json
     )
 
 
@@ -2066,11 +2046,7 @@ def test_Flow_Flow_Collection_GET_200(api_client_cognito, stub_multi_flow):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert not DeepDiff(
-        stub_multi_flow["flow_collection"],
-        response_json,
-        ignore_order=True,
-    )
+    assert_equal_unordered(stub_multi_flow["flow_collection"], response_json)
 
 
 def test_Flow_Flow_Collection_GET_404(api_client_cognito, id_404):
