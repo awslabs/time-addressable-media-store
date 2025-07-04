@@ -1,6 +1,7 @@
 # pylint: disable=too-many-lines
 import pytest
 import requests
+from conftest import assert_equal_unordered
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -323,9 +324,9 @@ def test_List_Sources_GET_200_format(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [
-        {**stub_data_source, "collected_by": [stub_multi_source["id"]]}
-    ] == response_json
+    assert_equal_unordered(
+        [{**stub_data_source, "collected_by": [stub_multi_source["id"]]}], response_json
+    )
 
 
 def test_List_Sources_GET_200_label(
@@ -356,7 +357,7 @@ def test_List_Sources_GET_200_label(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [stub_multi_source] == response_json
+    assert_equal_unordered([stub_multi_source], response_json)
 
 
 def test_List_Sources_GET_200_limit(api_client_cognito):
@@ -426,7 +427,7 @@ def test_List_Sources_GET_200_tag_name(
         for record in response_json:
             if prop in record:
                 del record[prop]
-    assert [stub_multi_source] == response_json
+    assert_equal_unordered([stub_multi_source], response_json)
 
 
 def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
@@ -630,10 +631,9 @@ def test_Source_Details_GET_200(
     for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
-    assert {
-        **stub_data_source,
-        "collected_by": [stub_multi_source["id"]],
-    } == response_json
+    assert_equal_unordered(
+        {**stub_data_source, "collected_by": [stub_multi_source["id"]]}, response_json
+    )
 
 
 def test_Source_Details_GET_404(api_client_cognito, id_404):

@@ -28,6 +28,12 @@ Parameters:
     Default: ""
     AllowedPattern: '|subnet-[a-z0-9]+'
 
+  NeptuneDBInstanceClass:
+    Description: The DBInstanceClass to be used for the Neptune Database
+    Type: String
+    Default: db.serverless
+    AllowedPattern: ^db\.(serverless|[a-z0-9]+\.[a-z0-9]+)$
+
   NeptuneServerlessConfiguration:
     Description: Neptune Serverless Scaling Configuration.
     Type: String
@@ -47,7 +53,7 @@ Mappings:
   Solution:
     Constants:
       ApiVersion: "7.0"
-      ServiceVersion: "4.0"
+      ServiceVersion: "4.1"
 
   OAuth:
     Scopes:
@@ -1977,6 +1983,7 @@ Resources:
         PrivateSubnetIds: !If [CreateVpc, !GetAtt VpcStack.Outputs.PrivateSubnetIds, !Join [',', !Ref PrivateSubnetIds]]
         LambdaSecurityGroupId: !Ref LambdaSecurityGroup
         ServerlessScalingConfiguration: !Ref NeptuneServerlessConfiguration
+        DBInstanceClass: !Ref NeptuneDBInstanceClass
 
   WafStack:
     Type: AWS::CloudFormation::Stack

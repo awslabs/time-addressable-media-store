@@ -4,6 +4,7 @@ from copy import deepcopy
 import boto3
 import pytest
 import requests
+from deepdiff import DeepDiff
 
 STACK_NAME = os.environ["TAMS_STACK_NAME"]
 REGION = os.environ["TAMS_REGION"]
@@ -318,3 +319,10 @@ def get_client_secret(session, user_pool_id, client_id, client_region):
         UserPoolId=user_pool_id, ClientId=client_id
     )
     return user_pool_client["UserPoolClient"]["ClientSecret"]
+
+
+def assert_equal_unordered(obj1, obj2):
+    """Assert that two objects are equal, ignoring order of lists and sets."""
+    diff = DeepDiff(obj1, obj2, ignore_order=True)
+    if diff:
+        raise AssertionError(f"Objects are not equal:\n{diff}")
