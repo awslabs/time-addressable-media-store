@@ -232,8 +232,8 @@ def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
     serialised = {}
     for k, v in obj.items():
         if isinstance(v, (list, dict)):
-            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{k}"] = json.dumps(
-                v, default=json_number
+            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{k}"] = (
+                json.dumps(v, default=json_number) if v else None
             )
         else:
             serialised[f"{key_prefix}{k}"] = v
@@ -348,3 +348,14 @@ def generate_failed_segment(
             },
         }
     )
+
+
+@tracer.capture_method(capture_response=False)
+def get_default_value(value) -> dict | list | None:
+    """Return appropriate default value based on input type."""
+    if isinstance(value, dict):
+        return {}
+    elif isinstance(value, list):
+        return []
+    else:
+        return None
