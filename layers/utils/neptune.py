@@ -14,6 +14,7 @@ from schema import Flowcollection, Source
 from utils import (
     deserialise_neptune_obj,
     filter_dict,
+    get_default_value,
     model_dump,
     parse_api_gw_parameters,
     publish_event,
@@ -488,7 +489,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
             - essence_parameters.keys()
         }
         null_properties = {
-            k: None
+            k: get_default_value(existing_dict[k])
             for k in (
                 existing_dict.keys()
                 - {
