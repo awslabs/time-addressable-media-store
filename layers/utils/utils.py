@@ -232,13 +232,12 @@ def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
     serialised = {}
     for k, v in obj.items():
         # Add backticks around property names containing dots
-        prop_name = f"`{k}`" if "." in k else k
         if isinstance(v, (list, dict)):
-            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{prop_name}"] = (
+            serialised[f"{key_prefix}`{constants.SERIALISE_PREFIX}{k}`"] = (
                 json.dumps(v, default=json_number) if v else None
             )
         else:
-            serialised[f"{key_prefix}{prop_name}"] = v
+            serialised[f"{key_prefix}`{k}`"] = v
     return serialised
 
 
