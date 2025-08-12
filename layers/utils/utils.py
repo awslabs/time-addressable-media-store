@@ -231,7 +231,6 @@ def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
     """Return a new dict with properties of type dict/list serialised into string"""
     serialised = {}
     for k, v in obj.items():
-        # Add backticks around property names containing dots
         if isinstance(v, (list, dict)):
             serialised[f"{key_prefix}`{constants.SERIALISE_PREFIX}{k}`"] = (
                 json.dumps(v, default=json_number) if v else None
