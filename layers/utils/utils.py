@@ -232,11 +232,11 @@ def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
     serialised = {}
     for k, v in obj.items():
         if isinstance(v, (list, dict)):
-            serialised[f"{key_prefix}`{constants.SERIALISE_PREFIX}{k}`"] = (
-                json.dumps(v, default=json_number) if v else None
-            )
+            serialised[
+                f"{key_prefix}{safe_property_name(constants.SERIALISE_PREFIX + k)}"
+            ] = (json.dumps(v, default=json_number) if v else None)
         else:
-            serialised[f"{key_prefix}`{k}`"] = v
+            serialised[f"{key_prefix}{safe_property_name(k)}"] = v
     return serialised
 
 
@@ -275,9 +275,13 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
             elif key == "tag_exists":
                 for tag_name, tag_exists in value.items():
                     if tag_exists:
-                        where_literals.append(f"t.`{tag_name}` IS NOT NULL")
+                        where_literals.append(
+                            f"t.{safe_property_name(tag_name)} IS NOT NULL"
+                        )
                     else:
-                        where_literals.append(f"t.`{tag_name}` IS NULL")
+                        where_literals.append(
+                            f"t.{safe_property_name(tag_name)} IS NULL"
+                        )
             else:
                 return_dict["properties"][key] = value
     return return_dict, where_literals
@@ -359,3 +363,9 @@ def get_default_value(value) -> dict | list | None:
         return []
     else:
         return None
+
+
+@tracer.capture_method(capture_response=False)
+def safe_property_name(name: str) -> str:
+    """Returns a safe OpenCypher property name, wrapping in backticks and escaping existing backticks if needed."""
+    return f"`{name.replace('`', '``')}`"
