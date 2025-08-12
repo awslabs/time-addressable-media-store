@@ -16,9 +16,9 @@ from utils import (
     filter_dict,
     get_default_value,
     model_dump,
+    opencypher_property_name,
     parse_api_gw_parameters,
     publish_event,
-    safe_property_name,
     serialise_neptune_obj,
 )
 
@@ -295,7 +295,7 @@ def query_node_property(record_type: str, record_id: str, prop_name: str) -> any
         query = (
             qb.match()
             .node(ref_name="n", labels=record_type, properties={"id": record_id})
-            .return_literal(f"n.{safe_property_name(prop_name)} AS property")
+            .return_literal(f"n.{opencypher_property_name(prop_name)} AS property")
             .get()
         )
         results = neptune.execute_open_cypher_query(openCypherQuery=query)
@@ -825,5 +825,5 @@ def generate_flow_collection_query(
     # Build the dict of set operations to carry out
     for _, c_ref, _, props in ref_names:
         for k, v in props.items():
-            set_dict[f"{c_ref}.{safe_property_name(k)}"] = v
+            set_dict[f"{c_ref}.{opencypher_property_name(k)}"] = v
     return query.set(set_dict)
