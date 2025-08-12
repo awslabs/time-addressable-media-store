@@ -231,12 +231,14 @@ def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
     """Return a new dict with properties of type dict/list serialised into string"""
     serialised = {}
     for k, v in obj.items():
+        # Add backticks around property names containing dots
+        prop_name = f"`{k}`" if "." in k else k
         if isinstance(v, (list, dict)):
-            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{k}"] = (
+            serialised[f"{key_prefix}{constants.SERIALISE_PREFIX}{prop_name}"] = (
                 json.dumps(v, default=json_number) if v else None
             )
         else:
-            serialised[f"{key_prefix}{k}"] = v
+            serialised[f"{key_prefix}{prop_name}"] = v
     return serialised
 
 
@@ -275,9 +277,9 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
             elif key == "tag_exists":
                 for tag_name, tag_exists in value.items():
                     if tag_exists:
-                        where_literals.append(f"t.{tag_name} IS NOT NULL")
+                        where_literals.append(f"t.`{tag_name}` IS NOT NULL")
                     else:
-                        where_literals.append(f"t.{tag_name} IS NULL")
+                        where_literals.append(f"t.`{tag_name}` IS NULL")
             else:
                 return_dict["properties"][key] = value
     return return_dict, where_literals

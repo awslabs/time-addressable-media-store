@@ -284,7 +284,7 @@ class TestUtils:
             assert return_dict["tag_properties"][k] == v
 
         # Ensure tag_exists values are reflected in where literals
-        assert where_literals == ["t.y IS NOT NULL", "t.z IS NULL"]
+        assert where_literals == ["t.`y` IS NOT NULL", "t.`z` IS NULL"]
 
         # Ensure misc properties are included appropriately
         assert return_dict["properties"]["misc"] == query_parameters["misc"]

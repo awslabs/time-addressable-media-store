@@ -824,5 +824,7 @@ def generate_flow_collection_query(
     # Build the dict of set operations to carry out
     for _, c_ref, _, props in ref_names:
         for k, v in props.items():
-            set_dict[f"{c_ref}.{k}"] = v
+            # Add backticks around property names containing dots
+            prop_name = f"`{k}`" if "." in k else k
+            set_dict[f"{c_ref}.{prop_name}"] = v
     return query.set(set_dict)
