@@ -69,6 +69,7 @@ from utils import (
     generate_presigned_url,
     get_username,
     model_dump,
+    opencypher_property_name,
     parse_claims,
     parse_tag_parameters,
     publish_event,
@@ -340,7 +341,10 @@ def put_flow_tag_value(
         )  # 403
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flow_id, username, {f"t.{tag_name}": tag_value}
+        record_type,
+        flow_id,
+        username,
+        {f"t.{opencypher_property_name(tag_name)}": tag_value},
     )
     publish_event(
         f"{record_type}s/updated",
@@ -371,7 +375,10 @@ def delete_flow_tag_value(
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, flow_id, username, {f"t.{tag_name}": None}
+        record_type,
+        flow_id,
+        username,
+        {f"t.{opencypher_property_name(tag_name)}": None},
     )
     publish_event(
         f"{record_type}s/updated",

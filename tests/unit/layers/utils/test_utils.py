@@ -239,13 +239,13 @@ class TestUtils:
 
     def test_serialise_neptune_obj(self):
         child_key = "child"
-        serialised_key = f"{constants.SERIALISE_PREFIX}{child_key}"
+        serialised_key = f"`{constants.SERIALISE_PREFIX}{child_key}`"
         input_dict = {"id": "123", child_key: {"hello": "world"}}
 
         result = utils.serialise_neptune_obj(input_dict)
 
         assert isinstance(result, dict)
-        assert result["id"] == input_dict["id"]
+        assert result["`id`"] == input_dict["id"]
         assert isinstance(result[serialised_key], str)
         assert json.loads(result[serialised_key]) == input_dict[child_key]
 
@@ -284,7 +284,7 @@ class TestUtils:
             assert return_dict["tag_properties"][k] == v
 
         # Ensure tag_exists values are reflected in where literals
-        assert where_literals == ["t.y IS NOT NULL", "t.z IS NULL"]
+        assert where_literals == ["t.`y` IS NOT NULL", "t.`z` IS NULL"]
 
         # Ensure misc properties are included appropriately
         assert return_dict["properties"]["misc"] == query_parameters["misc"]

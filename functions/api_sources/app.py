@@ -34,6 +34,7 @@ from utils import (
     generate_link_url,
     get_username,
     model_dump,
+    opencypher_property_name,
     parse_claims,
     parse_tag_parameters,
     publish_event,
@@ -156,7 +157,10 @@ def put_source_tag_value(
         )  # 404
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, source_id, username, {f"t.{tag_name}": tag_value}
+        record_type,
+        source_id,
+        username,
+        {f"t.{opencypher_property_name(tag_name)}": tag_value},
     )
     publish_event(
         f"{record_type}s/updated",
@@ -184,7 +188,10 @@ def delete_source_tag(
         )  # 404
     username = get_username(parse_claims(app.current_event.request_context))
     item_dict = set_node_property(
-        record_type, source_id, username, {f"t.{tag_name}": None}
+        record_type,
+        source_id,
+        username,
+        {f"t.{opencypher_property_name(tag_name)}": None},
     )
     publish_event(
         f"{record_type}s/updated",
