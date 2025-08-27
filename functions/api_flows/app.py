@@ -211,8 +211,9 @@ def put_flow_by_id(
             )  # 403
     except ValueError:
         existing_item = {}
+    # Ensure format is not being changed but only for flow updates
     if (
-        existing_item.get("format")
+        existing_item.get("format") is not None
         and existing_item.get("format") != flow.root.format.value
     ):
         raise BadRequestError(
