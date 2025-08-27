@@ -779,7 +779,7 @@ def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
     # Check if supplied source already exists, create if not. Raise error if format does not match
     try:
         existing_source = query_node("source", flow_dict["source_id"])
-        if existing_source["format"] != flow_dict["format"]:
+        if existing_source.get("format") != flow_dict.get("format"):
             raise BadRequestError(
                 "Bad request. The format of the flow must match the specified source."
             )  # 400
