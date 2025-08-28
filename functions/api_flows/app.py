@@ -211,6 +211,14 @@ def put_flow_by_id(
             )  # 403
     except ValueError:
         existing_item = {}
+    # Ensure format is not being changed but only for flow updates
+    if (
+        existing_item.get("format") is not None
+        and existing_item.get("format") != flow.root.format.value
+    ):
+        raise BadRequestError(
+            "Bad request. The format of the flow cannot be changed."
+        )  # 400
     if not validate_flow_collection(flow_id, flow.root.flow_collection):
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
     # API spec states these fields should be ignored if given in a PUT request.

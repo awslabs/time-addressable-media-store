@@ -8,6 +8,7 @@ import boto3
 import constants
 import cymple
 from aws_lambda_powertools import Tracer
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from cymple import QueryBuilder
 from deepdiff import DeepDiff
 from schema import Flowcollection, Source
@@ -775,8 +776,14 @@ def validate_flow_collection(flow_id: str, flow_collection: Flowcollection):
 @tracer.capture_method(capture_response=False)
 def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
     """Perform an OpenCypher Merge operation on the supplied TAMS Source/Flow record"""
-    # Check if supplied source already exists, create if not
-    if not check_node_exists("source", flow_dict["source_id"]):
+    # Check if supplied source already exists, create if not. Raise error if format does not match
+    try:
+        existing_source = query_node("source", flow_dict["source_id"])
+        if existing_source.get("format") != flow_dict.get("format"):
+            raise BadRequestError(
+                "Bad request. The format of the flow must match the specified source."
+            )  # 400
+    except ValueError:
         source: Source = Source(**flow_dict)
         source.id = flow_dict["source_id"]
         source_dict = model_dump(source)
