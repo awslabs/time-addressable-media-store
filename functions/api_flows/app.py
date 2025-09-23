@@ -115,9 +115,7 @@ def get_flows(
         app.current_event.query_string_parameters
     )
     custom_headers = {}
-    if param_limit:
-        custom_headers["X-Paging-Limit"] = str(param_limit)
-    items, next_page = query_flows(
+    items, next_page, limit_used = query_flows(
         {
             "source_id": param_source_id,
             "timerange": param_timerange,
@@ -151,6 +149,8 @@ def get_flows(
     if next_page:
         custom_headers["X-Paging-NextKey"] = str(next_page)
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
+    if next_page or limit_used != param_limit:
+        custom_headers["X-Paging-Limit"] = str(limit_used)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200

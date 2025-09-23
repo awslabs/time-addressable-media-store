@@ -326,7 +326,7 @@ def query_flow_collection(flow_id: str) -> list:
 
 
 @tracer.capture_method(capture_response=False)
-def query_sources(parameters: dict) -> tuple[list, int]:
+def query_sources(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Sources from the Neptune Database"""
     props, where_literals = parse_api_gw_parameters(
         {
@@ -369,11 +369,11 @@ def query_sources(parameters: dict) -> tuple[list, int]:
         deserialise_neptune_obj(result["source"]) for result in results["results"]
     ]
     next_page = page + limit if len(deserialised_results) == limit else None
-    return deserialised_results, next_page
+    return deserialised_results, next_page, limit
 
 
 @tracer.capture_method(capture_response=False)
-def query_flows(parameters: dict) -> tuple[list, int]:
+def query_flows(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Flows from the Neptune Database"""
     props, where_literals = parse_api_gw_parameters(
         {
@@ -423,7 +423,7 @@ def query_flows(parameters: dict) -> tuple[list, int]:
         deserialise_neptune_obj(result["flow"]) for result in results["results"]
     ]
     next_page = page + limit if len(deserialised_results) == limit else None
-    return deserialised_results, next_page
+    return deserialised_results, next_page, limit
 
 
 @tracer.capture_method(capture_response=False)

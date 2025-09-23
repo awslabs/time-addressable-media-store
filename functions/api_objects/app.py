@@ -66,7 +66,7 @@ def get_objects_by_id(
         custom_headers["X-Paging-NextKey"] = next_key
         custom_headers["Link"] = generate_link_url(app.current_event, next_key)
     # Set Paging Limit header if paging limit being used is not the one specified
-    if param_limit != args["Limit"]:
+    if "LastEvaluatedKey" in query or param_limit != args["Limit"]:
         custom_headers["X-Paging-Limit"] = str(args["Limit"])
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
