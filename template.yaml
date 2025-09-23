@@ -1723,6 +1723,7 @@ Resources:
                 - sqs:SendMessage
               Resource:
                 - !GetAtt CleanupS3Queue.Arn
+                - !GetAtt DeleteRequestQueue.Arn
             - Effect: Allow
               Action:
                 - neptune-db:ReadDataViaQuery
