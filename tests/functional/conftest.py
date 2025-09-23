@@ -103,16 +103,14 @@ def api_event_factory():
         function: A factory function that creates API Gateway event dictionaries
     """
 
-    def _create_event(
-        http_method, path, webhooks_enabled="Yes", query_params=None, json_body=None
-    ):
+    def _create_event(http_method, path, query_params=None, json_body=None):
         event = {
             "httpMethod": http_method,
             "path": path,
             "queryStringParameters": query_params,
             "stageVariables": {
                 "api_version": "1.0",
-                "webhooks_enabled": webhooks_enabled,
+                "webhooks_enabled": "Yes",
                 "service_version": "aws.1.0",
             },
             "requestContext": {

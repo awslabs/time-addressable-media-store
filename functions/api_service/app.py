@@ -5,10 +5,7 @@ import boto3
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
-from aws_lambda_powertools.event_handler.exceptions import (
-    BadRequestError,
-    NotFoundError,
-)
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
@@ -66,15 +63,13 @@ def get_service():
         Key={"record_type": "service", "id": constants.SERVICE_INFO_ID}
     )
     stage_variables = app.current_event.stage_variables
-    webhooks_enabled = stage_variables.get("webhooks_enabled", "false").lower() == "yes"
     service = Service(
         type="urn:x-tams:service.example",
         api_version=stage_variables["api_version"],
         service_version=stage_variables["service_version"],
         **get_item.get("Item", {}),
     )
-    if webhooks_enabled:
-        service.event_stream_mechanisms = [Eventstreamcommon(name="webhooks")]
+    service.event_stream_mechanisms = [Eventstreamcommon(name="webhooks")]
     return model_dump(service), HTTPStatus.OK.value  # 200
 
 
@@ -103,10 +98,6 @@ def post_service(service_post: Annotated[Servicepost, Body()]):
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def get_webhooks():
-    if table_name is None:
-        raise NotFoundError(
-            "Webhooks are not supported by this API implementation"
-        )  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
     webhooks_table = dynamodb.Table(table_name)
@@ -129,10 +120,6 @@ def get_webhooks():
 @app.post("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def post_webhooks(webhook: Annotated[Webhookpost, Body()]):
-    if table_name is None:
-        raise NotFoundError(
-            "Webhooks are not supported by this API implementation"
-        )  # 404
     webhooks_table = dynamodb.Table(table_name)
     query = webhooks_table.query(
         IndexName="url-index",

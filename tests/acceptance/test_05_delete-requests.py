@@ -538,15 +538,14 @@ def test_Flow_Delete_Request_Details_GET_404(api_client_cognito, id_404):
     )
 
 
-def test_Webhooks_Table_Empty(session, region, stack, webhooks_enabled):
-    if webhooks_enabled:
-        # Arrange
-        dynamodb = session.resource("dynamodb", region_name=region)
-        webhooks_table = dynamodb.Table(stack["outputs"]["WebhooksTable"])
-        # Act
-        scan = webhooks_table.scan(Select="COUNT")
-        # Assert
-        assert 0 == scan["Count"]
+def test_Webhooks_Table_Empty(session, region, stack):
+    # Arrange
+    dynamodb = session.resource("dynamodb", region_name=region)
+    webhooks_table = dynamodb.Table(stack["outputs"]["WebhooksTable"])
+    # Act
+    scan = webhooks_table.scan(Select="COUNT")
+    # Assert
+    assert 0 == scan["Count"]
 
 
 def test_FlowSegments_Table_Empty(session, region, stack):
@@ -560,6 +559,7 @@ def test_FlowSegments_Table_Empty(session, region, stack):
 
 
 def test_FlowStorage_Table_Empty(session, region, stack):
+    time.sleep(3)  # Wait to allow for SQS queue to be processed.
     # Arrange
     dynamodb = session.resource("dynamodb", region_name=region)
     storage_table = dynamodb.Table(stack["outputs"]["FlowStorageTable"])

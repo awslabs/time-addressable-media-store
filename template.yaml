@@ -3,14 +3,6 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Time-addressable Media Store API implementation (uksb-yzlyq9dyct)
 
 Parameters:
-  EnableWebhooks:
-    Description: Configure whether this platform will support webhooks or not.
-    Type: String
-    AllowedValues:
-      - "Yes"
-      - "No"
-    Default: "Yes"
-
   VpcId:
     Description: The ID of an existing VPC, if one exists. Leave blank to have one created.
     Type: String
@@ -65,8 +57,6 @@ Mappings:
       Delete: tams-api/delete
 
 Conditions:
-  SupportWebhooks: !Equals [!Ref EnableWebhooks, "Yes"]
-
   CreateVpc: !Equals [!Ref VpcId, ""]
 
   CreateWaf: !Equals [!Ref DeployWaf, "Yes"]
@@ -160,7 +150,6 @@ Resources:
         service_version: !Sub
           - aws.${ServiceVersion}
           - ServiceVersion: !FindInMap [Solution, Constants, ServiceVersion]
-        webhooks_enabled: !Ref EnableWebhooks
       Cors:
         AllowMethods: '''*'''
         AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
@@ -267,7 +256,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: KEYS_ONLY
-    Condition: SupportWebhooks
 
   FlowStorageTable:
     DeletionPolicy: RetainExceptOnCreate
@@ -385,7 +373,6 @@ Resources:
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt WebhooksDeliveryQueueDLQ.Arn
         maxReceiveCount: 1
-    Condition: SupportWebhooks
 
   WebhooksDeliveryQueueDLQ:
     Type: AWS::SQS::Queue
@@ -393,7 +380,6 @@ Resources:
       KmsMasterKeyId: alias/aws/sqs
       VisibilityTimeout: 30
       MessageRetentionPeriod: 86400
-    Condition: SupportWebhooks
 
   WebhooksDeliveryQueueDLQAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -411,7 +397,6 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: missing
-    Condition: SupportWebhooks
 
   EventBus:
     Type: AWS::Events::EventBus
@@ -474,7 +459,7 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SERVICE_TABLE: !Ref ServiceTable
-          WEBHOOKS_TABLE: !If [SupportWebhooks, !Ref WebhooksTable, !Ref 'AWS::NoValue']
+          WEBHOOKS_TABLE: !Ref WebhooksTable
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -485,6 +470,14 @@ Resources:
                 - dynamodb:PutItem
               Resource:
                 - !GetAtt ServiceTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:BatchWriteItem
+              Resource:
+                - !GetAtt WebhooksTable.Arn
+                - !Sub ${WebhooksTable.Arn}/index/url-index
       Events:
         headRoot:
           Type: Api
@@ -626,24 +619,6 @@ Resources:
                 - !FindInMap [OAuth, Scopes, Put]
                 - !FindInMap [OAuth, Scopes, Post]
                 - !FindInMap [OAuth, Scopes, Delete]
-
-  ServiceFunctionRoleWebhooksPolicy:
-    Type: AWS::IAM::RolePolicy
-    Properties:
-      RoleName: !Ref ServiceFunctionRole
-      PolicyName: dynamodb
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - dynamodb:Scan
-              - dynamodb:Query
-              - dynamodb:BatchWriteItem
-            Resource:
-              - !GetAtt WebhooksTable.Arn
-              - !Sub ${WebhooksTable.Arn}/index/url-index
-    Condition: SupportWebhooks
 
   SourcesFunction:
     Type: AWS::Serverless::Function
@@ -1673,7 +1648,6 @@ Resources:
             Pattern:
               source:
                 - tams.api
-    Condition: SupportWebhooks
 
   WebhooksDeliveryFunction:
     Type: AWS::Serverless::Function
@@ -1704,7 +1678,6 @@ Resources:
             Enabled: True
             FunctionResponseTypes:
               - ReportBatchItemFailures
-    Condition: SupportWebhooks
 
   SqsDeleteRequestsFunction:
     Type: AWS::Serverless::Function
@@ -2033,7 +2006,7 @@ Outputs:
     Value: !Ref FlowStorageTable
 
   WebhooksTable:
-    Value: !If [SupportWebhooks, !Ref WebhooksTable, ""]
+    Value: !Ref WebhooksTable
 
   CleanupS3QueueUrl:
     Value: !Ref CleanupS3Queue
@@ -2079,7 +2052,7 @@ Outputs:
       Name: !Sub ${AWS::StackName}-AdditionalStorage-ObjectsFunctionRole
 
   AdditionalStorageWebhooksFunctionRole:
-    Value: !If [SupportWebhooks, !Ref WebhooksFunctionRole, ""]
+    Value: !Ref WebhooksFunctionRole
     Export:
       Name: !Sub ${AWS::StackName}-AdditionalStorage-WebhooksFunctionRole
 
