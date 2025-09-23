@@ -1,6 +1,5 @@
 import base64
 import json
-import os
 from http import HTTPStatus
 from typing import Optional
 
