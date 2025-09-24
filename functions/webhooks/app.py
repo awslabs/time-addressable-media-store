@@ -1,20 +1,12 @@
 import os
-from collections import defaultdict
-from functools import reduce
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
     EventBridgeEvent,
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import And, Attr, Key, Or
-from dynamodb import (
-    get_default_storage_backend,
-    get_storage_backend,
-    get_store_name,
-    webhooks_table,
-)
-from schema import Webhook
+from dynamodb import get_default_storage_backend, get_storage_backend, get_store_name
+from neptune import get_matching_webhooks
 from segment_get_urls import populate_get_urls
 from utils import model_dump, put_message
 
@@ -24,39 +16,6 @@ metrics = Metrics()
 
 webhooks_queue = os.environ["WEBHOOKS_QUEUE_URL"]
 store_name = get_store_name()
-
-
-attribute_mappings = {
-    "flow": "flow_ids",
-    "source": "source_ids",
-    "flow-collected-by": "flow_collected_by_ids",
-    "source-collected-by": "source_collected_by_ids",
-}
-
-
-@tracer.capture_method(capture_response=False)
-def get_matching_webhooks(event):
-    expressions = defaultdict(list)
-    for resource in event.resources:
-        _, resource_type, resource_id = resource.split(":")
-        expressions[attribute_mappings[resource_type]].append(resource_id)
-    filter_expressions = []
-    for attr, id_list in expressions.items():
-        id_expressions = [Attr(attr).contains(id_list[0])]
-        for r_id in id_list[1:]:
-            id_expressions.append(Attr(attr).contains(r_id))
-        id_expressions.append(Attr(attr).not_exists())
-        filter_expressions.append(reduce(Or, id_expressions))
-    args = {"KeyConditionExpression": Key("event").eq(event.detail_type)}
-    if len(filter_expressions) > 0:
-        args["FilterExpression"] = reduce(And, filter_expressions)
-    query = webhooks_table.query(**args)
-    items = query["Items"]
-    while "LastEvaluatedKey" in query:
-        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
-        query = webhooks_table.query(**args)
-        items.extend(query["Items"])
-    return [Webhook(**item, events=[item["event"]]) for item in items]
 
 
 @tracer.capture_method(capture_response=False)

@@ -1,5 +1,6 @@
 import json
 import os
+from collections import defaultdict
 from datetime import datetime, timezone
 
 import boto3
@@ -11,7 +12,7 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from cymple import QueryBuilder
 from deepdiff import DeepDiff
-from schema import Flowcollection, Source
+from schema import Flowcollection, Source, Webhook
 from utils import (
     deserialise_neptune_obj,
     filter_dict,
@@ -154,6 +155,24 @@ def generate_delete_request_query(
 
 @tracer.capture_method(capture_response=False)
 # pylint: disable=dangerous-default-value
+def generate_webhook_query(
+    properties: dict, set_dict: dict = None, where_literals: list = []
+) -> cymple.builder.NodeAvailable:
+    """Returns an Open Cypher Match query to return specified Webhook"""
+    query = qb.match().node(
+        ref_name="webhook",
+        labels="webhook",
+        properties=properties.get("webhook", {}),
+    )
+    if set_dict:
+        query = query.set(set_dict).with_("*")
+    if len(where_literals) > 0:
+        query = query.where_literal(" AND ".join(where_literals))
+    return query
+
+
+@tracer.capture_method(capture_response=False)
+# pylint: disable=dangerous-default-value
 def generate_match_query(
     record_type: str, properties: dict, set_dict: dict = None, where_literals: list = []
 ) -> cymple.builder.NodeAvailable:
@@ -165,6 +184,8 @@ def generate_match_query(
             return generate_flow_query(properties, set_dict, where_literals)
         case "delete_request":
             return generate_delete_request_query(properties, set_dict, where_literals)
+        case "webhook":
+            return generate_webhook_query(properties, set_dict, where_literals)
 
 
 @tracer.capture_method(capture_response=False)
@@ -248,11 +269,11 @@ def get_flow_collected_by(flow_id: str) -> list:
 
 
 @tracer.capture_method(capture_response=False)
-def query_node(record_type: str, record_id: str) -> dict:
+def query_node(record_type: str, record_id: str, id_field: str = "id") -> dict:
     """Returns the specified Node from the Neptune Database"""
     try:
         query = (
-            generate_match_query(record_type, {record_type: {"id": record_id}})
+            generate_match_query(record_type, {record_type: {id_field: record_id}})
             .return_literal(constants.RETURN_LITERAL[record_type])
             .get()
         )
@@ -452,6 +473,27 @@ def query_delete_requests() -> list:
 
 
 @tracer.capture_method(capture_response=False)
+def query_webhooks() -> list:
+    """Returns a list of the TAMS Webhooks from the Neptune Database"""
+    query = generate_webhook_query(
+        {
+            "webhook": {},
+        },
+        where_literals=[],
+    )
+    query = (
+        query.return_literal(constants.RETURN_LITERAL["webhook"])
+        .order_by("webhook.url")
+        .get()
+    )
+    results = execute_open_cypher_query(query)
+    deserialised_results = [
+        deserialise_neptune_obj(result["webhook"]) for result in results["results"]
+    ]
+    return deserialised_results
+
+
+@tracer.capture_method(capture_response=False)
 def merge_source(source_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Source record"""
     tags = source_dict.get("tags", {})
@@ -600,6 +642,42 @@ def merge_delete_request(delete_request_dict: dict) -> None:
 
 
 @tracer.capture_method(capture_response=False)
+def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
+    """Perform an OpenCypher Merge operation on the supplied TAMS Webhook record"""
+    webhook_properties = filter_dict(
+        webhook_dict,
+        {"url"},
+    )
+    if existing_dict:
+        null_properties = {
+            k: get_default_value(existing_dict[k])
+            for k in (
+                existing_dict.keys()
+                - {
+                    "url",
+                }
+            )
+            - webhook_properties.keys()
+        }
+        webhook_properties = webhook_properties | null_properties
+    query = (
+        qb.merge()
+        .node(
+            ref_name="webhook",
+            labels="webhook",
+            properties={"url": webhook_dict["url"]},
+        )
+        .set(serialise_neptune_obj(webhook_properties, "webhook."))
+    )
+    query = query.return_literal(constants.RETURN_LITERAL["webhook"])
+    results = execute_open_cypher_query(query.get())
+    deserialised_results = [
+        deserialise_neptune_obj(result["webhook"]) for result in results["results"]
+    ]
+    return deserialised_results[0]
+
+
+@tracer.capture_method(capture_response=False)
 def delete_flow(flow_id: str) -> str | None:
     """Deletes the specified Flow from the Neptune Database"""
     try:
@@ -627,6 +705,18 @@ def delete_flow(flow_id: str) -> str | None:
         return results["results"][0]["source_id"]
     except IndexError:
         return None
+
+
+@tracer.capture_method(capture_response=False)
+def delete_webhook(webhook_url: str) -> None:
+    """Deletes the specified Webhook from the Neptune Database"""
+    query = (
+        qb.match()
+        .node(ref_name="webhook", labels="webhook", properties={"url": webhook_url})
+        .detach_delete(ref_name="webhook")
+        .get()
+    )
+    execute_open_cypher_query(query)
 
 
 @tracer.capture_method(capture_response=False)
@@ -842,3 +932,37 @@ def generate_flow_collection_query(
         for k, v in props.items():
             set_dict[f"{c_ref}.{opencypher_property_name(k)}"] = v
     return query.set(set_dict)
+
+
+@tracer.capture_method(capture_response=False)
+def get_matching_webhooks(event):
+    attribute_mappings = {
+        "flow": "flow_ids",
+        "source": "source_ids",
+        "flow-collected-by": "flow_collected_by_ids",
+        "source-collected-by": "source_collected_by_ids",
+    }
+    expressions = defaultdict(list)
+    for resource in event.resources:
+        _, resource_type, resource_id = resource.split(":")
+        expressions[attribute_mappings[resource_type]].append(resource_id)
+    where_literals = [rf'webhook.SERIALISE_events CONTAINS "\"{event.detail_type}\""']
+    for attr, id_list in expressions.items():
+        resource_conditions = [f"webhook.SERIALISE_{attr} IS NULL"]
+        for resource_id in id_list:
+            resource_conditions.append(
+                rf'webhook.SERIALISE_{attr} CONTAINS "\"{resource_id}\""'
+            )
+        where_literals.append(f"({' OR '.join(resource_conditions)})")
+    query = generate_webhook_query(
+        {
+            "webhook": {},
+        },
+        where_literals=where_literals,
+    )
+    query = query.return_literal(constants.RETURN_LITERAL["webhook"]).get()
+    results = execute_open_cypher_query(query)
+    return [
+        Webhook(**deserialise_neptune_obj(result["webhook"]))
+        for result in results["results"]
+    ]

@@ -5,6 +5,7 @@ import uuid
 
 import boto3
 import pytest
+from conftest import serialise_dict
 from pytest_lazy_fixtures import lf
 
 pytestmark = [
@@ -30,25 +31,24 @@ def webhooks():
     return app
 
 
-@pytest.fixture
-def webhook_item_factory(webhooks_table):
-    """
-    Factory to create and cleanup webhook items for testing.
-    """
-    created_items = []
+#############
+# FUNCTIONS #
+#############
 
-    def create_item(item_data):
-        webhooks_table.put_item(Item=item_data)
-        # Extract key fields for deletion
-        key = {k: v for k, v in item_data.items() if k in ["event", "url"]}
-        created_items.append(key)
-        return key
 
-    yield create_item
-
-    # Cleanup all created items
-    for key in created_items:
-        webhooks_table.delete_item(Key=key)
+def generate_opencyher_query(event_type, where_conditions):
+    where_expression = ""
+    for k, v in where_conditions.items():
+        where_expression += (
+            " AND "
+            + rf'(webhook.SERIALISE_{k} IS NULL OR webhook.SERIALISE_{k} CONTAINS "\"{v}\"")'
+        )
+    return (
+        r"MATCH (webhook: webhook) WHERE "
+        + rf'webhook.SERIALISE_events CONTAINS "\"{event_type}\""'
+        + where_expression
+        + r" RETURN webhook {.*}"
+    )
 
 
 #########
@@ -63,34 +63,62 @@ SAMPLE_LABELS = [
     "aws.eu-west-1:s3.presigned:Example TAMS",
 ]
 INVALID_STORAGE_ID = str(uuid.uuid4())
+DUMMY_ID = str(uuid.uuid4())
 
 
 @pytest.mark.parametrize(
-    "webhook_item,resources,expected_count",
+    "webhook_item,query_data,resources,expected_count",
     [
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url"},
+            {
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
             id="basic",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "presigned": True},
+            {
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+                "presigned": True,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="presigned-true",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "presigned": False},
+            {
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+                "presigned": False,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="presigned-false",
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "verbose_storage": True,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -98,9 +126,13 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "verbose_storage": False,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -108,9 +140,13 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -118,9 +154,13 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [INVALID_STORAGE_ID],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
@@ -128,25 +168,41 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [lf("default_storage_id")],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
             id="accept_storage_ids-matched",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "accept_get_urls": []},
+            {
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+                "accept_get_urls": [],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
             id="accept_get_urls-empty",
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": ["dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
@@ -154,9 +210,13 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": SAMPLE_LABELS[:1],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
@@ -164,9 +224,13 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": SAMPLE_LABELS,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -174,19 +238,23 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": [SAMPLE_LABELS[0], "dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="accept_get_urls-double-one",
         ),
         pytest.param(
+            None,
             {
-                "event": "flows/segments_added",
-                "url": "test-url",
-                "flow_ids": ["dummy"],
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 0, "get_url": 0},
@@ -194,9 +262,13 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "flow_ids": [SAMPLE_FLOW_ID],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -209,8 +281,9 @@ def test_segments_added_using_controlled_storage(
     lambda_context,
     webhooks,
     default_storage_id,
-    webhook_item_factory,
+    mock_neptune_client,
     webhook_item,
+    query_data,
     resources,
     expected_count,
 ):
@@ -227,7 +300,9 @@ def test_segments_added_using_controlled_storage(
             }
         ],
     }
-    webhook_item_factory(webhook_item)
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [{"webhook": serialise_dict(webhook_item)}] if webhook_item else []
+    }
     event = {
         "detail-type": "flows/segments_added",
         "resources": resources,
@@ -238,8 +313,16 @@ def test_segments_added_using_controlled_storage(
     webhooks.lambda_handler(event, lambda_context)
     client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
     receive_message = client.receive_message(QueueUrl=os.environ["WEBHOOKS_QUEUE_URL"])
+    opencypher_query = generate_opencyher_query(
+        query_data["event_type"],
+        query_data["conditions"],
+    )
 
     # Assert
+    mock_neptune_client.execute_open_cypher_query.assert_called_with(
+        openCypherQuery=opencypher_query
+    )
+
     if expected_count["message"] == 0:
         assert "Messages" not in receive_message
         return
@@ -299,38 +382,51 @@ def test_segments_added_using_controlled_storage(
     # Check item structure
     for key, value in message_body["item"].items():
         if value:
-            if key == "events":
-                assert value == [webhook_item["event"]]
-            else:
-                assert value == webhook_item[key]
+            assert value == webhook_item[key]
 
 
 @pytest.mark.parametrize(
-    "webhook_item,resources,expected_count",
+    "webhook_item,query_data,resources,expected_count",
     [
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url"},
+            {"events": ["flows/segments_added"], "url": "test-url"},
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
             id="basic",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "presigned": True},
+            {"events": ["flows/segments_added"], "url": "test-url", "presigned": True},
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="presigned-true",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "presigned": False},
+            {"events": ["flows/segments_added"], "url": "test-url", "presigned": False},
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="presigned-false",
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "verbose_storage": True,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -338,9 +434,13 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "verbose_storage": False,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -348,9 +448,13 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -358,9 +462,13 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [INVALID_STORAGE_ID],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
@@ -368,25 +476,41 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [lf("default_storage_id")],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
             id="accept_storage_ids-matched",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "accept_get_urls": []},
+            {
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+                "accept_get_urls": [],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
             id="accept_get_urls-empty",
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": ["dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
@@ -394,9 +518,13 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": SAMPLE_LABELS[:1],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
@@ -404,9 +532,13 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": SAMPLE_LABELS,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -414,19 +546,23 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": [SAMPLE_LABELS[0], "dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="accept_get_urls-double-one",
         ),
         pytest.param(
+            None,
             {
-                "event": "flows/segments_added",
-                "url": "test-url",
-                "flow_ids": ["dummy"],
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 0, "get_url": 0},
@@ -434,9 +570,13 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "flow_ids": [SAMPLE_FLOW_ID],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
@@ -448,8 +588,9 @@ def test_segments_added_using_controlled_storage(
 def test_segments_added_using_legacy_storage(
     lambda_context,
     webhooks,
-    webhook_item_factory,
+    mock_neptune_client,
     webhook_item,
+    query_data,
     resources,
     expected_count,
 ):
@@ -465,7 +606,9 @@ def test_segments_added_using_legacy_storage(
             }
         ],
     }
-    webhook_item_factory(webhook_item)
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [{"webhook": serialise_dict(webhook_item)}] if webhook_item else []
+    }
     event = {
         "detail-type": "flows/segments_added",
         "resources": resources,
@@ -476,8 +619,16 @@ def test_segments_added_using_legacy_storage(
     webhooks.lambda_handler(event, lambda_context)
     client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
     receive_message = client.receive_message(QueueUrl=os.environ["WEBHOOKS_QUEUE_URL"])
+    opencypher_query = generate_opencyher_query(
+        query_data["event_type"],
+        query_data["conditions"],
+    )
 
     # Assert
+    mock_neptune_client.execute_open_cypher_query.assert_called_with(
+        openCypherQuery=opencypher_query
+    )
+
     if expected_count["message"] == 0:
         assert "Messages" not in receive_message
         return
@@ -537,38 +688,51 @@ def test_segments_added_using_legacy_storage(
     # Check item structure
     for key, value in message_body["item"].items():
         if value:
-            if key == "events":
-                assert value == [webhook_item["event"]]
-            else:
-                assert value == webhook_item[key]
+            assert value == webhook_item[key]
 
 
 @pytest.mark.parametrize(
-    "webhook_item,resources,expected_count",
+    "webhook_item,query_data,resources,expected_count",
     [
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url"},
+            {"events": ["flows/segments_added"], "url": "test-url"},
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="basic",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "presigned": True},
+            {"events": ["flows/segments_added"], "url": "test-url", "presigned": True},
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
             id="presigned-true",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "presigned": False},
+            {"events": ["flows/segments_added"], "url": "test-url", "presigned": False},
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="presigned-false",
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "verbose_storage": True,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
@@ -576,9 +740,13 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "verbose_storage": False,
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
@@ -586,9 +754,13 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
@@ -596,25 +768,41 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_storage_ids": [INVALID_STORAGE_ID],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
             id="accept_storage_ids-unmatched",
         ),
         pytest.param(
-            {"event": "flows/segments_added", "url": "test-url", "accept_get_urls": []},
+            {
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+                "accept_get_urls": [],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
             id="accept_get_urls-empty",
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": ["dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 0},
@@ -622,9 +810,13 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": ["test"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
@@ -632,19 +824,23 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "accept_get_urls": ["test", "dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
             id="accept_get_urls-double-one",
         ),
         pytest.param(
+            None,
             {
-                "event": "flows/segments_added",
-                "url": "test-url",
-                "flow_ids": ["dummy"],
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 0, "get_url": 0},
@@ -652,9 +848,13 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "event": "flows/segments_added",
+                "events": ["flows/segments_added"],
                 "url": "test-url",
                 "flow_ids": [SAMPLE_FLOW_ID],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
@@ -666,8 +866,9 @@ def test_segments_added_using_legacy_storage(
 def test_segments_added_using_external_storage(
     lambda_context,
     webhooks,
-    webhook_item_factory,
+    mock_neptune_client,
     webhook_item,
+    query_data,
     resources,
     expected_count,
 ):
@@ -684,7 +885,9 @@ def test_segments_added_using_external_storage(
             }
         ],
     }
-    webhook_item_factory(webhook_item)
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [{"webhook": serialise_dict(webhook_item)}] if webhook_item else []
+    }
     event = {
         "detail-type": "flows/segments_added",
         "resources": resources,
@@ -695,8 +898,16 @@ def test_segments_added_using_external_storage(
     webhooks.lambda_handler(event, lambda_context)
     client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
     receive_message = client.receive_message(QueueUrl=os.environ["WEBHOOKS_QUEUE_URL"])
+    opencypher_query = generate_opencyher_query(
+        query_data["event_type"],
+        query_data["conditions"],
+    )
 
     # Assert
+    mock_neptune_client.execute_open_cypher_query.assert_called_with(
+        openCypherQuery=opencypher_query
+    )
+
     if expected_count["message"] == 0:
         assert "Messages" not in receive_message
         return
@@ -757,7 +968,4 @@ def test_segments_added_using_external_storage(
     # Check item structure
     for key, value in message_body["item"].items():
         if value:
-            if key == "events":
-                assert value == [webhook_item["event"]]
-            else:
-                assert value == webhook_item[key]
+            assert value == webhook_item[key]

@@ -14,6 +14,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from dynamodb import get_storage_backend_dict, get_store_name
+from neptune import delete_webhook, merge_webhook, query_node, query_webhooks
 from schema import (
     Eventstreamcommon,
     Service,
@@ -24,7 +25,7 @@ from schema import (
     Webhookpost,
 )
 from typing_extensions import Annotated
-from utils import filter_dict, model_dump
+from utils import model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -33,8 +34,8 @@ app = APIGatewayRestResolver(
 )
 metrics = Metrics()
 
+record_type = "webhook"
 dynamodb = boto3.resource("dynamodb")
-table_name = os.environ.get("WEBHOOKS_TABLE", None)
 service_table = dynamodb.Table(os.environ["SERVICE_TABLE"])
 
 
@@ -98,52 +99,27 @@ def post_service(service_post: Annotated[Servicepost, Body()]):
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def get_webhooks():
+    items = query_webhooks()
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    webhooks_table = dynamodb.Table(table_name)
-    scan = webhooks_table.scan()
-    # Group records to match API schema
-    schema_dict = {}
-    for item in scan["Items"]:
-        if "api_key_value" in item:
-            item.pop("api_key_value")  # api key value not to be returnable as per spec.
-        event = item.pop("event")
-        if item["url"] in schema_dict:
-            schema_dict[item["url"]]["events"].append(event)
-        else:
-            schema_dict[item["url"]] = {**item, "events": [event]}
-    return [
-        model_dump_webhook(Webhook(**item)) for item in schema_dict.values()
-    ], HTTPStatus.OK.value  # 200
+    return (
+        model_dump([Webhook(**item) for item in items]),
+        HTTPStatus.OK.value,
+    )  # 200
 
 
 @app.post("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def post_webhooks(webhook: Annotated[Webhookpost, Body()]):
-    webhooks_table = dynamodb.Table(table_name)
-    query = webhooks_table.query(
-        IndexName="url-index",
-        KeyConditionExpression=Key("url").eq(webhook.url),
-    )
-    existing_events = [item["event"] for item in query["Items"]]
-    delete_events = [
-        {"event": e, "url": webhook.url}
-        for e in existing_events
-        if e not in webhook.events
-    ]
-    item_dict = model_dump_webhook(webhook)
-    with webhooks_table.batch_writer() as batch:
-        for event in webhook.events:
-            batch.put_item(
-                Item={
-                    **filter_dict(item_dict, {"events"}),
-                    "event": event,
-                }
-            )
-        for item in delete_events:
-            batch.delete_item(Key=item)
+
     if len(webhook.events) == 0:
+        delete_webhook(webhook.url)
         return None, HTTPStatus.NO_CONTENT.value  # 204
+    try:
+        existing_item = query_node(record_type, webhook.url, "url")
+    except ValueError:
+        existing_item = {}
+    item_dict = model_dump(Webhook(**merge_webhook(model_dump(webhook), existing_item)))
     return item_dict, HTTPStatus.CREATED.value  # 201
 
 
