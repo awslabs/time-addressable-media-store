@@ -130,14 +130,17 @@ def test_Register_Webhook_URL_POST_201_create(api_client_cognito):
     webhook = {
         "url": "https://hook.example.com",
         "api_key_name": "Authorization",
-        "api_key_value": "Bearer 21238dksdjqwpqscj9",
         "events": ["flows/created", "flows/updated", "flows/deleted"],
+    }
+    webhook_post = {
+        **webhook,
+        "api_key_value": "Bearer 21238dksdjqwpqscj9",
     }
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
-        json=webhook,
+        json=webhook_post,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
@@ -153,14 +156,17 @@ def test_Register_Webhook_URL_POST_201_update(api_client_cognito):
     webhook = {
         "url": "https://hook.example.com",
         "api_key_name": "Authorization",
-        "api_key_value": "Bearer 12138dksdjqwpqscj9",
         "events": ["flows/created", "flows/updated"],
+    }
+    webhook_post = {
+        **webhook,
+        "api_key_value": "Bearer 21238dksdjqwpqscj9",
     }
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
-        json=webhook,
+        json=webhook_post,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
