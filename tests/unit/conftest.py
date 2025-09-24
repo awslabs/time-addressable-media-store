@@ -15,7 +15,6 @@ os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
 os.environ["USER_POOL_ID"] = "123"
 os.environ["WEBHOOKS_QUEUE_URL"] = "test-queue"
-os.environ["WEBHOOKS_TABLE"] = "webhooks-table"
 
 logger = logging.getLogger(__name__)
 builder = ConditionExpressionBuilder()

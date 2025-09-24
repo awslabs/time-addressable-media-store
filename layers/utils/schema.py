@@ -261,9 +261,6 @@ class Webhook(BaseModel):
     api_key_name: Optional[str] = Field(
         None, description="The HTTP header name that is added to the event POST"
     )
-    api_key_value: Optional[str] = Field(
-        None, description="The value that the HTTP header 'api_key_name' will be set to"
-    )
     events: List[str] = Field(..., description="List of event types to receive")
     flow_ids: Optional[
         List[

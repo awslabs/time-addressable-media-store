@@ -29,7 +29,6 @@ dynamodb = boto3.resource("dynamodb")
 service_table = dynamodb.Table(os.environ.get("SERVICE_TABLE", ""))
 segments_table = dynamodb.Table(os.environ.get("SEGMENTS_TABLE", ""))
 storage_table = dynamodb.Table(os.environ.get("STORAGE_TABLE", ""))
-webhooks_table = dynamodb.Table(os.environ.get("WEBHOOKS_TABLE", ""))
 
 
 class TimeRangeBoundary(Enum):

@@ -222,41 +222,6 @@ Resources:
           Projection:
             ProjectionType: ALL
 
-  WebhooksTable:
-    DeletionPolicy: RetainExceptOnCreate
-    UpdateReplacePolicy: Retain
-    Type: AWS::DynamoDB::Table
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-          - id: W74
-            reason: Encryption not required
-          - id: W78
-            reason: Backup not required
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: True
-      AttributeDefinitions:
-        - AttributeName: event
-          AttributeType: S
-        - AttributeName: url
-          AttributeType: S
-      KeySchema:
-        - AttributeName: event
-          KeyType: HASH
-        - AttributeName: url
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: url-index
-          KeySchema:
-            - AttributeName: url
-              KeyType: HASH
-            - AttributeName: event
-              KeyType: RANGE
-          Projection:
-            ProjectionType: KEYS_ONLY
-
   FlowStorageTable:
     DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
@@ -459,7 +424,6 @@ Resources:
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SERVICE_TABLE: !Ref ServiceTable
-          WEBHOOKS_TABLE: !Ref WebhooksTable
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -472,12 +436,13 @@ Resources:
                 - !GetAtt ServiceTable.Arn
             - Effect: Allow
               Action:
-                - dynamodb:Scan
-                - dynamodb:Query
-                - dynamodb:BatchWriteItem
-              Resource:
-                - !GetAtt WebhooksTable.Arn
-                - !Sub ${WebhooksTable.Arn}/index/url-index
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headRoot:
           Type: Api
@@ -1612,8 +1577,8 @@ Resources:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-webhooks
           POWERTOOLS_METRICS_NAMESPACE: TAMS
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
           SERVICE_TABLE: !Ref ServiceTable
-          WEBHOOKS_TABLE: !Ref WebhooksTable
           WEBHOOKS_QUEUE_URL: !Ref WebhooksDeliveryQueue
       Policies:
         - Version: "2012-10-17"
@@ -1621,14 +1586,16 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:Query
-              Resource:
-                - !GetAtt WebhooksTable.Arn
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
                 - dynamodb:GetItem
               Resource:
                 - !GetAtt ServiceTable.Arn
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
             - Effect: Allow
               Action:
                 - s3:GetObject
@@ -2005,9 +1972,6 @@ Outputs:
 
   FlowStorageTable:
     Value: !Ref FlowStorageTable
-
-  WebhooksTable:
-    Value: !Ref WebhooksTable
 
   CleanupS3QueueUrl:
     Value: !Ref CleanupS3Queue
