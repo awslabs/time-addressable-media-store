@@ -141,7 +141,7 @@ def get_flow_segments_by_id(
             app.current_event, str(query["LastEvaluatedKey"]["timerange_end"])
         )
     # Set Paging Limit header if paging limit being used is not the one specified
-    if param_limit != args["Limit"]:
+    if "LastEvaluatedKey" in query or param_limit != args["Limit"]:
         custom_headers["X-Paging-Limit"] = str(args["Limit"])
     custom_headers["X-Paging-Count"] = str(len(items))
     custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
