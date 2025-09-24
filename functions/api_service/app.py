@@ -159,9 +159,3 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
     raise BadRequestError(ex.errors())  # 400
-
-
-@tracer.capture_method(capture_response=False)
-def model_dump_webhook(webhook: Webhook):
-    """Custom model dump to retain empty values from webhook"""
-    return webhook.model_dump(by_alias=True, exclude_unset=True)
