@@ -14,7 +14,7 @@ from aws_lambda_powertools.utilities.data_classes.sqs_event import SQSEvent, SQS
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from requests import Session
 from requests.adapters import HTTPAdapter, Retry
-from schema import Flow, Flowsegment, Source, Webhook
+from schema import Flow, Flowsegment, Source, Webhookpost
 from utils import model_dump
 
 tracer = Tracer()
@@ -28,7 +28,7 @@ def record_handler(record: SQSRecord) -> None:
     """Processes a single SQS record"""
     body = json.loads(record.body)
     event = EventBridgeEvent(body["event"])
-    webhook = Webhook(**body["item"])
+    webhook = Webhookpost(**body["item"])
     get_urls = body["get_urls"]
     retries = Retry(
         total=5,

@@ -12,7 +12,7 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from cymple import QueryBuilder
 from deepdiff import DeepDiff
-from schema import Flowcollection, Source, Webhook
+from schema import Flowcollection, Source, Webhookpost
 from utils import (
     deserialise_neptune_obj,
     filter_dict,
@@ -963,6 +963,6 @@ def get_matching_webhooks(event):
     query = query.return_literal(constants.RETURN_LITERAL["webhook"]).get()
     results = execute_open_cypher_query(query)
     return [
-        Webhook(**deserialise_neptune_obj(result["webhook"]))
+        Webhookpost(**deserialise_neptune_obj(result["webhook"]))
         for result in results["results"]
     ]
