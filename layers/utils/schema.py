@@ -18,331 +18,6 @@ from pydantic import (
 )
 
 
-class Uuid(
-    RootModel[
-        constr(
-            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        )
-    ]
-):
-    root: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(..., title="UUID")
-
-
-class Contentformat(Enum):
-    """
-    Identifies the content format for a flow or source using a URN string.
-    """
-
-    urn_x_nmos_format_video = "urn:x-nmos:format:video"
-    urn_x_tam_format_image = "urn:x-tam:format:image"
-    urn_x_nmos_format_audio = "urn:x-nmos:format:audio"
-    urn_x_nmos_format_data = "urn:x-nmos:format:data"
-    urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
-
-
-class Mimetype(RootModel[constr(pattern=r".*/.*")]):
-    root: constr(pattern=r".*/.*") = Field(
-        ..., description="MIME Type string.", title="MIME Type"
-    )
-
-
-class Status(Enum):
-    """
-    Status of the delete request
-    """
-
-    created = "created"
-    started = "started"
-    done = "done"
-    error = "error"
-
-
-class GetUrl(BaseModel):
-    url: str = Field(
-        ...,
-        description="A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
-    )
-    label: Optional[str] = Field(
-        None,
-        description="Label identifying this URL. Service implementations should reject any requests using labels that are already associated with Storage Backends. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.",
-    )
-
-
-class Flowstoragepost(BaseModel):
-    """
-    Post data for the flow storage endpoint
-    """
-
-    limit: Optional[int] = Field(
-        None,
-        description="Limit the number of storage segments in each response page. Implementations may specify their own default and maximum for the limit",
-    )
-    object_ids: Optional[List[str]] = Field(
-        None,
-        description="Array of object_ids to use. The supplied object_ids must be new and not already in use in this store. A 400 response will be returned if any supplied object_id already exists.",
-    )
-    storage_id: Optional[
-        constr(
-            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        )
-    ] = Field(
-        None,
-        description="The storage backend to allocate storage in. A storage backend identifier as advertised at the `/service` endpoint. If not set the default, as advertised at the `/service` endpoint, will be used if available. An invalid storage backend identifier will result in a 400 error.",
-    )
-
-
-class Action(Enum):
-    create_bucket = "create_bucket"
-
-
-class Object(BaseModel):
-    """
-    Describes a media object in the store.
-    """
-
-    id: str = Field(..., description="The media object identifier.")
-    referenced_by_flows: List[
-        constr(
-            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        )
-    ] = Field(
-        ...,
-        description="List of Flows that reference this media object via Flow Segments in this store.",
-    )
-    first_referenced_by_flow: Optional[
-        constr(
-            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        )
-    ] = Field(
-        None,
-        description="The first Flow that had a Flow Segment reference the media object in this store. This Flow is also present in 'referenced_by_flows' if it is still referenced by the Flow. This property is optional and may in some implementations become unset if the Flow no longer references the media object, e.g. because it was deleted.",
-    )
-
-
-class Servicepost(BaseModel):
-    """
-    Post update to the service info
-    """
-
-    name: Optional[str] = Field(None, description="The service instance name")
-    description: Optional[str] = Field(
-        None, description="The service instance description"
-    )
-
-
-class Format(Enum):
-    """
-    The primary content type URN for the Source.
-    """
-
-    urn_x_nmos_format_video = "urn:x-nmos:format:video"
-    urn_x_tam_format_image = "urn:x-tam:format:image"
-    urn_x_nmos_format_audio = "urn:x-nmos:format:audio"
-    urn_x_nmos_format_data = "urn:x-nmos:format:data"
-    urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
-
-
-class Tags(RootModel[Optional[Dict[str, str]]]):
-    """
-    Key value is a freeform string.
-    """
-
-    root: Optional[Dict[str, str]] = None
-
-
-class Timerange(
-    RootModel[
-        constr(
-            pattern=r"^(\[|\()?(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?(_(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?)?(\]|\))?$"
-        )
-    ]
-):
-    root: constr(
-        pattern=r"^(\[|\()?(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?(_(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?)?(\]|\))?$"
-    ) = Field(
-        ...,
-        description="A timerange of timestamps. It is represented using one or two timestamps with inclusivity and exclusivity markers.\n\nE.g.\n* `[0:0_10:0)` represents 10 seconds of media starting at timestamp `0:0` and ending before `10:0`.\n* `(5:0_` represents a timerange starting after `5:0` and to eternity.\n* `[1694429247:0_1694429248:0)` is a 1 second TAI timerange starting at 2023-09-11T10:46:50.0Z UTC.\n* `[1694429247:0]` is an instantaneous TAI timerange at 2023-09-11T10:46:50.0Z UTC.\n  This is equivalent to `[1694429247:0_1694429247:0]`.\n  The short syntax is preferred due to ease of identification as instantaneous.\n  Instantaneous TimeRanges cannot use exclusive markers (i.e. `(` or `)`).\n* A `[` or `]` indicates that bound is inclusive, and a `(` or `)` indicates that bound is exclusive.\n\nDetails of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.\n",
-        title="TimeRange",
-    )
-
-
-class Webhookpost(BaseModel):
-    """
-    Register to receive updates via webhook
-    """
-
-    url: str = Field(
-        ...,
-        description="The URL to which the API should make HTTP POST requests with event data",
-    )
-    api_key_name: Optional[str] = Field(
-        None,
-        description="The HTTP header name that is added to the event POST with value 'api_key_value'",
-    )
-    api_key_value: Optional[str] = Field(
-        None, description="The value that the HTTP header 'api_key_name' will be set to"
-    )
-    events: List[str] = Field(..., description="List of event types to receive")
-    flow_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow and Flow Segment events to Flows in the given list of Flow IDs",
-    )
-    source_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow, Flow Segment and Source events to Sources in the given list of Source IDs",
-    )
-    flow_collected_by_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow and Flow Segment events to those with Flow that is collected by a Flow Collection in the given list of Flow Collection IDs",
-    )
-    source_collected_by_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow, Flow Segment and Source events to those with Source that is collected by a Source Collection in the given list of Source Collection IDs",
-    )
-    accept_get_urls: Optional[List[str]] = Field(
-        None,
-        description="List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.",
-    )
-    accept_storage_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="List of labels of `storage_id`s to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_storage_ids` query parameter for the /flows/{flowId}/segments API endpoint, except that the IDs are represented using a JSON array rather than a (comma separated list) string.",
-    )
-    presigned: Optional[bool] = Field(
-        None,
-        description="Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.",
-    )
-    verbose_storage: Optional[bool] = Field(
-        None,
-        description="Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.",
-    )
-
-
-class Webhook(BaseModel):
-    """
-    Register to receive updates via webhook
-    """
-
-    url: str = Field(
-        ...,
-        description="The URL to which the API should make HTTP POST requests with event data",
-    )
-    api_key_name: Optional[str] = Field(
-        None, description="The HTTP header name that is added to the event POST"
-    )
-    events: List[str] = Field(..., description="List of event types to receive")
-    flow_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow and Flow Segment events to Flows in the given list of Flow IDs",
-    )
-    source_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow, Flow Segment and Source events to Sources in the given list of Source IDs",
-    )
-    flow_collected_by_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow and Flow Segment events to those with Flow that is collected by a Flow Collection in the given list of Flow Collection IDs",
-    )
-    source_collected_by_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Limit Flow, Flow Segment and Source events to those with Source that is collected by a Source Collection in the given list of Source Collection IDs",
-    )
-    accept_get_urls: Optional[List[str]] = Field(
-        None,
-        description="List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_get_urls` query parameter for the /flows/{flowId}/segments API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.",
-    )
-    accept_storage_ids: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="List of labels of `storage_id`s to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_storage_ids` query parameter for the /flows/{flowId}/segments API endpoint, except that the IDs are represented using a JSON array rather than a (comma separated list) string.",
-    )
-    presigned: Optional[bool] = Field(
-        None,
-        description="Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the /flows/{flowId}/segments API endpoint.",
-    )
-    verbose_storage: Optional[bool] = Field(
-        None,
-        description="Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the /flows/{flowId}/segments API endpoint.",
-    )
-
-
-class Collectionitem(BaseModel):
-    """
-    Describes how an object (Source or Flow) is collected into another object of the same type
-    """
-
-    id: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(
-        ...,
-        description="Source or Flow Identifier of the member of this collection. Sources must only collect Sources, and Flows must only collect Flows. Must already be registered in TAMS",
-    )
-    role: str = Field(
-        ...,
-        description="A human-readable role of the element in this collection (e.g. 'R' to denote a right audio channel in a collection of mono audio Sources)",
-    )
-
-
 class ChannelNumber(RootModel[conint(ge=0)]):
     root: conint(ge=0)
 
@@ -423,9 +98,32 @@ class Containermapping(BaseModel):
     )
 
 
+class Contentformat(Enum):
+    """
+    Identifies the content format for a Flow or Source using a URN string
+    """
+
+    urn_x_nmos_format_video = "urn:x-nmos:format:video"
+    urn_x_tam_format_image = "urn:x-tam:format:image"
+    urn_x_nmos_format_audio = "urn:x-nmos:format:audio"
+    urn_x_nmos_format_data = "urn:x-nmos:format:data"
+    urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
+
+
+class Status(Enum):
+    """
+    Status of the delete request
+    """
+
+    created = "created"
+    started = "started"
+    done = "done"
+    error = "error"
+
+
 class Error(BaseModel):
     """
-    Provides more information for the error status.
+    Provides more information for an error status.
     """
 
     type: str = Field(..., description="The error type name.")
@@ -442,7 +140,7 @@ class Error(BaseModel):
 
 class Eventstreamcommon(BaseModel):
     """
-    Describes an event stream mechanism available in this implementation of TAMS
+    Describes an event stream mechanism available in this service instance
     """
 
     name: str = Field(
@@ -458,9 +156,9 @@ class Eventstreamcommon(BaseModel):
     )
 
 
-class Format1(Enum):
+class Format(Enum):
     """
-    The primary content type URN for the flow.
+    The primary content type URN for the Flow.
     """
 
     urn_x_nmos_format_audio = "urn:x-nmos:format:audio"
@@ -517,9 +215,18 @@ class EssenceParameters(BaseModel):
     )
 
 
-class Format2(Enum):
+class SegmentDuration(BaseModel):
     """
-    The primary content type URN for the flow.
+    The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
+    """
+
+    numerator: PositiveInt = Field(..., description="numerator")
+    denominator: Optional[PositiveInt] = Field(1, description="denominator")
+
+
+class Format1(Enum):
+    """
+    The primary content type URN for the Flow.
     """
 
     urn_x_nmos_format_data = "urn:x-nmos:format:data"
@@ -535,13 +242,13 @@ class EssenceParameters1(BaseModel):
     )
     data_type: Optional[str] = Field(
         None,
-        description="The type of information encoded in the flow, identified using a URN. e.g. The data_type may be urn:x-tams:data:bounding-box, and the codec `application/json`.",
+        description="The type of information encoded in the Flow, identified using a URN. e.g. The data_type may be urn:x-tams:data:bounding-box, and the codec `application/json`.",
     )
 
 
-class Format3(Enum):
+class Format2(Enum):
     """
-    The primary content type URN for the flow.
+    The primary content type URN for the Flow.
     """
 
     urn_x_tam_format_image = "urn:x-tam:format:image"
@@ -576,17 +283,28 @@ class EssenceParameters2(BaseModel):
     )
 
 
-class Format4(Enum):
+class Format3(Enum):
     """
-    The primary content type URN for the flow.
+    The primary content type URN for the Flow.
     """
 
     urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
 
 
-class Format5(Enum):
+class GetUrl(BaseModel):
+    url: str = Field(
+        ...,
+        description="A URL to which a GET request can be made to directly retrieve the contents of the Media Object. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
+    )
+    label: Optional[str] = Field(
+        None,
+        description="Label identifying this URL. Service implementations should reject any requests using labels that are already associated with Storage Backends. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.",
+    )
+
+
+class Format4(Enum):
     """
-    The primary content type URN for the flow.
+    The primary content type URN for the Flow.
     """
 
     urn_x_nmos_format_video = "urn:x-nmos:format:video"
@@ -773,9 +491,67 @@ class Httprequest(BaseModel):
     )
 
 
+class Mimetype(
+    RootModel[
+        constr(
+            pattern=r"^(application|audio|font|example|image|message|model|multipart|text|video|x-(?:[0-9A-Za-z!#$%&\'*+.^_`|~-]+))/([0-9A-Za-z!#$%&\'*+.^_`|~-]+)$"
+        )
+    ]
+):
+    root: constr(
+        pattern=r"^(application|audio|font|example|image|message|model|multipart|text|video|x-(?:[0-9A-Za-z!#$%&\'*+.^_`|~-]+))/([0-9A-Za-z!#$%&\'*+.^_`|~-]+)$"
+    ) = Field(
+        ...,
+        description="A Mime Type without parameters as defined in [RFC2045](https://www.rfc-editor.org/rfc/rfc2045#section-5.1) and [RFC7231](https://www.rfc-editor.org/rfc/rfc7231#section-3.1.1.1)",
+        title="MIME Type",
+    )
+
+
+class Service(BaseModel):
+    """
+    Provides information about the service instance
+    """
+
+    name: Optional[str] = Field(
+        None,
+        description="The service instance name. This should be a very short, human-readable name that may be displayed in listings of Service instances.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="The service instance description. This should be a human-readable description that may be showed in detailed views of Service instances. The description should be longer and more detailed than `name`.",
+    )
+    type: str = Field(
+        ...,
+        description="The type identifier for the service instance. The value must start with 'urn:x-tams:service'",
+    )
+    api_version: constr(pattern=r"^(0|[1-9]\d*)\.(0|[1-9]\d*)$") = Field(
+        ...,
+        description="The version of the TAMS API specification this service instance implements",
+    )
+    service_version: Optional[str] = Field(
+        None,
+        description="The version of software providing this service. Note: Different implementations and software houses may use different conventions for their version identification. As such, this field is intentionally permissive and intended to be informative only. Client implementations should avoid using this field to determine compatibility.",
+    )
+    event_stream_mechanisms: Optional[List[Eventstreamcommon]] = Field(
+        None,
+        description="List the types of event stream that this service implementation supports",
+    )
+
+
+class Servicepost(BaseModel):
+    """
+    Post update to the service info
+    """
+
+    name: Optional[str] = Field(None, description="The service instance name")
+    description: Optional[str] = Field(
+        None, description="The service instance description"
+    )
+
+
 class StoreType(Enum):
     """
-    The generic store type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.
+    The generic Storage Backend type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.
     """
 
     http_object_store = "http_object_store"
@@ -788,19 +564,43 @@ class Storagebackend(BaseModel):
 
     store_type: Optional[StoreType] = Field(
         None,
-        description="The generic store type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.",
+        description="The generic Storage Backend type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.",
     )
     provider: Optional[str] = Field(
-        None, description="The cloud (or other) provider of the storage"
+        None, description="The cloud (or other) provider of the Storage Backend"
     )
     region: Optional[str] = Field(
-        None, description="The region in the cloud this storage backend resides"
+        None, description="The region in the cloud this Storage Backend resides"
     )
     availability_zone: Optional[str] = Field(
         None,
-        description="The availability zone in the cloud region this storage backend resides. Note that many cloud providers randomize availability zone identifiers such that they are consistent within a cloud account, but not necessarily between accounts. Caution should be exercised when using this parameter.",
+        description="The availability zone in the cloud region this Storage Backend resides. Note that many cloud providers randomize availability zone identifiers such that they are consistent within a cloud account, but not necessarily between accounts. Caution should be exercised when using this parameter.",
     )
     store_product: Optional[str] = Field(None, description="The storage product name.")
+
+
+class Tags(RootModel[Optional[Dict[str, str]]]):
+    """
+    Key value is a freeform string.
+    """
+
+    root: Optional[Dict[str, str]] = None
+
+
+class Timerange(
+    RootModel[
+        constr(
+            pattern=r"^(\[|\()?(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?(_(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?)?(\]|\))?$"
+        )
+    ]
+):
+    root: constr(
+        pattern=r"^(\[|\()?(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?(_(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?)?(\]|\))?$"
+    ) = Field(
+        ...,
+        description="A timerange of timestamps. It is represented using one or two timestamps with inclusivity and exclusivity markers.\n\nE.g.\n* `[0:0_10:0)` represents 10 seconds of media starting at timestamp `0:0` and ending before `10:0`.\n* `(5:0_` represents a timerange starting after `5:0` and to eternity.\n* `[1694429247:0_1694429248:0)` is a 1 second TAI timerange starting at 2023-09-11T10:46:50.0Z UTC.\n* `[1694429247:0]` is an instantaneous TAI timerange at 2023-09-11T10:46:50.0Z UTC.\n  This is equivalent to `[1694429247:0_1694429247:0]`.\n  The short syntax is preferred due to ease of identification as instantaneous.\n  Instantaneous TimeRanges cannot use exclusive markers (i.e. `(` or `)`).\n* A `[` or `]` indicates that bound is inclusive, and a `(` or `)` indicates that bound is exclusive.\n\nDetails of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.\n",
+        title="TimeRange",
+    )
 
 
 class Timestamp(RootModel[constr(pattern=r"^-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8})$")]):
@@ -811,13 +611,168 @@ class Timestamp(RootModel[constr(pattern=r"^-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}
     )
 
 
-class SegmentDuration(BaseModel):
+class Urllabellist(RootModel[constr(pattern=r"^([^,]+(,[^,]+)*)?$")]):
+    root: constr(pattern=r"^([^,]+(,[^,]+)*)?$") = Field(
+        ...,
+        description="A list of Media Object GET URL Labels, formatted for use in query string parameters",
+        title="Query String GET URL Label list",
+    )
+
+
+class Uuid(
+    RootModel[
+        constr(
+            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        )
+    ]
+):
+    root: constr(
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    ) = Field(
+        ...,
+        description="A Universally Unique Identifier (UUID) as defined in [RFC9562](https://www.rfc-editor.org/rfc/rfc9562)",
+        title="UUID",
+    )
+
+
+class Uuidlist(
+    RootModel[
+        constr(
+            pattern=r"^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$"
+        )
+    ]
+):
+    root: constr(
+        pattern=r"^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$"
+    ) = Field(
+        ...,
+        description="A list of Universally Unique Identifiers (UUIDs) as defined in [RFC9562](https://www.rfc-editor.org/rfc/rfc9562), formatted for use in query string parameters",
+        title="Query String UUID list",
+    )
+
+
+class Event(Enum):
+    flows_created = "flows/created"
+    flows_updated = "flows/updated"
+    flows_deleted = "flows/deleted"
+    flows_segments_added = "flows/segments_added"
+    flows_segments_deleted = "flows/segments_deleted"
+    sources_created = "sources/created"
+    sources_updated = "sources/updated"
+    sources_deleted = "sources/deleted"
+
+
+class Webhook(BaseModel):
     """
-    The target flow segment duration in seconds. The duration for each segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
+    Register to receive updates via webhook
     """
 
-    numerator: PositiveInt = Field(..., description="numerator")
-    denominator: Optional[PositiveInt] = Field(1, description="denominator")
+    url: str = Field(
+        ...,
+        description="The URL to which the service instance should make HTTP POST requests with event data",
+    )
+    api_key_name: Optional[str] = Field(
+        None, description="The HTTP header name that is added to the event POST"
+    )
+    events: List[Event] = Field(..., description="List of event types to receive")
+    flow_ids: Optional[List[Uuid]] = Field(
+        None,
+        description="Limit Flow and Flow Segment events to Flows in the given list of Flow IDs",
+    )
+    source_ids: Optional[List[Uuid]] = Field(
+        None,
+        description="Limit Flow, Flow Segment and Source events to Sources in the given list of Source IDs",
+    )
+    flow_collected_by_ids: Optional[List[Uuid]] = Field(
+        None,
+        description="Limit Flow and Flow Segment events to those with Flow that is collected by a Flow Collection in the given list of Flow Collection IDs",
+    )
+    source_collected_by_ids: Optional[List[Uuid]] = Field(
+        None,
+        description="Limit Flow, Flow Segment and Source events to those with Source that is collected by a Source Collection in the given list of Source Collection IDs",
+    )
+    accept_get_urls: Optional[List[str]] = Field(
+        None,
+        description="List of labels of URLs to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_get_urls` query parameter for the [/flows/{flowId}/segments](#/operations/GET_flows-flowId-segments) API endpoint, except that the labels are represented using a JSON array rather than a (comma separated list) string.",
+    )
+    accept_storage_ids: Optional[List[Uuid]] = Field(
+        None,
+        description="List of labels of `storage_id`s to include in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `accept_storage_ids` query parameter for the [/flows/{flowId}/segments](#/operations/GET_flows-flowId-segments) API endpoint, except that the IDs are represented using a JSON array rather than a (comma separated list) string.",
+    )
+    presigned: Optional[bool] = Field(
+        None,
+        description="Whether to include presigned/non-presigned URLs in the `get_urls` property in `flows/segments_added` events. Where multiple `get_urls` filter query parameters are provided, the included `get_urls` will match all filters. This option is the same as the `presigned` query parameter for the [/flows/{flowId}/segments](#/operations/GET_flows-flowId-segments) API endpoint.",
+    )
+    verbose_storage: Optional[bool] = Field(
+        None,
+        description="Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the [/flows/{flowId}/segments](#/operations/GET_flows-flowId-segments) API endpoint.",
+    )
+
+
+class Status1(Enum):
+    """
+    Status of the Webhook. `created` indicates the webhook has been successfully registered but is yet to begin sending events or, depending on the service implementation, the worker responsible for sending the events has yet to start. `started` indicates the webhook is active and sending events. `disabled` indicates the webhook has been disabled by a client and is not currently sending events. `error` indicates an error condition has been encountered and the webhook has been disabled by the service instance. More information about the error condition will be indicated by the service instance in the `error` parameter. Service implementations SHOULD implement appropriate retries and only enter the `error` state when absolutely necesary. A webhook in the `error` or `disabled` state may be re-enabled by a client by setting the status to `created`. A webhook in the `created` or `started` state may be disabled by a client by setting the status to `disabled`. Attempting to transition an `error` status to `disabled` SHOULD be rejected.
+    """
+
+    created = "created"
+    started = "started"
+    disabled = "disabled"
+    error = "error"
+
+
+class Status2(Enum):
+    """
+    Status of the Webhook. `created` will register the webhook in the created state and the service instance will attempt to start sending events. `disabled` will register the webhook in a disabled state and will not send events. Assumed to be `created` if not set.
+    """
+
+    created = "created"
+    disabled = "disabled"
+
+
+class Webhookpost(Webhook):
+    """
+    Register to receive updates via webhook
+    """
+
+    api_key_value: Optional[str] = Field(
+        None, description="The value that the HTTP header 'api_key_name' will be set to"
+    )
+    status: Optional[Status2] = Field(
+        None,
+        description="Status of the Webhook. `created` will register the webhook in the created state and the service instance will attempt to start sending events. `disabled` will register the webhook in a disabled state and will not send events. Assumed to be `created` if not set.",
+    )
+
+
+class Status3(Enum):
+    """
+    Status of the Webhook. `created` indicates the webhook has been successfully registered but is yet to begin sending events or, depending on the service implementation, the worker responsible for sending the events has yet to start. `started` indicates the webhook is active and sending events. `disabled` indicates the webhook has been disabled by a client and is not currently sending events. `error` indicates an error condition has been encountered and the webhook has been disabled by the service instance. More information about the error condition will be indicated by the service instance in the `error` parameter. Service implementations SHOULD implement appropriate retries and only enter the `error` state when absolutely necesary. A webhook in the `error` or `disabled` state may be re-enabled by a client by setting the status to `created`. A webhook in the `created` or `started` state may be disabled by a client by setting the status to `disabled`. Attempting to transition an `error` status to `disabled` SHOULD be rejected.
+    """
+
+    created = "created"
+    disabled = "disabled"
+
+
+class Webhookwithid(Webhook):
+    """
+    Details of an existing registered webhook
+    """
+
+    id: Uuid = Field(..., description="Webhook identifier")
+
+
+class Collectionitem(BaseModel):
+    """
+    Describes how an entity (Source or Flow) is collected into another entity of the same type
+    """
+
+    id: Uuid = Field(
+        ...,
+        description="Source or Flow Identifier of the member of this collection. Sources MUST only collect Sources, and Flows MUST only collect Flows. Must already be registered in this service instance",
+    )
+    role: str = Field(
+        ...,
+        description="A human-readable role of the element in this collection (e.g. 'R' to denote a right audio channel in a collection of mono audio Sources)",
+    )
 
 
 class Deletionrequest(BaseModel):
@@ -825,19 +780,17 @@ class Deletionrequest(BaseModel):
     Describes an ongoing deletion request
     """
 
-    id: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(..., description="Deletion Request ID")
-    flow_id: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(..., description="ID of the flow to which the deletion request relates")
+    id: Uuid = Field(..., description="Deletion Request ID")
+    flow_id: Uuid = Field(
+        ..., description="ID of the Flow to which the deletion request relates"
+    )
     timerange_to_delete: Timerange = Field(
         ...,
-        description="The timerange of FlowSegments to be deleted in this request, as described by the [TimeRange](../schemas/timerange#top) type",
+        description="The timerange of Flow Segments to be deleted in this request, as described by the [TimeRange](#/schemas/timerange) type",
     )
     timerange_remaining: Optional[Timerange] = Field(
         None,
-        description="The timerange of FlowSegments not yet deleted by this request, as described by the [TimeRange](../schemas/timerange#top) type",
+        description="The timerange of Flow Segments not yet deleted by this request, as described by the [TimeRange](#/schemas/timerange) type",
     )
     delete_flow: bool = Field(
         ...,
@@ -848,7 +801,7 @@ class Deletionrequest(BaseModel):
     )
     created_by: Optional[str] = Field(
         None,
-        description="A string identifier for the entity that created the deletion request. Implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
+        description="A string identifier for the entity that created the deletion request. Service implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system.",
     )
     updated: Optional[datetime] = Field(
         None, description="Date/Time when this deletion request was updated"
@@ -859,12 +812,8 @@ class Deletionrequest(BaseModel):
     status: Status = Field(..., description="Status of the delete request")
     error: Optional[Error] = Field(
         None,
-        description="Provides more information for the error status, as described by the [Error](../schemas/error#top) type",
+        description="Provides more information for the error status, as described by the [Error](#/schemas/error) type",
     )
-
-
-class Deletionrequestslist(RootModel[List[Deletionrequest]]):
-    root: List[Deletionrequest] = Field(..., title="Deletion Requests List")
 
 
 class FlowcollectionItem(Collectionitem):
@@ -875,282 +824,14 @@ class FlowcollectionItem(Collectionitem):
 
 
 class Flowcollection(RootModel[List[FlowcollectionItem]]):
-    root: List[FlowcollectionItem] = Field(..., title="Flow Collection")
-
-
-class FailedSegment(BaseModel):
     """
-    Failed segment details
+    Describes how Flows are collected into another Flow
     """
 
-    object_id: str = Field(
+    root: List[FlowcollectionItem] = Field(
         ...,
-        description="The object ID of the segment which has failed to register with the TAMS API",
-    )
-    timerange: Optional[Timerange] = Field(
-        None,
-        description="The timerange of segment that has failed, as described by the [TimeRange](../schemas/timerange#top) type",
-    )
-    error: Optional[Error] = Field(
-        None,
-        description="Provides more information for the error status, as described by the [Error](../schemas/error#top) type",
-    )
-
-
-class Flowsegmentbulkfailure(BaseModel):
-    """
-    List of segments that have failed to register
-    """
-
-    failed_segments: List[FailedSegment] = Field(
-        ...,
-        description="The list of segments which have failed to register with the TAMS API",
-    )
-
-
-class Flowsegmentpost(BaseModel):
-    """
-    Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
-    """
-
-    object_id: str = Field(
-        ..., description="The object store identifier for the media object."
-    )
-    ts_offset: Optional[Timestamp] = Field(
-        None,
-        description="The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative",
-    )
-    timerange: Timerange = Field(
-        ...,
-        description="The timerange for the samples contained in the segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.",
-    )
-    last_duration: Optional[Timestamp] = Field(
-        None,
-        description="The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative",
-    )
-    sample_offset: Optional[int] = Field(
-        None,
-        description="The start of the segment represented as a count of samples from the start of the object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set.",
-    )
-    sample_count: Optional[int] = Field(
-        None,
-        description="The count of samples in the segment (which may be fewer than in the object). The count could be less than expected given the segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples",
-    )
-    get_urls: Optional[List[GetUrl]] = Field(
-        None,
-        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the segment. This is required by the `http_object_store` media store type, which is the only one currently described. Clients may choose any URL in the list and treat them as identical, however servers may sort the list such that the preferred URL is first. `get_urls` should only be used to add uncontrolled URLs. URLs for the provided object_id controlled by the service instance will be populated automatically by the service instance.",
-    )
-    key_frame_count: Optional[int] = Field(
-        None,
-        description="The number of key frames in the segment. This should be set greater than zero when the segment contains key frames that serve as a stream access point",
-    )
-
-
-class GetUrl1(Storagebackend):
-    storage_id: Optional[
-        constr(
-            pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-        )
-    ] = Field(None, description="Storage backend identifier")
-    url: str = Field(
-        ...,
-        description="A URL to which a GET request can be made to directly retrieve the contents of the segment. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
-    )
-    presigned: Optional[bool] = Field(
-        None,
-        description="If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed.",
-    )
-    label: Optional[str] = Field(
-        None,
-        description="Label identifying this URL. If the URL is controlled by the service instance, this is the Storage Backend's label. If the URL is uncontrolled, this is the label provided when a client registered the URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.",
-    )
-    controlled: Optional[bool] = Field(
-        None,
-        description="If `true`, this URL is on a storage backend controlled by this service instance. If `false`, this URL is uncontrolled and does not have it's lifecycle managed by this instance. If this parameter is unset, assume `true`.",
-    )
-
-
-class Flowsegment(BaseModel):
-    """
-    Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
-    """
-
-    object_id: str = Field(
-        ..., description="The object store identifier for the media object."
-    )
-    ts_offset: Optional[Timestamp] = Field(
-        None,
-        description="The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative",
-    )
-    timerange: Timerange = Field(
-        ...,
-        description="The timerange for the samples contained in the segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.",
-    )
-    last_duration: Optional[Timestamp] = Field(
-        None,
-        description="The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative",
-    )
-    sample_offset: Optional[int] = Field(
-        None,
-        description="The start of the segment represented as a count of samples from the start of the object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set.",
-    )
-    sample_count: Optional[int] = Field(
-        None,
-        description="The count of samples in the segment (which may be fewer than in the object). The count could be less than expected given the segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples",
-    )
-    get_urls: Optional[List[GetUrl1]] = Field(
-        None,
-        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the segment. This is required by the `http_object_store` media store type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage backend metadata for controlled URLs should be populated by the TAMS instance based on the storage backend the object copy resides in.",
-    )
-    key_frame_count: Optional[int] = Field(
-        None,
-        description="The number of key frames in the segment. This should be set greater than zero when the segment contains key frames that serve as a stream access point",
-    )
-
-
-class PreItem(BaseModel):
-    """
-    An action
-    """
-
-    action: Action
-    bucket_id: Optional[str] = Field(
-        None, description="The name of the bucket that needs to be created"
-    )
-    put_url: Optional[Httprequest] = None
-    put_cors_url: Optional[Httprequest] = None
-
-
-class MediaObject(BaseModel):
-    """
-    Information for a media object
-    """
-
-    object_id: str = Field(
-        ..., description="The object store identifier for the media object."
-    )
-    put_url: Httprequest
-    put_cors_url: Optional[Httprequest] = None
-
-
-class Flowstorage(BaseModel):
-    """
-    Gives information on storage for media objects. This schema is for the `http_object_store` media store type which provides URLs for storing media objects in bucket, and is the only store type currently implemented.
-    """
-
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    pre: Optional[List[PreItem]] = Field(
-        None,
-        description="Actions that need to be taken before the media object can be written",
-    )
-    media_objects: Optional[List[MediaObject]] = Field(
-        None,
-        description="List of information for identifying and uploading media objects",
-    )
-
-
-class Service(BaseModel):
-    """
-    Provides information about the store service
-    """
-
-    name: Optional[str] = Field(None, description="The service instance name")
-    description: Optional[str] = Field(
-        None, description="The service instance description"
-    )
-    type: str = Field(
-        ...,
-        description="The type identifier for the service. The value must start with 'urn:x-tams:service'",
-    )
-    api_version: constr(pattern=r"^(0|[1-9]\d*)\.(0|[1-9]\d*)$") = Field(
-        ...,
-        description="The version of the TAMS API specification this deployment implements",
-    )
-    service_version: Optional[str] = Field(
-        None,
-        description="The version of software providing this service. Note: Different implementations and software houses may use different conventions for their version identification. As such, this field is intentionally permissive and intended to be informative only. Implementations should avoid using this field to determine compatibility.",
-    )
-    event_stream_mechanisms: Optional[List[Eventstreamcommon]] = Field(
-        None,
-        description="List the types of event stream that this implementation supports",
-    )
-
-
-class Source(BaseModel):
-    """
-    Describes a Source: an abstract representation of a piece of media as defined in <https://specs.amwa.tv/ms-04/releases/v1.0.0/docs/2.2._Explanation_-_Source.html>
-
-    Sources may be elemental (and represented directly by a Flow), or may represent a collection of other Sources, e.g. a Source collecting video and audio together.
-    """
-
-    id: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(..., description="Source identifier")
-    format: Format = Field(
-        ..., description="The primary content type URN for the Source."
-    )
-    label: Optional[str] = Field(
-        None, description="Freeform string label for the Source"
-    )
-    description: Optional[str] = Field(
-        None, description="Freeform text describing the Source"
-    )
-    created_by: Optional[str] = Field(
-        None,
-        description="A string identifier for the entity that created the Source. Implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
-    )
-    updated_by: Optional[str] = Field(
-        None,
-        description="A string identifier for the entity that updated the Source metadata most recently. Implementations SHOULD set suitable default values for `updated_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
-    )
-    created: Optional[datetime] = Field(
-        None,
-        description="The date-time the Source was created in a given context, e.g. in the store. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
-    )
-    updated: Optional[datetime] = Field(
-        None,
-        description="The date-time the Source metadata was last updated in a given context, e.g. in the store. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
-    )
-    tags: Optional[Tags] = None
-    source_collection: Optional[List[Collectionitem]] = Field(
-        None,
-        description="List of Sources that are collected together by this Source. This attribute is intended to be read-only. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally. Source collections can be inferred from Flow collection definitions.",
-    )
-    collected_by: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
-        None,
-        description="Sources that reference this Source to include it in a collection. This attribute is intended to be read-only. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally. Source collections can be inferred from Flow collection definitions.",
-    )
-
-
-class StoragebackendslistItem(Storagebackend):
-    id: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(..., description="Storage backend identifier")
-    label: Optional[str] = Field(
-        None, description="Freeform string label for a storage backend."
-    )
-    default_storage: Optional[bool] = Field(
-        None,
-        description="If set to `true`, this is the default storage backend. The default storage backend will be used if the client does not specify a storage backend id when requesting the allocation of storage. If this parameter is not set, assume `false`. Instances may either set one storage backend as default, or none - indicating that clients must always specify a storage backend.",
-    )
-
-
-class Storagebackendslist(RootModel[List[StoragebackendslistItem]]):
-    """
-    Information about the storage backends available on this service instance.
-    """
-
-    root: List[StoragebackendslistItem] = Field(
-        ...,
-        description="Information about the storage backends available on this service instance.",
+        description="Describes how Flows are collected into another Flow",
+        title="Flow Collection",
     )
 
 
@@ -1159,103 +840,86 @@ class Flowcore(BaseModel):
     Describes a Flow (common properties to all Flows, imported by type-specific specifications)
     """
 
-    id: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(..., description="Flow identifier")
-    source_id: constr(
-        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    ) = Field(..., description="Source identifier")
-    label: Optional[str] = Field(None, description="Freeform string label for the flow")
+    id: Uuid = Field(..., description="Flow identifier")
+    source_id: Uuid = Field(..., description="Source identifier")
+    label: Optional[str] = Field(
+        None,
+        description="Freeform string label for the Flow. This should be a very short, human-readable label that may be displayed in listings of Flows.",
+    )
     description: Optional[str] = Field(
-        None, description="Freeform text describing the flow"
+        None,
+        description="Freeform text describing the Flow. This should be a human-readable description that may be showed in detailed views of Flows. The description should be longer and more detailed than `label`.",
     )
     created_by: Optional[str] = Field(
         None,
-        description="A string identifier for the entity that created the flow. Implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
+        description="A string identifier for the entity that created the Flow. Service implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
     )
     updated_by: Optional[str] = Field(
         None,
-        description="A string identifier for the entity that updated the flow metadata most recently. Implementations SHOULD set suitable default values for `updated_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
+        description="A string identifier for the entity that updated the Flow metadata most recently. Service implementations SHOULD set suitable default values for `updated_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
     )
-    tags: Optional[Tags] = None
+    tags: Optional[Tags] = Field(
+        None,
+        description="Key value is a freeform string. WARNING: When updating a Flow with `tags` set, `tags` will be replaced with the provided dictionary. `tags` WILL NOT be merged with the provided values. When `tags` is not set in the request, `tags` will be unset (i.e. set to `{}`). To update individual tags, clients should use the [Create or Update Flow Tag](#/operations/PUT_flows-flowId-tags-name) endpoint.",
+    )
     metadata_version: Optional[str] = Field(
         None,
-        description="A change to the flow metadata, not including metadata_version, last_update or segments, results in a new version. If the metadata_version for flow instances is identical then the metadata is identical.",
+        description="A change to the Flow metadata, not including metadata_version, metadata_updated, segments_updated, or Segments, results in a new version. If the metadata_version for Flow instances is identical then the metadata is identical. Service implementations SHOULD set suitable default values for `metadata_version` whenever Flow metadata is changed and `metadata_version` is either not set by the client, or set to it's existing value. Service implementations MAY permit clients to edit the value, subject to suitable permissions-based limitations. Where media is transfered between TAMS service instances without changing the Flow metadata, clients SHOULD maintain the `metadata_version`. To support this, service implementations SHOULD always accept the setting of `metadata_version` by the client on initial Flow creation. Service implementations SHOULD update this field where metadata is updated via child endpoints. Note that this specification places no requirements on incremental versioning. Service implementations may, for example, choose to use hashes or date-time version identifiers.",
     )
     generation: Optional[conint(ge=0)] = Field(
         None,
-        description="An indication of how many lossy encodings the flow content has been through. A flow with a higher generation may contain less of the original information than a flow with a lower generation.",
+        description='An indication of how many lossy encodings the Flow content has been through. This parameter provides a hint to clients as to which is the "highest qualty" Flow available to them. A Flow with a higher generation may contain less of the original information than a Flow with a lower generation. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where the originating device outputs multiple qualities of the Source, `generation` should represent the encoding processes each has been through as accurately as possible.',
     )
     created: Optional[datetime] = Field(
         None,
-        description="The date-time the flow was created in a given context, e.g. in the store. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
+        description="The date-time the Flow was created in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
     metadata_updated: Optional[datetime] = Field(
         None,
-        description="The date-time the flow metadata was updated in a given context, e.g. in the store. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
+        description="The date-time the Flow metadata was updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
     segments_updated: Optional[datetime] = Field(
         None,
-        description="The date-time the flow segments were updated in a given context, e.g. in the store. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
+        description="The date-time the Flow Segments were updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
     read_only: Optional[bool] = Field(
         None,
-        description="If set to 'true', implementations SHOULD reject client requests to update Flow metadata (other than the read_only property), Flow Segments and media objects",
+        description="If set to 'true', service implementations SHOULD reject client requests to update Flow metadata (other than the read_only property), and Flow Segments. Service implementations should also reject requests to the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage) endpoint for the Flow, and requests to delete the Flow.",
     )
-    codec: Optional[constr(pattern=r"^[^\s/]+/[^\s/]+$")] = Field(
+    codec: Optional[Mimetype] = Field(
         None,
-        description="A MIME type identification of the (lossy or lossless) coding used for the flow content.",
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
     )
-    container: Optional[constr(pattern=r"^[^\s/]+/[^\s/]+$")] = Field(
-        None, description="The container MIME type for flow segments."
+    container: Optional[Mimetype] = Field(
+        None,
+        description="The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
     )
     avg_bit_rate: Optional[conint(ge=0)] = Field(
         None,
-        description="The average bit rate of the flow segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.",
+        description="The average bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.",
     )
     max_bit_rate: Optional[conint(ge=0)] = Field(
         None,
-        description="The maximum bit rate of the flow segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.",
+        description="The maximum bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.",
     )
     segment_duration: Optional[SegmentDuration] = Field(
         None,
-        description="The target flow segment duration in seconds. The duration for each segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.",
+        description="The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.",
     )
     timerange: Optional[Timerange] = Field(
         None,
-        description="The timerange of samples available in the flow, as described by the [TimeRange](../schemas/timerange#top) type",
+        description="The timerange of samples available in the Flow, as described by the [TimeRange](#/schemas/timerange) type. Service implementations MUST ignore this if given in a PUT request, and instead manage it internally.",
     )
     flow_collection: Optional[Flowcollection] = Field(
         None, description="List of Flows that are collected together by this Flow."
     )
-    collected_by: Optional[
-        List[
-            constr(
-                pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            )
-        ]
-    ] = Field(
+    collected_by: Optional[List[Uuid]] = Field(
         None,
-        description="Flows that reference this Flow to include it in a collection. This attribute is intended to be read-only. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
+        description="Flows that reference this Flow to include it in a collection. This attribute is intended to be read-only. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
     container_mapping: Optional[Containermapping] = Field(
         None,
         description="Describes the mapping of the Flow essence from the this Flow's container",
-    )
-
-
-class Flowaudio(Flowcore):
-    """
-    Describes an audio Flow
-    """
-
-    format: Format1 = Field(
-        ..., description="The primary content type URN for the flow."
-    )
-    essence_parameters: EssenceParameters = Field(
-        ...,
-        description="Describes the parameters of the essence inside this audio Flow",
-        title="Audio Flow Essence Parameters",
     )
 
 
@@ -1264,8 +928,8 @@ class Flowdata(Flowcore):
     Describes a data Flow
     """
 
-    format: Format2 = Field(
-        ..., description="The primary content type URN for the flow."
+    format: Format1 = Field(
+        ..., description="The primary content type URN for the Flow."
     )
     essence_parameters: EssenceParameters1 = Field(
         ...,
@@ -1276,11 +940,11 @@ class Flowdata(Flowcore):
 
 class Flowimage(Flowcore):
     """
-    Describes an still image Flow
+    Describes a still image Flow, for use by thumbnail tracks etc
     """
 
-    format: Format3 = Field(
-        ..., description="The primary content type URN for the flow."
+    format: Format2 = Field(
+        ..., description="The primary content type URN for the Flow."
     )
     essence_parameters: EssenceParameters2 = Field(
         ...,
@@ -1294,8 +958,120 @@ class Flowmulti(Flowcore):
     Describes a multi-essence Flow
     """
 
-    format: Format4 = Field(
-        ..., description="The primary content type URN for the flow."
+    format: Format3 = Field(
+        ..., description="The primary content type URN for the Flow."
+    )
+
+
+class FailedSegment(BaseModel):
+    """
+    Failed Segment details
+    """
+
+    object_id: str = Field(
+        ...,
+        description="The Object ID of the Segment which has failed to register with the service instance",
+    )
+    timerange: Optional[Timerange] = Field(
+        None,
+        description="The timerange of Segment that has failed, as described by the [TimeRange](#/schemas/timerange) type",
+    )
+    error: Optional[Error] = Field(
+        None,
+        description="Provides more information for the error status, as described by the [Error](#/schemas/error) type",
+    )
+
+
+class Flowsegmentbulkfailure(BaseModel):
+    """
+    List of Segments that have failed to register
+    """
+
+    failed_segments: List[FailedSegment] = Field(
+        ...,
+        description="The list of Segments which have failed to register with the service instance",
+    )
+
+
+class Flowsegmentpost(BaseModel):
+    """
+    Provides the location and metadata of the media files corresponding to timerange Segments of a Flow.
+    """
+
+    object_id: str = Field(
+        ..., description="The Object identifier for the Media Object."
+    )
+    ts_offset: Optional[Timestamp] = Field(
+        None,
+        description="The timestamp offset between the sample timestamps stored in, or inferred from, the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](#/schemas/timestamp) type",
+    )
+    timerange: Timerange = Field(
+        ...,
+        description="The timerange for the samples contained in the Segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](#/schemas/timerange) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.",
+    )
+    last_duration: Optional[Timestamp] = Field(
+        None,
+        description="The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](#/schemas/timestamp) type, but cannot be negative",
+    )
+    sample_offset: Optional[int] = Field(
+        None,
+        description="The start of the Segment represented as a count of samples from the start of the Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set. Must be set if the Flow Segment doesn't start at the beginning of the Media Object.",
+    )
+    sample_count: Optional[int] = Field(
+        None,
+        description="The count of samples in the Segment (which may be fewer than in the Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Must be set if the Flow Segment doesn't use the entire Media Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples",
+    )
+    get_urls: Optional[List[GetUrl]] = Field(
+        None,
+        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the Media Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat them as identical, however service instances may sort the list such that the preferred URL is first. `get_urls` should only be used to add uncontrolled URLs. URLs for the provided object_id controlled by the service instance will be populated automatically by the service instance.",
+    )
+    key_frame_count: Optional[int] = Field(
+        None,
+        description="The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point",
+    )
+
+
+class MediaObject(BaseModel):
+    """
+    Information for a Media Object
+    """
+
+    object_id: str = Field(
+        ..., description="The object store identifier for the Media Object."
+    )
+    put_url: Httprequest
+
+
+class Flowstorage(BaseModel):
+    """
+    Gives information on storage for Media Objects. This schema is for the `http_object_store` Storage Backend type which provides URLs for storing Media Objects in object store buckets, and is the only Storage Backend type currently implemented.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    media_objects: Optional[List[MediaObject]] = Field(
+        None,
+        description="List of information for identifying and uploading Media Objects",
+    )
+
+
+class Flowstoragepost(BaseModel):
+    """
+    Post data for the Flow storage endpoint
+    """
+
+    limit: Optional[int] = Field(
+        None,
+        description="Limit the number of Media Objects in each response page. Service implementations may specify their own default and maximum for the limit",
+    )
+    object_ids: Optional[List[str]] = Field(
+        None,
+        description="Array of object_ids to use. The supplied object_ids must be new and not already in use in this TAMS service instance. A 400 response will be returned if any supplied object_id already exists.",
+    )
+    storage_id: Optional[Uuid] = Field(
+        None,
+        description="The Storage Backend to allocate storage in. A Storage Backend identifier as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint. If not set the default, as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint, will be used if available. An invalid Storage Backend identifier will result in a 400 error.",
     )
 
 
@@ -1304,13 +1080,203 @@ class Flowvideo(Flowcore):
     Describes a video Flow
     """
 
-    format: Format5 = Field(
-        ..., description="The primary content type URN for the flow."
+    format: Format4 = Field(
+        ..., description="The primary content type URN for the Flow."
     )
     essence_parameters: EssenceParameters3 = Field(
         ...,
         description="Describes the parameters of the essence inside this video Flow",
         title="Video Flow Essence Parameters",
+    )
+
+
+class GetUrl1(Storagebackend):
+    storage_id: Optional[Uuid] = Field(None, description="Storage Backend identifier")
+    url: str = Field(
+        ...,
+        description="A URL to which a GET request can be made to directly retrieve the contents of the media object. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
+    )
+    presigned: Optional[bool] = Field(
+        None,
+        description="If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed.",
+    )
+    label: Optional[str] = Field(
+        None,
+        description="Label identifying this URL. If the URL is controlled by the service instance, this is the Storage Backend's label. If the URL is uncontrolled, this is the label provided when a client registered the URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.",
+    )
+    controlled: Optional[bool] = Field(
+        None,
+        description="If `true`, this URL is on a Storage Backend controlled by this service instance. If `false`, this URL is uncontrolled and does not have it's lifecycle managed by this instance. If this parameter is unset, assume `true`.",
+    )
+
+
+class Objectcore(BaseModel):
+    """
+    Provides the location and metadata of the media files corresponding to a Media Object.
+    """
+
+    get_urls: Optional[List[GetUrl1]] = Field(
+        None,
+        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the Media Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage Backend metadata for controlled URLs should be populated by the TAMS instance based on the Storage Backend the Meda Object instance resides in.",
+    )
+    key_frame_count: Optional[int] = Field(
+        None,
+        description="The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point",
+    )
+
+
+class Source(BaseModel):
+    """
+    Describes a Source: an abstract representation of a piece of media as defined in <https://specs.amwa.tv/ms-04/releases/v1.0.0/docs/2.2._Explanation_-_Source.html>
+
+    Sources may be elemental (and represented directly by a Flow), or may represent a collection of other Sources, e.g. a Source collecting video and audio together.
+    """
+
+    id: Uuid = Field(..., description="Source identifier")
+    format: Contentformat = Field(
+        ..., description="The primary content type URN for the Source."
+    )
+    label: Optional[str] = Field(
+        None,
+        description="Freeform string label for the Source. This should be a very short, human-readable label that may be displayed in listings of Sources.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Freeform text describing the Source. This should be a human-readable description that may be showed in detailed views of Sources. The description should be longer and more detailed than `label`.",
+    )
+    created_by: Optional[str] = Field(
+        None,
+        description="A string identifier for the entity that created the Source. Service implementations SHOULD set suitable default values for `created_by` based on the principal accessing the systems.",
+    )
+    updated_by: Optional[str] = Field(
+        None,
+        description="A string identifier for the entity that updated the Source metadata most recently. Service implementations SHOULD set suitable default values for `updated_by` based on the principal accessing the system.",
+    )
+    created: Optional[datetime] = Field(
+        None,
+        description="The date-time the Source was created in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
+    )
+    updated: Optional[datetime] = Field(
+        None,
+        description="The date-time the Source metadata was last updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
+    )
+    tags: Optional[Tags] = None
+    source_collection: Optional[List[Collectionitem]] = Field(
+        None,
+        description="List of Sources that are collected together by this Source. This attribute is intended to be read-only. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally. Source collections can be inferred from Flow collection definitions.",
+    )
+    collected_by: Optional[List[Uuid]] = Field(
+        None,
+        description="Sources that reference this Source to include it in a collection. This attribute is intended to be read-only. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally. Source collections can be inferred from Flow collection definitions.",
+    )
+
+
+class StoragebackendslistItem(Storagebackend):
+    id: Uuid = Field(..., description="Storage backend identifier")
+    label: Optional[str] = Field(
+        None, description="Freeform string label for a storage backend."
+    )
+    default_storage: Optional[bool] = Field(
+        None,
+        description="If set to `true`, this is the default storage backend. The default storage backend will be used if the client does not specify a storage backend id when requesting the allocation of storage. If this parameter is not set, assume `false`. Service instances may either set one storage backend as default, or none - indicating that clients must always specify a storage backend.",
+    )
+
+
+class Storagebackendslist(RootModel[List[StoragebackendslistItem]]):
+    """
+    Information about the storage backends available on this service instance.
+    """
+
+    root: List[StoragebackendslistItem] = Field(
+        ...,
+        description="Information about the storage backends available on this service instance.",
+        title="Storage Backends List",
+    )
+
+
+class Webhookget(Webhookwithid):
+    """
+    Describes a Webhook
+    """
+
+    error: Optional[Error] = Field(
+        None,
+        description="Provides more information for the error status, as described by the [Error](../schemas/error#top) type",
+    )
+    status: Status1 = Field(
+        ...,
+        description="Status of the Webhook. `created` indicates the webhook has been successfully registered but is yet to begin sending events or, depending on the service implementation, the worker responsible for sending the events has yet to start. `started` indicates the webhook is active and sending events. `disabled` indicates the webhook has been disabled by a client and is not currently sending events. `error` indicates an error condition has been encountered and the webhook has been disabled by the service instance. More information about the error condition will be indicated by the service instance in the `error` parameter. Service implementations SHOULD implement appropriate retries and only enter the `error` state when absolutely necesary. A webhook in the `error` or `disabled` state may be re-enabled by a client by setting the status to `created`. A webhook in the `created` or `started` state may be disabled by a client by setting the status to `disabled`. Attempting to transition an `error` status to `disabled` SHOULD be rejected.",
+    )
+
+
+class Webhookput(Webhookwithid):
+    """
+    Modify existing webhook
+    """
+
+    api_key_value: Optional[str] = Field(
+        None, description="The value that the HTTP header 'api_key_name' will be set to"
+    )
+    status: Status3 = Field(
+        ...,
+        description="Status of the Webhook. `created` indicates the webhook has been successfully registered but is yet to begin sending events or, depending on the service implementation, the worker responsible for sending the events has yet to start. `started` indicates the webhook is active and sending events. `disabled` indicates the webhook has been disabled by a client and is not currently sending events. `error` indicates an error condition has been encountered and the webhook has been disabled by the service instance. More information about the error condition will be indicated by the service instance in the `error` parameter. Service implementations SHOULD implement appropriate retries and only enter the `error` state when absolutely necesary. A webhook in the `error` or `disabled` state may be re-enabled by a client by setting the status to `created`. A webhook in the `created` or `started` state may be disabled by a client by setting the status to `disabled`. Attempting to transition an `error` status to `disabled` SHOULD be rejected.",
+    )
+
+
+class Flowaudio(Flowcore):
+    """
+    Describes an audio Flow
+    """
+
+    format: Format = Field(
+        ..., description="The primary content type URN for the Flow."
+    )
+    essence_parameters: EssenceParameters = Field(
+        ...,
+        description="Describes the parameters of the essence inside this audio Flow",
+        title="Audio Flow Essence Parameters",
+    )
+
+
+class Flowsegment(Objectcore):
+    """
+    Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
+    """
+
+    object_id: str = Field(
+        ..., description="The object store identifier for the Media Object."
+    )
+    ts_offset: Optional[Timestamp] = Field(
+        None,
+        description="The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](../schemas/timestamp#top) type",
+    )
+    timerange: Timerange = Field(
+        ...,
+        description="The timerange for the samples contained in the Segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.",
+    )
+    last_duration: Optional[Timestamp] = Field(
+        None,
+        description="The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative",
+    )
+    sample_offset: Optional[int] = Field(
+        None,
+        description="The start of the Segment represented as a count of samples from the start of the Media Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set.",
+    )
+    sample_count: Optional[int] = Field(
+        None,
+        description="The count of samples in the Segment (which may be fewer than in the Media Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples",
+    )
+
+
+class Object(Objectcore):
+    id: str = Field(..., description="The Media Object identifier.")
+    referenced_by_flows: List[Uuid] = Field(
+        ...,
+        description="List of Flows that reference this Media Object via Flow Segments in this store instance.",
+    )
+    first_referenced_by_flow: Optional[Uuid] = Field(
+        None,
+        description="The first Flow that had a Flow Segment reference the Media Object in this store instance. This Flow is also present in 'referenced_by_flows' if it is still referenced by the Flow. This property is optional and may in some implementations become unset if the Flow no longer references the media object, e.g. because it was deleted.",
     )
 
 
