@@ -79,10 +79,13 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
             ]
         # Filter by storage_id
         if item.accept_storage_ids:
+            accept_storage_ids = [
+                storage_id.root for storage_id in item.accept_storage_ids
+            ]
             get_urls = [
                 get_url
                 for get_url in get_urls
-                if get_url.get("storage_id") in item.accept_storage_ids
+                if get_url.get("storage_id") in accept_storage_ids
             ]
         # Filter by presigned
         if item.presigned is not None:

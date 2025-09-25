@@ -791,7 +791,7 @@ def post_flow_storage_by_id(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
         )  # 400
     if flow_storage_post.storage_id:
-        storage_backend = get_storage_backend(flow_storage_post.storage_id)
+        storage_backend = get_storage_backend(flow_storage_post.storage_id.root)
     else:
         storage_backend = get_default_storage_backend()
     if flow_storage_post.limit is None and flow_storage_post.object_ids is None:
@@ -825,13 +825,15 @@ def post_flow_storage_by_id(
         media_objects=(
             [
                 get_presigned_put(
-                    flow.root.container, storage_backend["bucket_name"], object_id
+                    flow.root.container.root, storage_backend["bucket_name"], object_id
                 )
                 for object_id in flow_storage_post.object_ids
             ]
             if flow_storage_post.object_ids
             else [
-                get_presigned_put(flow.root.container, storage_backend["bucket_name"])
+                get_presigned_put(
+                    flow.root.container.root, storage_backend["bucket_name"]
+                )
                 for _ in range(flow_storage_post.limit)
             ]
         )
