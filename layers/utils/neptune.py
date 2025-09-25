@@ -866,7 +866,9 @@ def validate_flow_collection(flow_id: str, flow_collection: Flowcollection):
     if not flow_collection:
         return True
     for collection in flow_collection.root:
-        if flow_id == collection.id or not check_node_exists("flow", collection.id):
+        if flow_id == collection.id.root or not check_node_exists(
+            "flow", collection.id.root
+        ):
             return False
     return True
 
@@ -883,7 +885,7 @@ def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
             )  # 400
     except ValueError:
         source: Source = Source(**flow_dict)
-        source.id = flow_dict["source_id"]
+        source.id.root = flow_dict["source_id"]
         source_dict = model_dump(source)
         merge_source(source_dict)
         publish_event(
