@@ -106,6 +106,11 @@ def api_client_cognito(access_token, api_endpoint):
 
 
 @pytest.fixture(scope="session")
+def webhook_ids():
+    return []
+
+
+@pytest.fixture(scope="session")
 def media_objects():
     return []
 
@@ -297,6 +302,15 @@ def stub_multi_source():
             "flow_status": "ingesting",
             "test": "this",
         },
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_webhook_basic():
+    return {
+        "url": "https://hook.example.com",
+        "api_key_name": "Authorization",
+        "events": ["flows/created", "flows/updated", "flows/deleted"],
     }
 
 
