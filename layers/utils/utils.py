@@ -234,7 +234,7 @@ def serialise_neptune_obj(obj: dict, key_prefix: str = "") -> dict:
         if isinstance(v, (list, dict)):
             serialised[
                 f"{key_prefix}{opencypher_property_name(constants.SERIALISE_PREFIX + k)}"
-            ] = (json.dumps(v, default=json_number) if v else None)
+            ] = (json.dumps(v, default=json_number) if v or v == [] else None)
         else:
             serialised[f"{key_prefix}{opencypher_property_name(k)}"] = v
     return serialised

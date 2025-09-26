@@ -532,6 +532,50 @@ Resources:
               AuthorizationScopes:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Post]
+        headServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+        getServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
+        putServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
+        deleteServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headStorageBackends:
           Type: Api
           Properties:
