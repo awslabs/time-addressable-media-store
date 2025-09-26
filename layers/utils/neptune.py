@@ -960,7 +960,10 @@ def get_matching_webhooks(event):
     for resource in event.resources:
         _, resource_type, resource_id = resource.split(":")
         expressions[attribute_mappings[resource_type]].append(resource_id)
-    where_literals = [rf'webhook.SERIALISE_events CONTAINS "\"{event.detail_type}\""']
+    where_literals = [
+        r'webhook.status IN ["created", "started"]',
+        rf'webhook.SERIALISE_events CONTAINS "\"{event.detail_type}\""',
+    ]
     for attr, id_list in expressions.items():
         resource_conditions = [f"webhook.SERIALISE_{attr} IS NULL"]
         for resource_id in id_list:
