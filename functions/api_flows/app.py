@@ -200,7 +200,7 @@ def put_flow_by_id(
     flow: Annotated[Flow, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
-    if flow.root.id != flow_id:
+    if flow.root.id.root != flow_id:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
     try:
         existing_item = query_node(record_type, flow_id)
