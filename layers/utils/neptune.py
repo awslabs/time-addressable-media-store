@@ -10,9 +10,13 @@ import constants
 import cymple
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
+    EventBridgeEvent,
+)
 from cymple import QueryBuilder
 from deepdiff import DeepDiff
-from schema import Flowcollection, Source, Webhookpost
+from schema import Flowcollection, Source
+from schema_extra import Webhookfull
 from utils import (
     deserialise_neptune_obj,
     filter_dict,
@@ -949,7 +953,8 @@ def generate_flow_collection_query(
 
 
 @tracer.capture_method(capture_response=False)
-def get_matching_webhooks(event):
+def get_matching_webhooks(event: EventBridgeEvent) -> list[Webhookfull]:
+    """Returns webhooks that match the event's detail type and resources"""
     attribute_mappings = {
         "flow": "flow_ids",
         "source": "source_ids",
@@ -962,13 +967,13 @@ def get_matching_webhooks(event):
         expressions[attribute_mappings[resource_type]].append(resource_id)
     where_literals = [
         r'webhook.status IN ["created", "started"]',
-        rf'webhook.SERIALISE_events CONTAINS "\"{event.detail_type}\""',
+        rf'webhook.{constants.SERIALISE_PREFIX}events CONTAINS "\"{event.detail_type}\""',
     ]
     for attr, id_list in expressions.items():
-        resource_conditions = [f"webhook.SERIALISE_{attr} IS NULL"]
+        resource_conditions = [f"webhook.{constants.SERIALISE_PREFIX}{attr} IS NULL"]
         for resource_id in id_list:
             resource_conditions.append(
-                rf'webhook.SERIALISE_{attr} CONTAINS "\"{resource_id}\""'
+                rf'webhook.{constants.SERIALISE_PREFIX}{attr} CONTAINS "\"{resource_id}\""'
             )
         where_literals.append(f"({' OR '.join(resource_conditions)})")
     query = generate_webhook_query(
@@ -980,6 +985,6 @@ def get_matching_webhooks(event):
     query = query.return_literal(constants.RETURN_LITERAL["webhook"]).get()
     results = execute_open_cypher_query(query)
     return [
-        Webhookpost(**deserialise_neptune_obj(result["webhook"]))
+        Webhookfull(**deserialise_neptune_obj(result["webhook"]))
         for result in results["results"]
     ]
