@@ -333,13 +333,20 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       KmsMasterKeyId: alias/aws/sqs
-      VisibilityTimeout: 30
+      VisibilityTimeout: 900
       MessageRetentionPeriod: 86400
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt WebhooksDeliveryQueueDLQ.Arn
         maxReceiveCount: 1
 
   WebhooksDeliveryQueueDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      KmsMasterKeyId: alias/aws/sqs
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 86400
+
+  WebhooksErrorQueue:
     Type: AWS::SQS::Queue
     Properties:
       KmsMasterKeyId: alias/aws/sqs
@@ -532,6 +539,50 @@ Resources:
               AuthorizationScopes:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Post]
+        headServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Head
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Head]
+        getServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Get
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Get]
+        putServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Put
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Put]
+        deleteServiceWebhookWebhookId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/webhooks/{webhookId}
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
         headStorageBackends:
           Type: Api
           Properties:
@@ -1592,6 +1643,8 @@ Resources:
             - Effect: Allow
               Action:
                 - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
               Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
               Condition:
                 StringEquals:
@@ -1631,16 +1684,68 @@ Resources:
       Layers:
         - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
         - !Ref UtilsLayer
+      Timeout: 900
       Environment:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
           POWERTOOLS_SERVICE_NAME: tams-webhooks-delivery
           POWERTOOLS_METRICS_NAMESPACE: TAMS
+          ERROR_QUEUE_URL: !Ref WebhooksErrorQueue
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - !GetAtt WebhooksErrorQueue.Arn
       Events:
         SQSEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt WebhooksDeliveryQueue.Arn
+            BatchSize: 10
+            Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  WebhooksErrorFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/webhooks_error/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
+        - !Ref UtilsLayer
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_SERVICE_NAME: tams-webhooks
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
+          NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WebhooksErrorQueue.Arn
             BatchSize: 10
             Enabled: True
             FunctionResponseTypes:

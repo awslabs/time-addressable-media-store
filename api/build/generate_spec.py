@@ -77,6 +77,8 @@ def process_openapi_spec(spec):
                         replace_external_ref(item)
 
     replace_external_ref(spec)
+    if not spec["components"].get("schemas"):
+        spec["components"]["schemas"] = {}
     for schema in sorted(external_schemas):
         with open(f"{sys.path[0]}/tams/api/{schema[0]}", "r", encoding="utf-8") as sf:
             raw_content = sf.read()

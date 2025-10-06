@@ -6,7 +6,7 @@ from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
 )
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import get_default_storage_backend, get_storage_backend, get_store_name
-from neptune import get_matching_webhooks
+from neptune import get_matching_webhooks, set_node_property_base
 from segment_get_urls import populate_get_urls
 from utils import model_dump, put_message
 
@@ -52,6 +52,11 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
         # Add ALL get_urls to event
         populate_get_urls(event.detail["segments"], include_storage_id=True)
     for item in schema_items:
+        # Update status to started if created
+        if item.status.value == "created":
+            set_node_property_base(
+                "webhook", item.id.root, {"webhook.status": "started"}
+            )
         # Not a segments_added event so no further action required just send it.
         if event.detail_type != "flows/segments_added":
             post_event(event, item)
@@ -79,10 +84,13 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
             ]
         # Filter by storage_id
         if item.accept_storage_ids:
+            accept_storage_ids = [
+                storage_id.root for storage_id in item.accept_storage_ids
+            ]
             get_urls = [
                 get_url
                 for get_url in get_urls
-                if get_url.get("storage_id") in item.accept_storage_ids
+                if get_url.get("storage_id") in accept_storage_ids
             ]
         # Filter by presigned
         if item.presigned is not None:

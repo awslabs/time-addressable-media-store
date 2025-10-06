@@ -1,31 +1,48 @@
 import os
 from http import HTTPStatus
+from typing import Optional
 
 import boto3
 import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
-from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler import (
+    APIGatewayRestResolver,
+    CORSConfig,
+    Response,
+    content_types,
+)
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    NotFoundError,
+)
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
-from aws_lambda_powertools.event_handler.openapi.params import Body
+from aws_lambda_powertools.event_handler.openapi.params import Body, Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import Key
 from dynamodb import get_storage_backend_dict, get_store_name
-from neptune import delete_webhook, merge_webhook, query_node, query_webhooks
+from neptune import (
+    check_node_exists,
+    delete_webhook,
+    merge_webhook,
+    query_node,
+    query_webhooks,
+)
 from schema import (
     Eventstreamcommon,
     Service,
     Servicepost,
     Storagebackendslist,
     StoragebackendslistItem,
-    Webhook,
+    Uuid,
+    Webhookget,
     Webhookpost,
+    Webhookput,
 )
 from typing_extensions import Annotated
-from utils import model_dump
+from utils import generate_link_url, model_dump
 
 tracer = Tracer()
 logger = Logger()
@@ -37,6 +54,8 @@ metrics = Metrics()
 record_type = "webhook"
 dynamodb = boto3.resource("dynamodb")
 service_table = dynamodb.Table(os.environ["SERVICE_TABLE"])
+
+UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/")
@@ -98,29 +117,105 @@ def post_service(service_post: Annotated[Servicepost, Body()]):
 @app.head("/service/webhooks")
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
-def get_webhooks():
-    items = query_webhooks()
+def get_webhooks(
+    param_page: Annotated[Optional[str], Query(alias="page")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
+):
+    custom_headers = {}
+    items, next_page, limit_used = query_webhooks(
+        {
+            "page": param_page,
+            "limit": param_limit,
+        }
+    )
+    if next_page:
+        custom_headers["X-Paging-NextKey"] = str(next_page)
+        custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
+    if next_page or limit_used != param_limit:
+        custom_headers["X-Paging-Limit"] = str(limit_used)
     if app.current_event.request_context.http_method == "HEAD":
-        return None, HTTPStatus.OK.value  # 200
-    return (
-        model_dump([Webhook(**item) for item in items]),
-        HTTPStatus.OK.value,
-    )  # 200
+        return Response(
+            status_code=HTTPStatus.OK.value,  # 200
+            body=None,
+            headers=custom_headers,
+        )
+    return Response(
+        status_code=HTTPStatus.OK.value,  # 200
+        content_type=content_types.APPLICATION_JSON,
+        body=model_dump([Webhookget(**item) for item in items]),
+        headers=custom_headers,
+    )
 
 
 @app.post("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def post_webhooks(webhook: Annotated[Webhookpost, Body()]):
-
-    if len(webhook.events) == 0:
-        delete_webhook(webhook.url)
-        return None, HTTPStatus.NO_CONTENT.value  # 204
-    try:
-        existing_item = query_node(record_type, webhook.url, "url")
-    except ValueError:
-        existing_item = {}
-    item_dict = model_dump(Webhook(**merge_webhook(model_dump(webhook), existing_item)))
+    webhook_dict = webhook.model_dump(mode="json")
+    # Set default status if None
+    if not webhook_dict.get("status"):
+        webhook_dict["status"] = "created"
+    webhook_put = Webhookput(
+        **webhook_dict,
+        id=app.current_event.request_context.request_id,
+    )
+    item_dict = model_dump(
+        Webhookget(**merge_webhook(webhook_put.model_dump(mode="json"), None))
+    )
     return item_dict, HTTPStatus.CREATED.value  # 201
+
+
+@app.head("/service/webhooks/<webhookId>")
+@app.get("/service/webhooks/<webhookId>")
+@tracer.capture_method(capture_response=False)
+def get_webhook_by_id(
+    webhook_id: Annotated[str, Path(alias="webhookId", pattern=UUID_PATTERN)],
+):
+    try:
+        item = query_node(record_type, webhook_id)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested Webhook ID in the path is invalid."
+        ) from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return model_dump(Webhookget(**item)), HTTPStatus.OK.value  # 200
+
+
+@app.put("/service/webhooks/<webhookId>")
+@tracer.capture_method(capture_response=False)
+def put_webhook_by_id(
+    webhook: Annotated[Webhookput, Body()],
+    webhook_id: Annotated[str, Path(alias="webhookId", pattern=UUID_PATTERN)],
+):
+    if webhook.id.root != webhook_id:
+        raise NotFoundError("The requested Webhook ID in the path is invalid.")  # 404
+    try:
+        existing_item = query_node(record_type, webhook_id)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested Webhook ID in the path is invalid."
+        ) from e  # 404
+    if (
+        webhook.status
+        and webhook.status.value == "disabled"
+        and existing_item["status"] == "error"
+    ):
+        raise BadRequestError(
+            "Bad request. The Webhook is currently in an error status and therefore cannot be updated to disabled."
+        )  # 400
+    updated_webhook = merge_webhook(model_dump(webhook), existing_item)
+    return model_dump(Webhookget(**updated_webhook)), HTTPStatus.CREATED.value  # 201
+
+
+@app.delete("/service/webhooks/<webhookId>")
+@tracer.capture_method(capture_response=False)
+def delete_webhook_by_id(
+    webhook_id: Annotated[str, Path(alias="webhookId", pattern=UUID_PATTERN)],
+):
+    if not check_node_exists(record_type, webhook_id):
+        raise NotFoundError("The requested Webhook ID in the path is invalid.")  # 404
+    delete_webhook(webhook_id)
+    return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
 @app.head("/service/storage-backends")

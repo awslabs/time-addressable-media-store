@@ -10,9 +10,13 @@ import constants
 import cymple
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
+    EventBridgeEvent,
+)
 from cymple import QueryBuilder
 from deepdiff import DeepDiff
-from schema import Flowcollection, Source, Webhookpost
+from schema import Flowcollection, Source
+from schema_extra import Webhookfull
 from utils import (
     deserialise_neptune_obj,
     filter_dict,
@@ -269,11 +273,11 @@ def get_flow_collected_by(flow_id: str) -> list:
 
 
 @tracer.capture_method(capture_response=False)
-def query_node(record_type: str, record_id: str, id_field: str = "id") -> dict:
+def query_node(record_type: str, record_id: str) -> dict:
     """Returns the specified Node from the Neptune Database"""
     try:
         query = (
-            generate_match_query(record_type, {record_type: {id_field: record_id}})
+            generate_match_query(record_type, {record_type: {"id": record_id}})
             .return_literal(constants.RETURN_LITERAL[record_type])
             .get()
         )
@@ -473,8 +477,17 @@ def query_delete_requests() -> list:
 
 
 @tracer.capture_method(capture_response=False)
-def query_webhooks() -> list:
+def query_webhooks(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Webhooks from the Neptune Database"""
+    page = int(parameters.get("page") or 0)
+    limit = min(
+        (
+            parameters["limit"]
+            if parameters.get("limit")
+            else constants.DEFAULT_PAGE_LIMIT
+        ),
+        constants.MAX_PAGE_LIMIT,
+    )
     query = generate_webhook_query(
         {
             "webhook": {},
@@ -483,14 +496,17 @@ def query_webhooks() -> list:
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["webhook"])
-        .order_by("webhook.url")
+        .order_by("webhook.id")
+        .skip(page)
+        .limit(limit)
         .get()
     )
     results = execute_open_cypher_query(query)
     deserialised_results = [
         deserialise_neptune_obj(result["webhook"]) for result in results["results"]
     ]
-    return deserialised_results
+    next_page = page + limit if len(deserialised_results) == limit else None
+    return deserialised_results, next_page, limit
 
 
 @tracer.capture_method(capture_response=False)
@@ -646,7 +662,7 @@ def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Webhook record"""
     webhook_properties = filter_dict(
         webhook_dict,
-        {"url"},
+        {"id"},
     )
     if existing_dict:
         null_properties = {
@@ -654,7 +670,7 @@ def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
             for k in (
                 existing_dict.keys()
                 - {
-                    "url",
+                    "id",
                 }
             )
             - webhook_properties.keys()
@@ -665,7 +681,7 @@ def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
         .node(
             ref_name="webhook",
             labels="webhook",
-            properties={"url": webhook_dict["url"]},
+            properties={"id": webhook_dict["id"]},
         )
         .set(serialise_neptune_obj(webhook_properties, "webhook."))
     )
@@ -708,11 +724,11 @@ def delete_flow(flow_id: str) -> str | None:
 
 
 @tracer.capture_method(capture_response=False)
-def delete_webhook(webhook_url: str) -> None:
+def delete_webhook(webhook_id: str) -> None:
     """Deletes the specified Webhook from the Neptune Database"""
     query = (
         qb.match()
-        .node(ref_name="webhook", labels="webhook", properties={"url": webhook_url})
+        .node(ref_name="webhook", labels="webhook", properties={"id": webhook_id})
         .detach_delete(ref_name="webhook")
         .get()
     )
@@ -866,7 +882,9 @@ def validate_flow_collection(flow_id: str, flow_collection: Flowcollection):
     if not flow_collection:
         return True
     for collection in flow_collection.root:
-        if flow_id == collection.id or not check_node_exists("flow", collection.id):
+        if flow_id == collection.id.root or not check_node_exists(
+            "flow", collection.id.root
+        ):
             return False
     return True
 
@@ -883,7 +901,7 @@ def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
             )  # 400
     except ValueError:
         source: Source = Source(**flow_dict)
-        source.id = flow_dict["source_id"]
+        source.id.root = flow_dict["source_id"]
         source_dict = model_dump(source)
         merge_source(source_dict)
         publish_event(
@@ -935,7 +953,8 @@ def generate_flow_collection_query(
 
 
 @tracer.capture_method(capture_response=False)
-def get_matching_webhooks(event):
+def get_matching_webhooks(event: EventBridgeEvent) -> list[Webhookfull]:
+    """Returns webhooks that match the event's detail type and resources"""
     attribute_mappings = {
         "flow": "flow_ids",
         "source": "source_ids",
@@ -946,12 +965,15 @@ def get_matching_webhooks(event):
     for resource in event.resources:
         _, resource_type, resource_id = resource.split(":")
         expressions[attribute_mappings[resource_type]].append(resource_id)
-    where_literals = [rf'webhook.SERIALISE_events CONTAINS "\"{event.detail_type}\""']
+    where_literals = [
+        r'webhook.status IN ["created", "started"]',
+        rf'webhook.{constants.SERIALISE_PREFIX}events CONTAINS "\"{event.detail_type}\""',
+    ]
     for attr, id_list in expressions.items():
-        resource_conditions = [f"webhook.SERIALISE_{attr} IS NULL"]
+        resource_conditions = [f"webhook.{constants.SERIALISE_PREFIX}{attr} IS NULL"]
         for resource_id in id_list:
             resource_conditions.append(
-                rf'webhook.SERIALISE_{attr} CONTAINS "\"{resource_id}\""'
+                rf'webhook.{constants.SERIALISE_PREFIX}{attr} CONTAINS "\"{resource_id}\""'
             )
         where_literals.append(f"({' OR '.join(resource_conditions)})")
     query = generate_webhook_query(
@@ -963,6 +985,6 @@ def get_matching_webhooks(event):
     query = query.return_literal(constants.RETURN_LITERAL["webhook"]).get()
     results = execute_open_cypher_query(query)
     return [
-        Webhookpost(**deserialise_neptune_obj(result["webhook"]))
+        Webhookfull(**deserialise_neptune_obj(result["webhook"]))
         for result in results["results"]
     ]
