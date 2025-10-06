@@ -4,7 +4,7 @@ import logging
 import os
 import uuid
 import warnings
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import boto3
 import pytest
@@ -20,7 +20,6 @@ os.environ["POWERTOOLS_SERVICE_NAME"] = "tams"
 os.environ["SERVICE_TABLE"] = "service-table"
 os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
-os.environ["WEBHOOKS_TABLE"] = "webhooks-table"
 os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
 os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
@@ -57,28 +56,16 @@ def alternative_storage_id():
 @pytest.fixture(scope="module", autouse=True)
 def mock_neptune_client():
     """
-    Mock the Neptune client before any imports to isolate tests from actual Neptune service.
-    This is required since at the time of writing moto does not support `execute_open_cypher_query` API on Netune client.
-
+    Mock the Neptune client by patching the neptune module's client directly.
+    This is required since at the time of writing moto does not support `execute_open_cypher_query` API on Neptune client.
     Returns:
         MagicMock: A mock Neptune client that can be configured in tests
     """
-    # Create a mock Neptune client
     mock_client = MagicMock()
     mock_client.execute_open_cypher_query.return_value = {"results": []}
 
-    # Save original and patch
-    original_client = boto3.client
-
-    def patched_client(service_name, *args, **kwargs):
-        if service_name == "neptunedata":
-            return mock_client
-        return original_client(service_name, *args, **kwargs)
-
-    # Apply patch
-    boto3.client = patched_client
-
-    yield mock_client
+    with patch("neptune.neptune", mock_client):
+        yield mock_client
 
 
 @pytest.fixture(autouse=True)
@@ -91,6 +78,7 @@ def reset_mock_neptune_client(mock_neptune_client):
         mock_neptune_client: The mock Neptune client fixture
     """
     mock_neptune_client.execute_open_cypher_query.return_value = {"results": []}
+    mock_neptune_client.execute_open_cypher_query.side_effect = None
     yield
 
 
@@ -322,46 +310,6 @@ def storage_table():
 
 
 @pytest.fixture(scope="module", autouse=True)
-def webhooks_table():
-    """
-    Create and manage a test DynamoDB webhooks table for the test module.
-
-    Creates a webhooks table with appropriate schema before tests run and cleans it up afterward.
-
-    Returns:
-        Table: A DynamoDB table resource for test use
-    """
-    # Create DynamoDB table
-    client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
-    client.create_table(
-        TableName=os.environ["WEBHOOKS_TABLE"],
-        KeySchema=[
-            {"AttributeName": "event", "KeyType": "HASH"},
-            {"AttributeName": "url", "KeyType": "RANGE"},
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "event", "AttributeType": "S"},
-            {"AttributeName": "url", "AttributeType": "S"},
-        ],
-        GlobalSecondaryIndexes=[
-            {
-                "IndexName": "url-index",
-                "KeySchema": [
-                    {"AttributeName": "url", "KeyType": "HASH"},
-                    {"AttributeName": "event", "KeyType": "RANGE"},
-                ],
-                "Projection": {"ProjectionType": "KEYS_ONLY"},
-            }
-        ],
-        BillingMode="PAY_PER_REQUEST",
-    )
-    yield boto3.resource(
-        "dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"]
-    ).Table(os.environ["WEBHOOKS_TABLE"])
-    client.delete_table(TableName=os.environ["WEBHOOKS_TABLE"])
-
-
-@pytest.fixture(scope="module", autouse=True)
 def webhooks_queue():
     """
     Create and manage a test SQS Queue for webhooks.
@@ -409,3 +357,13 @@ def create_pagination_token(data):
     return base64.b64encode(json.dumps(data, default=int).encode("utf-8")).decode(
         "utf-8"
     )
+
+
+def serialise_dict(input_dict):
+    result = {}
+    for k, v in input_dict.items():
+        if isinstance(v, list):
+            result[f"SERIALISE_{k}"] = json.dumps(v)
+        else:
+            result[k] = v
+    return result
