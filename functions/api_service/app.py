@@ -203,10 +203,8 @@ def put_webhook_by_id(
         raise BadRequestError(
             "Bad request. The Webhook is currently in an error status and therefore cannot be updated to disabled."
         )  # 400
-    item_dict = model_dump(
-        Webhookget(**merge_webhook(model_dump(webhook), existing_item))
-    )
-    return item_dict, HTTPStatus.CREATED.value  # 201
+    updated_webhook = merge_webhook(model_dump(webhook), existing_item)
+    return model_dump(Webhookget(**updated_webhook)), HTTPStatus.CREATED.value  # 201
 
 
 @app.delete("/service/webhooks/<webhookId>")
