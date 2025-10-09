@@ -21,6 +21,7 @@ from neptune import (
     merge_delete_request,
     update_flow_segments_updated,
 )
+from schema import Flowsegmentpost
 from utils import pop_outliers, publish_event, put_message, put_message_batches
 
 tracer = Tracer()
@@ -108,7 +109,7 @@ def get_timerange_expression(
     expression_type: Type[Attr] | Type[Key],
     boundary: TimeRangeBoundary,
     filter_value: TimeRange,
-):
+) -> Attr | Key:
     """Returns a DynamoDB expression, for Key or Filter, to add the specfied timerange condition."""
     other_boundary = (
         TimeRangeBoundary.START
@@ -199,7 +200,7 @@ def delete_flow_segments(
     s3_queue: str,
     del_queue: str,
     item_dict: dict | None = None,
-):
+) -> None:
     """Performs the logic to delete flow segments exits gracefully if within 5 seconds of Lambda timeout"""
     delete_error = None
     args = get_key_and_args(flow_id, parameters)
@@ -359,6 +360,7 @@ def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
 @lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_store_name() -> str:
+    """Get the store name from service configuration, defaults to 'tams'."""
     get_item = service_table.get_item(
         Key={"record_type": "service", "id": constants.SERVICE_INFO_ID}
     )
@@ -370,7 +372,8 @@ def get_store_name() -> str:
 
 
 @tracer.capture_method(capture_response=False)
-def get_storage_backend_dict(item, store_name) -> dict:
+def get_storage_backend_dict(item: dict, store_name: str) -> dict:
+    """Transform storage backend item into standardized dictionary format with label."""
     return {
         "storage_id": item["id"],
         "label": f'aws.{item["region"]}:s3:{store_name}',
@@ -381,6 +384,7 @@ def get_storage_backend_dict(item, store_name) -> dict:
 @lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_default_storage_backend() -> dict:
+    """Retrieve the default storage backend configuration from service table."""
     query = service_table.query(
         KeyConditionExpression=Key("record_type").eq("storage-backend"),
         FilterExpression=Attr("default_storage").eq(True),
@@ -388,18 +392,19 @@ def get_default_storage_backend() -> dict:
     items = query["Items"]
     if len(items) == 0:
         raise BadRequestError("No default storage backend found")  # 404
-    return dict(get_storage_backend_dict(items[0], get_store_name()))
+    return get_storage_backend_dict(items[0], get_store_name())
 
 
 @lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_storage_backend(storage_id: str) -> dict:
+    """Retrieve specific storage backend configuration by storage_id."""
     get_item = service_table.get_item(
         Key={"record_type": "storage-backend", "id": storage_id}
     )
     if not get_item.get("Item"):
         raise BadRequestError("Invalid storage backend identifier")  # 404
-    return dict(get_storage_backend_dict(get_item["Item"], get_store_name()))
+    return get_storage_backend_dict(get_item["Item"], get_store_name())
 
 
 @lru_cache()
