@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 from aws_lambda_powertools import Tracer
-from dynamodb import get_default_storage_backend, get_storage_backend
+from dynamodb import list_storage_backends
 from utils import generate_presigned_url
 
 tracer = Tracer()
@@ -74,32 +74,23 @@ def create_presigned_urls_parallel(url_set: Set[str]) -> Dict[str, str]:
 @tracer.capture_method(capture_response=False)
 def get_storage_backends(
     accept_storage_ids: Optional[str],
-    segments: List[Dict],
-    default_storage_backend_id: str,
 ) -> Dict[str, Dict]:
-    """Get storage backend configurations for segments.
+    """Get storage backend configurations for accepted storage ids.
 
     Args:
         accept_storage_ids: Comma-separated storage IDs to filter by
-        segments: List of segment dictionaries
-        default_storage_backend_id: The id of the default storage backend
 
     Returns:
         Dict mapping storage IDs to their backend configurations
     """
-    filter_ids = set(accept_storage_ids.split(",")) if accept_storage_ids else None
-    distinct_storage_ids = set(
-        storage_id
-        for segment in segments
-        for storage_id in segment.get("storage_ids", [default_storage_backend_id])
-    )
-    filtered_storage_ids = (
-        distinct_storage_ids & filter_ids if filter_ids else distinct_storage_ids
-    )
-    return {
-        storage_id: get_storage_backend(storage_id)
-        for storage_id in filtered_storage_ids
+    storage_backends = {
+        storage_backend["id"]: storage_backend
+        for storage_backend in list_storage_backends()
     }
+    if not accept_storage_ids:
+        return storage_backends
+    filter_ids = set(accept_storage_ids.split(",")) if accept_storage_ids else None
+    return {k: v for k, v in storage_backends.items() if k in filter_ids}
 
 
 @tracer.capture_method(capture_response=False)
@@ -170,12 +161,9 @@ def populate_get_urls(
     filter_labels = (
         None if accept_get_urls is None else accept_get_urls.split(",")
     )  # Test explictly for None as empty string has special meaning but would be falsey
-    default_storage_backend = get_default_storage_backend()
-    storage_backends = get_storage_backends(
-        accept_storage_ids, segments, default_storage_backend["id"]
-    )
-    default_storage_available = (
-        storage_backends.get(default_storage_backend["id"]) is not None
+    storage_backends = get_storage_backends(accept_storage_ids)
+    default_storage_backend = next(
+        (v for v in storage_backends.values() if v.get("default_storage")), None
     )
     # Keep track of unique needed presigned urls during the loop
     urls_needing_presigning = set()
@@ -183,7 +171,7 @@ def populate_get_urls(
         storage_ids = segment.get("storage_ids", [])
         get_urls = [] if accept_storage_ids else segment.get("get_urls", [])
         if not storage_ids and not segment.get("get_urls"):
-            if default_storage_available:
+            if default_storage_backend:
                 get_urls.extend(
                     create_segment_access_urls(
                         segment,

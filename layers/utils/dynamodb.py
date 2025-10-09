@@ -400,3 +400,18 @@ def get_storage_backend(storage_id: str) -> dict:
     if not get_item.get("Item"):
         raise BadRequestError("Invalid storage backend identifier")  # 404
     return dict(get_storage_backend_dict(get_item["Item"], get_store_name()))
+
+
+@lru_cache()
+@tracer.capture_method(capture_response=False)
+def list_storage_backends() -> list[dict]:
+    """Retrieve all storage backend items from service table."""
+    args = {"KeyConditionExpression": Key("record_type").eq("storage-backend")}
+    query = service_table.query(**args)
+    items = query["Items"]
+    while "LastEvaluatedKey" in query:
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = service_table.query(**args)
+        items.extend(query["Items"])
+    store_name = get_store_name()
+    return [get_storage_backend_dict(item, store_name) for item in items]
