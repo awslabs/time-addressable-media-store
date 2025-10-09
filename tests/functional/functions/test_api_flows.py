@@ -155,12 +155,10 @@ def test_POST_storage_returns_201_with_default_storage_objects_when_flow_exists(
         assert put_url.get("content-type")
         assert media_object.get("object_id")
         # Check expected items are present in the storage_table
-        item = storage_table.get_item(
-            Key={"id": media_object["object_id"], "flow_id": sample_flow_id}
-        )["Item"]
+        item = storage_table.get_item(Key={"id": media_object["object_id"]})["Item"]
         assert item is not None
         assert item.get("expire_at")
-        assert item["storage_ids"] == [default_storage_id]
+        assert item["storage_id"] == default_storage_id
 
 
 # pylint: disable=redefined-outer-name
@@ -215,12 +213,10 @@ def test_POST_storage_returns_201_with_alternative_storage_objects_when_flow_exi
         assert put_url["url"].startswith("https://alternative-storage.s3.")
         assert media_object.get("object_id")
         # Check expected items are present in the storage_table
-        item = storage_table.get_item(
-            Key={"id": media_object["object_id"], "flow_id": sample_flow_id}
-        )["Item"]
+        item = storage_table.get_item(Key={"id": media_object["object_id"]})["Item"]
         assert item is not None
         assert item.get("expire_at")
-        assert item["storage_ids"] == [alternative_storage_id]
+        assert item["storage_id"] == alternative_storage_id
 
 
 # pylint: disable=redefined-outer-name

@@ -20,7 +20,6 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import (
 from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
 from dynamodb import get_object_id_query_kwargs, segments_table, storage_table
 from schema import Object
 from typing_extensions import Annotated
@@ -74,18 +73,14 @@ def get_objects_by_id(
             body=None,
             headers=custom_headers,
         )
-    object_query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
-    valid_object_items = [
-        item for item in object_query["Items"] if item.get("expire_at") is None
-    ]
-    first_referenced_by_flow = (
-        None if len(valid_object_items) == 0 else valid_object_items[0]["flow_id"]
+    get_item = storage_table.get_item(
+        Key={"id": object_id}, ProjectionExpression="flow_id"
     )
     schema_item = Object(
         **{
             "id": object_id,
             "referenced_by_flows": set([item["flow_id"] for item in items]),
-            "first_referenced_by_flow": first_referenced_by_flow,
+            "first_referenced_by_flow": get_item.get("Item", {}).get("flow_id"),
         }
     )
     return Response(

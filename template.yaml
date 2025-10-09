@@ -238,13 +238,9 @@ Resources:
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
-        - AttributeName: flow_id
-          AttributeType: S
       KeySchema:
         - AttributeName: id
           KeyType: HASH
-        - AttributeName: flow_id
-          KeyType: RANGE
       TimeToLiveSpecification:
         AttributeName: expire_at
         Enabled: true
@@ -1399,7 +1395,7 @@ Resources:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
             - Effect: Allow
               Action:
-                - dynamodb:Query
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
@@ -1506,6 +1502,10 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource:
                 - !GetAtt FlowStorageTable.Arn
       Events:
         headMediaObjectInformation:
@@ -1849,7 +1849,7 @@ Resources:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
             - Effect: Allow
               Action:
-                - dynamodb:Query
+                - dynamodb:GetItem
                 - dynamodb:DeleteItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn

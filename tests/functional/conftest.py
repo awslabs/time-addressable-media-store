@@ -295,11 +295,9 @@ def storage_table():
         TableName=os.environ["STORAGE_TABLE"],
         KeySchema=[
             {"AttributeName": "id", "KeyType": "HASH"},
-            {"AttributeName": "flow_id", "KeyType": "RANGE"},
         ],
         AttributeDefinitions=[
             {"AttributeName": "id", "AttributeType": "S"},
-            {"AttributeName": "flow_id", "AttributeType": "S"},
         ],
         BillingMode="PAY_PER_REQUEST",
     )

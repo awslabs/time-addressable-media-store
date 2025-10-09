@@ -286,44 +286,59 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 
 
 @tracer.capture_method(capture_response=False)
-def validate_object_id(object_id: str, flow_id: str) -> tuple[bool, list]:
-    """Check supplied object_id can be used for the supplied flow_id, returns storage_ids if valid"""
-    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
-    items = query["Items"]
-    if len(items) == 0:
-        # No matching object_id found so must be invalid
-        return False, []
-    object_item = items[0]
-    if object_item["flow_id"] == flow_id:
-        if object_item.get("expire_at"):
+def validate_object_id(
+    segment: Flowsegmentpost, flow_id: str
+) -> tuple[bool, str | None, str | None]:
+    """Check supplied segment object_id can be used for the supplied flow_id, returns storage_id if valid"""
+    get_item = storage_table.get_item(Key={"id": segment.object_id})
+    storage_item = get_item.get("Item")
+    if storage_item is None and not segment.get_urls:
+        # No matching object_id found and no get_urls supplied so must be invalid
+        return (
+            False,
+            None,
+            "Bad request. The object id does not exist and no get_urls supplied.",
+        )
+    if storage_item is None and segment.get_urls:
+        # No matching object_id found but get_urls supplied so this is valid
+        return True, None, None
+    if storage_item and segment.get_urls:
+        # Matching object_id found get_urls supplied which is not a valid use case
+        return (
+            False,
+            None,
+            "Bad request. A new object id is required when supplying get_urls.",
+        )
+    if storage_item["flow_id"] == flow_id:
+        if storage_item.get("expire_at"):
             # expire_at exists so this is first time use and needs updating to prevent TTL deletion
             storage_table.update_item(
                 Key={
-                    "id": object_id,
-                    "flow_id": flow_id,
+                    "id": segment.object_id,
                 },
                 AttributeUpdates={"expire_at": {"Action": "DELETE"}},
             )
-        # flow_id matches so is a valida object_id
-        return True, object_item.get("storage_ids", [])
-    if object_item.get("expire_at") is None:
+        # flow_id matches so is a valid object_id
+        return True, storage_item.get("storage_id"), None
+    if storage_item.get("expire_at") is None:
         # object_id already used therefore can be re-used by any flow_id
-        return True, object_item.get("storage_ids", [])
-    # All other options are invalid
-    return False, []
+        return True, storage_item.get("storage_id"), None
+    # First time use object_id must be used on flow_id it was created with
+    return (
+        False,
+        None,
+        "Bad request. The object id is not valid to be used for the flow id supplied.",
+    )
 
 
 @tracer.capture_method(capture_response=False)
 def delete_flow_storage_record(object_id: str) -> None:
     """Delete the DDB record associated with the supplied object_id"""
-    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
-    for item in query["Items"]:
-        storage_table.delete_item(
-            Key={
-                "id": item["id"],
-                "flow_id": item["flow_id"],
-            },
-        )
+    storage_table.delete_item(
+        Key={
+            "id": object_id,
+        },
+    )
 
 
 @tracer.capture_method(capture_response=False)

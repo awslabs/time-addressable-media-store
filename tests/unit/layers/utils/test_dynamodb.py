@@ -11,6 +11,7 @@ from botocore.exceptions import ClientError
 # pylint: disable=no-name-in-module
 from conftest import parse_dynamo_expression
 from mediatimestamp.immutable import TimeRange, Timestamp
+from schema import Flowsegmentpost
 
 pytestmark = [
     pytest.mark.unit,
@@ -462,14 +463,13 @@ class TestDynamoDB:
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_object_id_not_found(self, mock_storage_table):
-        object_id = "abc"
+        segment = Flowsegmentpost(object_id="abc", timerange="_")
         flow_id = "123"
 
-        return_items = {"Items": []}
+        return_item = {}
+        mock_storage_table.get_item.return_value = return_item
 
-        mock_storage_table.query.return_value = return_items
-
-        result, _ = dynamodb.validate_object_id(object_id, flow_id)
+        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert not result
@@ -478,17 +478,13 @@ class TestDynamoDB:
     def test_validate_object_id_matched_flow_id_expire_present(
         self, mock_storage_table
     ):
-        object_id = "abc"
+        segment = Flowsegmentpost(object_id="abc", timerange="_")
         flow_id = "123"
 
-        return_items = {
-            "Items": [
-                {"id": "abc", "flow_id": "123", "expire_at": 12345},
-            ]
-        }
-        mock_storage_table.query.return_value = return_items
+        return_item = {"Item": {"id": "abc", "flow_id": "123", "expire_at": 12345}}
+        mock_storage_table.get_item.return_value = return_item
 
-        result, _ = dynamodb.validate_object_id(object_id, flow_id)
+        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
 
         assert 1 == mock_storage_table.update_item.call_count
         assert result
@@ -497,17 +493,13 @@ class TestDynamoDB:
     def test_validate_object_id_matched_flow_id_expire_not_present(
         self, mock_storage_table
     ):
-        object_id = "abc"
+        segment = Flowsegmentpost(object_id="abc", timerange="_")
         flow_id = "123"
 
-        return_items = {
-            "Items": [
-                {"id": "abc", "flow_id": "123"},
-            ]
-        }
-        mock_storage_table.query.return_value = return_items
+        return_item = {"Item": {"id": "abc", "flow_id": "123"}}
+        mock_storage_table.get_item.return_value = return_item
 
-        result, _ = dynamodb.validate_object_id(object_id, flow_id)
+        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert result
@@ -516,17 +508,13 @@ class TestDynamoDB:
     def test_validate_object_id_not_matched_flow_id_expire_present(
         self, mock_storage_table
     ):
-        object_id = "abc"
+        segment = Flowsegmentpost(object_id="abc", timerange="_")
         flow_id = "456"
 
-        return_items = {
-            "Items": [
-                {"id": "abc", "flow_id": "123", "expire_at": 12345},
-            ]
-        }
-        mock_storage_table.query.return_value = return_items
+        return_item = {"Item": {"id": "abc", "flow_id": "123", "expire_at": 12345}}
+        mock_storage_table.get_item.return_value = return_item
 
-        result, _ = dynamodb.validate_object_id(object_id, flow_id)
+        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert not result
@@ -535,46 +523,24 @@ class TestDynamoDB:
     def test_validate_object_id_not_matched_flow_id_expire_not_present(
         self, mock_storage_table
     ):
-        object_id = "abc"
+        segment = Flowsegmentpost(object_id="abc", timerange="_")
         flow_id = "456"
 
-        return_items = {
-            "Items": [
-                {"id": "abc", "flow_id": "123"},
-            ]
-        }
-        mock_storage_table.query.return_value = return_items
+        return_item = {"Item": {"id": "abc", "flow_id": "123"}}
+        mock_storage_table.get_item.return_value = return_item
 
-        result, _ = dynamodb.validate_object_id(object_id, flow_id)
+        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
         assert result
 
     @patch("dynamodb.storage_table")
-    def test_delete_flow_storage_record_object_id_present(self, mock_storage_table):
+    def test_delete_flow_storage_record(self, mock_storage_table):
         object_id = "abc"
-
-        return_items = {
-            "Items": [
-                {"id": "abc", "flow_id": "123"},
-            ]
-        }
-        mock_storage_table.query.return_value = return_items
 
         dynamodb.delete_flow_storage_record(object_id)
 
         assert 1 == mock_storage_table.delete_item.call_count
-
-    @patch("dynamodb.storage_table")
-    def test_delete_flow_storage_record_object_id_not_present(self, mock_storage_table):
-        object_id = "abc"
-
-        return_items = {"Items": []}
-        mock_storage_table.query.return_value = return_items
-
-        dynamodb.delete_flow_storage_record(object_id)
-
-        assert 0 == mock_storage_table.delete_item.call_count
 
     def test_get_object_id_query_kwargs(self):
         object_id = "test-id"
@@ -632,7 +598,6 @@ class TestDynamoDB:
         }
 
         result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
-        print(result)
 
         assert result["IndexName"] == "object-id-index"
         assert (

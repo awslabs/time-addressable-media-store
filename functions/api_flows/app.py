@@ -800,7 +800,7 @@ def post_flow_storage_by_id(
     if flow_storage_post.object_ids:
         for object_id in flow_storage_post.object_ids:
             get_item = storage_table.get_item(
-                Key={"id": object_id, "flow_id": flow_id},
+                Key={"id": object_id},
                 ProjectionExpression="id",
             )
             if get_item.get("Item"):
@@ -842,7 +842,7 @@ def post_flow_storage_by_id(
                 "id": media_object.object_id,
                 "flow_id": flow_id,
                 "expire_at": expire_at,
-                "storage_ids": [storage_backend["id"]],
+                "storage_id": storage_backend["id"],
             }
         )
     return model_dump(flow_storage), HTTPStatus.CREATED.value  # 201
