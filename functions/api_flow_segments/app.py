@@ -323,7 +323,8 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
         0 if segment_timerange.includes_end() else 1
     )
-    item_dict["storage_ids"] = [storage_id]
+    if storage_id:
+        item_dict["storage_ids"] = [storage_id]
     segments_table.put_item(
         Item={**item_dict, "flow_id": flow["id"]}, ReturnValues="ALL_OLD"
     )
