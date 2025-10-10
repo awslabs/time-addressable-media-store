@@ -347,7 +347,7 @@ def decode_and_validate_page(page: str, object_id: str) -> dict:
     try:
         decoded_page = base64.b64decode(page).decode("utf-8")
         exclusive_start_key = json.loads(decoded_page)
-    except (UnicodeDecodeError, json.decoder.JSONDecodeError) as ex:
+    except Exception as ex:
         raise BadRequestError("Invalid page parameter value") from ex
     if any(
         f not in exclusive_start_key for f in ["flow_id", "object_id", "timerange_end"]
