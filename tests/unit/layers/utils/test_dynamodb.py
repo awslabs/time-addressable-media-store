@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import boto3
 import pytest
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from boto3.dynamodb.conditions import ConditionExpressionBuilder, Key
 from botocore.exceptions import ClientError
 
@@ -542,67 +543,222 @@ class TestDynamoDB:
 
         assert 1 == mock_storage_table.delete_item.call_count
 
-    def test_get_object_id_query_kwargs(self):
-        object_id = "test-id"
-        parameters = {}
-
-        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
-
-        assert result["IndexName"] == "object-id-index"
-        assert (
-            result["KeyConditionExpression"].get_expression()
-            == Key("object_id").eq(object_id).get_expression()
-        )
-        assert result["Limit"] == constants.DEFAULT_PAGE_LIMIT
-        assert "ExclusiveStartKey" not in result
-
-    def test_get_object_id_query_kwargs_limit(self):
-        object_id = "test-id"
-        parameters = {"limit": 1}
-
-        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
-
-        assert result["IndexName"] == "object-id-index"
-        assert (
-            result["KeyConditionExpression"].get_expression()
-            == Key("object_id").eq(object_id).get_expression()
-        )
-        assert result["Limit"] == 1
-        assert "ExclusiveStartKey" not in result
-
-    def test_get_object_id_query_kwargs_max_limit(self):
-        object_id = "test-id"
-        parameters = {"limit": 1000}
-
-        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
-
-        assert result["IndexName"] == "object-id-index"
-        assert (
-            result["KeyConditionExpression"].get_expression()
-            == Key("object_id").eq(object_id).get_expression()
-        )
-        assert result["Limit"] == constants.MAX_PAGE_LIMIT
-        assert "ExclusiveStartKey" not in result
-
-    def test_get_object_id_query_kwargs_page(self):
-        object_id = "test-id"
-        exclusive_start_key = {
-            "flow_id": "123",
-            "timerange_end": 1,
+    def test_decode_and_validate_page_valid(self):
+        """Test decode_and_validate_page with valid base64 encoded pagination key"""
+        object_id = "test-object-123"
+        page_data = {
+            "flow_id": "test-flow",
             "object_id": object_id,
+            "timerange_end": 1234567890,
         }
-        parameters = {
-            "page": base64.b64encode(
-                json.dumps(exclusive_start_key).encode("utf-8")
-            ).decode("utf-8")
-        }
-
-        result = dynamodb.get_object_id_query_kwargs(object_id, parameters)
-
-        assert result["IndexName"] == "object-id-index"
-        assert (
-            result["KeyConditionExpression"].get_expression()
-            == Key("object_id").eq(object_id).get_expression()
+        encoded_page = base64.b64encode(json.dumps(page_data).encode("utf-8")).decode(
+            "utf-8"
         )
-        assert result["Limit"] == constants.DEFAULT_PAGE_LIMIT
-        assert result["ExclusiveStartKey"] == exclusive_start_key
+
+        result = dynamodb.decode_and_validate_page(encoded_page, object_id)
+
+        assert result == page_data
+
+    def test_decode_and_validate_page_invalid_base64(self):
+        """Test decode_and_validate_page with invalid base64 encoding"""
+        object_id = "test-object-123"
+        invalid_page = "not-valid-base64!!!"
+
+        with pytest.raises(BadRequestError, match="Invalid page parameter value"):
+            dynamodb.decode_and_validate_page(invalid_page, object_id)
+
+    def test_decode_and_validate_page_invalid_json(self):
+        """Test decode_and_validate_page with invalid JSON content"""
+        object_id = "test-object-123"
+        invalid_json = base64.b64encode(b"not valid json").decode("utf-8")
+
+        with pytest.raises(BadRequestError, match="Invalid page parameter value"):
+            dynamodb.decode_and_validate_page(invalid_json, object_id)
+
+    def test_decode_and_validate_page_missing_flow_id(self):
+        """Test decode_and_validate_page with missing flow_id field"""
+        object_id = "test-object-123"
+        page_data = {"object_id": object_id, "timerange_end": 1234567890}
+        encoded_page = base64.b64encode(json.dumps(page_data).encode("utf-8")).decode(
+            "utf-8"
+        )
+
+        with pytest.raises(BadRequestError, match="Invalid page parameter value"):
+            dynamodb.decode_and_validate_page(encoded_page, object_id)
+
+    def test_decode_and_validate_page_missing_object_id(self):
+        """Test decode_and_validate_page with missing object_id field"""
+        object_id = "test-object-123"
+        page_data = {"flow_id": "test-flow", "timerange_end": 1234567890}
+        encoded_page = base64.b64encode(json.dumps(page_data).encode("utf-8")).decode(
+            "utf-8"
+        )
+
+        with pytest.raises(BadRequestError, match="Invalid page parameter value"):
+            dynamodb.decode_and_validate_page(encoded_page, object_id)
+
+    def test_decode_and_validate_page_missing_timerange_end(self):
+        """Test decode_and_validate_page with missing timerange_end field"""
+        object_id = "test-object-123"
+        page_data = {"flow_id": "test-flow", "object_id": object_id}
+        encoded_page = base64.b64encode(json.dumps(page_data).encode("utf-8")).decode(
+            "utf-8"
+        )
+
+        with pytest.raises(BadRequestError, match="Invalid page parameter value"):
+            dynamodb.decode_and_validate_page(encoded_page, object_id)
+
+    def test_decode_and_validate_page_mismatched_object_id(self):
+        """Test decode_and_validate_page with object_id mismatch"""
+        object_id = "test-object-123"
+        different_object_id = "different-object-456"
+        page_data = {
+            "flow_id": "test-flow",
+            "object_id": different_object_id,
+            "timerange_end": 1234567890,
+        }
+        encoded_page = base64.b64encode(json.dumps(page_data).encode("utf-8")).decode(
+            "utf-8"
+        )
+
+        with pytest.raises(BadRequestError, match="Invalid page parameter value"):
+            dynamodb.decode_and_validate_page(encoded_page, object_id)
+
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_basic(self, mock_segments_table):
+        """Test query_segments_by_object_id with basic parameters"""
+        object_id = "test-object-123"
+        mock_items = [{"object_id": object_id, "flow_id": "flow-1"}]
+        mock_segments_table.query.return_value = {"Items": mock_items}
+
+        items, last_key, limit = dynamodb.query_segments_by_object_id(object_id)
+
+        assert items == mock_items
+        assert last_key is None
+        assert limit == constants.DEFAULT_PAGE_LIMIT
+        assert mock_segments_table.query.call_count == 1
+
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_with_projection(self, mock_segments_table):
+        """Test query_segments_by_object_id with projection expression"""
+        object_id = "test-object-123"
+        projection = "flow_id,timerange"
+        mock_segments_table.query.return_value = {"Items": []}
+
+        dynamodb.query_segments_by_object_id(object_id, projection=projection)
+
+        call_kwargs = mock_segments_table.query.call_args[1]
+        assert call_kwargs["ProjectionExpression"] == projection
+
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_with_limit(self, mock_segments_table):
+        """Test query_segments_by_object_id with custom limit"""
+        object_id = "test-object-123"
+        limit = 5
+        mock_segments_table.query.return_value = {"Items": []}
+
+        _, _, returned_limit = dynamodb.query_segments_by_object_id(
+            object_id, limit=limit
+        )
+
+        call_kwargs = mock_segments_table.query.call_args[1]
+        assert call_kwargs["Limit"] == limit
+        assert returned_limit == limit
+
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_limit_exceeds_max(self, mock_segments_table):
+        """Test query_segments_by_object_id with limit exceeding MAX_PAGE_LIMIT"""
+        object_id = "test-object-123"
+        limit = constants.MAX_PAGE_LIMIT + 100
+        mock_segments_table.query.return_value = {"Items": []}
+
+        _, _, returned_limit = dynamodb.query_segments_by_object_id(
+            object_id, limit=limit
+        )
+
+        call_kwargs = mock_segments_table.query.call_args[1]
+        assert call_kwargs["Limit"] == constants.MAX_PAGE_LIMIT
+        assert returned_limit == constants.MAX_PAGE_LIMIT
+
+    @patch("dynamodb.decode_and_validate_page")
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_with_page(
+        self, mock_segments_table, mock_decode
+    ):
+        """Test query_segments_by_object_id with pagination"""
+        object_id = "test-object-123"
+        page = "encoded-page-token"
+        decoded_key = {
+            "flow_id": "flow-1",
+            "object_id": object_id,
+            "timerange_end": 123,
+        }
+        mock_decode.return_value = decoded_key
+        mock_segments_table.query.return_value = {"Items": []}
+
+        dynamodb.query_segments_by_object_id(object_id, page=page)
+
+        mock_decode.assert_called_once_with(page, object_id)
+        call_kwargs = mock_segments_table.query.call_args[1]
+        assert call_kwargs["ExclusiveStartKey"] == decoded_key
+
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_with_last_evaluated_key(
+        self, mock_segments_table
+    ):
+        """Test query_segments_by_object_id returns LastEvaluatedKey when limit reached"""
+        object_id = "test-object-123"
+        limit = 5
+        last_key = {"flow_id": "flow-1", "object_id": object_id, "timerange_end": 999}
+        mock_segments_table.query.return_value = {
+            "Items": [{"id": str(i)} for i in range(limit)],
+            "LastEvaluatedKey": last_key,
+        }
+
+        _, returned_last_key, _ = dynamodb.query_segments_by_object_id(
+            object_id, limit=limit
+        )
+
+        assert returned_last_key == last_key
+
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_fetch_all(self, mock_segments_table):
+        """Test query_segments_by_object_id with fetch_all=True"""
+        object_id = "test-object-123"
+        mock_segments_table.query.side_effect = [
+            {"Items": [{"id": "1"}], "LastEvaluatedKey": {"key": "val"}},
+            {"Items": [{"id": "2"}]},
+        ]
+
+        items, last_key, limit = dynamodb.query_segments_by_object_id(
+            object_id, fetch_all=True
+        )
+
+        assert len(items) == 2
+        assert last_key is None
+        assert limit is None
+        assert mock_segments_table.query.call_count == 2
+
+    @patch("dynamodb.segments_table")
+    def test_query_segments_by_object_id_pagination_until_limit(
+        self, mock_segments_table
+    ):
+        """Test query_segments_by_object_id continues pagination until limit reached"""
+        object_id = "test-object-123"
+        limit = 10
+        mock_segments_table.query.side_effect = [
+            {
+                "Items": [{"id": str(i)} for i in range(3)],
+                "LastEvaluatedKey": {"key": "1"},
+            },
+            {
+                "Items": [{"id": str(i)} for i in range(3, 8)],
+                "LastEvaluatedKey": {"key": "2"},
+            },
+            {"Items": [{"id": str(i)} for i in range(8, 12)]},
+        ]
+
+        items, _, _ = dynamodb.query_segments_by_object_id(object_id, limit=limit)
+
+        assert len(items) == 12
+        assert mock_segments_table.query.call_count == 3
