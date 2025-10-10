@@ -342,34 +342,53 @@ def delete_flow_storage_record(object_id: str) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
-    """Generate key expression and args for a dynamodb query operation"""
+def decode_and_validate_page(page: str, object_id: str) -> dict:
+    """Decode and validate base64 encoded pagination key"""
+    try:
+        decoded_page = base64.b64decode(page).decode("utf-8")
+        exclusive_start_key = json.loads(decoded_page)
+    except (UnicodeDecodeError, json.decoder.JSONDecodeError) as ex:
+        raise BadRequestError("Invalid page parameter value") from ex
+    if any(
+        f not in exclusive_start_key for f in ["flow_id", "object_id", "timerange_end"]
+    ):
+        raise BadRequestError("Invalid page parameter value")
+    if exclusive_start_key["object_id"] != object_id:
+        raise BadRequestError("Invalid page parameter value")
+    return exclusive_start_key
+
+
+@tracer.capture_method(capture_response=False)
+def query_segments_by_object_id(
+    object_id: str,
+    projection: str | None = None,
+    limit: int | None = None,
+    page: str | None = None,
+    fetch_all: bool = False,
+) -> tuple[list, dict | None, int | None]:
+    """Query segments by object_id using object-id-index"""
     kwargs = {
         "IndexName": "object-id-index",
-        "ProjectionExpression": "flow_id",
         "KeyConditionExpression": Key("object_id").eq(object_id),
-        "Limit": constants.DEFAULT_PAGE_LIMIT,
     }
-    # Pagination query string parameters
-    if parameters.get("limit"):
-        kwargs["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
-    if parameters.get("page"):
-        try:
-            decoded_page = base64.b64decode(parameters["page"]).decode("utf-8")
-            exclusive_start_key = json.loads(decoded_page)
-        except UnicodeDecodeError as ex:
-            raise BadRequestError("Invalid page parameter value") from ex  # 400
-        except json.decoder.JSONDecodeError as ex:
-            raise BadRequestError("Invalid page parameter value") from ex  # 400
-        if any(
-            f not in exclusive_start_key
-            for f in ["flow_id", "object_id", "timerange_end"]
-        ):
-            raise BadRequestError("Invalid page parameter value")  # 400
-        if exclusive_start_key["object_id"] != object_id:
-            raise BadRequestError("Invalid page parameter value")  # 400
-        kwargs["ExclusiveStartKey"] = exclusive_start_key
-    return kwargs
+    if projection:
+        kwargs["ProjectionExpression"] = projection
+    if not fetch_all:
+        kwargs["Limit"] = (
+            min(limit, constants.MAX_PAGE_LIMIT)
+            if limit
+            else constants.DEFAULT_PAGE_LIMIT
+        )
+        if page:
+            kwargs["ExclusiveStartKey"] = decode_and_validate_page(page, object_id)
+
+    query = segments_table.query(**kwargs)
+    items = query["Items"]
+    while "LastEvaluatedKey" in query and (fetch_all or len(items) < kwargs["Limit"]):
+        kwargs["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**kwargs)
+        items.extend(query["Items"])
+    return items, query.get("LastEvaluatedKey"), kwargs.get("Limit")
 
 
 @lru_cache()

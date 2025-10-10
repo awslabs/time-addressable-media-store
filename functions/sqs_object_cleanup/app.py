@@ -11,12 +11,11 @@ from aws_lambda_powertools.utilities.batch import (
 )
 from aws_lambda_powertools.utilities.data_classes.sqs_event import SQSEvent, SQSRecord
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
 from dynamodb import (
     delete_flow_storage_record,
     get_default_storage_backend,
     get_storage_backend,
-    segments_table,
+    query_segments_by_object_id,
 )
 
 tracer = Tracer()
@@ -54,12 +53,9 @@ def record_handler(record: SQSRecord) -> None:
             # Empty list means no cleanup needed
             continue
 
-        query = segments_table.query(
-            IndexName="object-id-index",
-            KeyConditionExpression=Key("object_id").eq(object_id),
-            ProjectionExpression="storage_ids",
+        items, _, _ = query_segments_by_object_id(
+            object_id, projection="storage_ids", fetch_all=True
         )
-        items = query.get("Items", [])
 
         # If no other records found with this object_id, delete for all storage_ids
         if len(items) == 0:
