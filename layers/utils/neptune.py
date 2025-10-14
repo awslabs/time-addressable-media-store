@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import json
 import os
 from collections import defaultdict
@@ -19,6 +20,7 @@ from schema import Flowcollection, Source
 from schema_extra import Webhookfull
 from utils import (
     deserialise_neptune_obj,
+    deserialize_tags_dict,
     filter_dict,
     get_default_value,
     model_dump,
@@ -26,6 +28,7 @@ from utils import (
     parse_api_gw_parameters,
     publish_event,
     serialise_neptune_obj,
+    serialise_tags_dict,
 )
 
 logger = Logger()
@@ -62,7 +65,7 @@ def generate_source_query(
             properties=properties.get("source", {}),
         )
         .related_to(label="has_tags")
-        .node(ref_name="t", labels="tags", properties=properties.get("tags", {}))
+        .node(ref_name="t", labels="tags")
     )
     if set_dict:
         query = query.set(set_dict).with_("*")
@@ -115,7 +118,7 @@ def generate_flow_query(
         .match()
         .node(ref_name="flow")
         .related_to(label="has_tags")
-        .node(ref_name="t", labels="tags", properties=properties.get("tags", {}))
+        .node(ref_name="t", labels="tags")
     )
     if set_dict:
         query = query.set(set_dict).with_("*")
@@ -163,10 +166,15 @@ def generate_webhook_query(
     properties: dict, set_dict: dict = None, where_literals: list = []
 ) -> cymple.builder.NodeAvailable:
     """Returns an Open Cypher Match query to return specified Webhook"""
-    query = qb.match().node(
-        ref_name="webhook",
-        labels="webhook",
-        properties=properties.get("webhook", {}),
+    query = (
+        qb.match()
+        .node(
+            ref_name="webhook",
+            labels="webhook",
+            properties=properties.get("webhook", {}),
+        )
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags", properties=properties.get("tags", {}))
     )
     if set_dict:
         query = query.set(set_dict).with_("*")
@@ -317,7 +325,7 @@ def query_node_tags(record_type: str, record_id: str) -> dict:
             .get()
         )
         results = execute_open_cypher_query(query)
-        return results["results"][0]["tags"]
+        return deserialize_tags_dict(results["results"][0]["tags"])
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
 
@@ -386,7 +394,6 @@ def query_sources(parameters: dict) -> tuple[list, int, int]:
     query = generate_source_query(
         {
             "source": props["properties"],
-            "tags": props["tag_properties"],
         },
         where_literals=where_literals,
     )
@@ -440,7 +447,6 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
             "flow": props["properties"],
             "source": props["source_properties"],
             "essence_parameters": props["essence_properties"],
-            "tags": props["tag_properties"],
         },
         where_literals=where_literals,
     )
@@ -479,6 +485,17 @@ def query_delete_requests() -> list:
 @tracer.capture_method(capture_response=False)
 def query_webhooks(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Webhooks from the Neptune Database"""
+    props, where_literals = parse_api_gw_parameters(
+        {
+            k: v
+            for k, v in parameters.items()
+            if k
+            in [
+                "tag_values",
+                "tag_exists",
+            ]
+        }
+    )
     page = int(parameters.get("page") or 0)
     limit = min(
         (
@@ -490,9 +507,9 @@ def query_webhooks(parameters: dict) -> tuple[list, int, int]:
     )
     query = generate_webhook_query(
         {
-            "webhook": {},
+            "webhook": props["properties"],
         },
-        where_literals=[],
+        where_literals=where_literals,
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["webhook"])
@@ -526,7 +543,7 @@ def merge_source(source_dict: dict) -> None:
     )
     # Add Set for Source Tags
     if tags:
-        query = query.set(serialise_neptune_obj(tags, "t."))
+        query = query.set(serialise_tags_dict(tags, "t."))
     execute_open_cypher_query(query.get())
 
 
@@ -597,7 +614,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
     )
     # Add Set for Flow Tags
     if tags:
-        query = query.set(serialise_neptune_obj(tags, "t."))
+        query = query.set(serialise_tags_dict(tags, "t."))
     # Add Set for Flow Essence Parameters
     if essence_parameters:
         query = query.set(serialise_neptune_obj(essence_parameters, "ep."))
@@ -660,21 +677,27 @@ def merge_delete_request(delete_request_dict: dict) -> None:
 @tracer.capture_method(capture_response=False)
 def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Webhook record"""
+    tags = webhook_dict.get("tags", {})
     webhook_properties = filter_dict(
         webhook_dict,
-        {"id"},
+        {"id", "tags"},
     )
     if existing_dict:
+        null_tags = {
+            k: None for k in existing_dict.get("tags", {}).keys() - tags.keys()
+        }
         null_properties = {
             k: get_default_value(existing_dict[k])
             for k in (
                 existing_dict.keys()
                 - {
                     "id",
+                    "tags",
                 }
             )
             - webhook_properties.keys()
         }
+        tags = tags | null_tags
         webhook_properties = webhook_properties | null_properties
     query = (
         qb.merge()
@@ -683,8 +706,13 @@ def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
             labels="webhook",
             properties={"id": webhook_dict["id"]},
         )
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags")
         .set(serialise_neptune_obj(webhook_properties, "webhook."))
     )
+    # Add Set for Webhook Tags
+    if tags:
+        query = query.set(serialise_tags_dict(tags, "t."))
     query = query.return_literal(constants.RETURN_LITERAL["webhook"])
     results = execute_open_cypher_query(query.get())
     deserialised_results = [
@@ -729,9 +757,14 @@ def delete_webhook(webhook_id: str) -> None:
     query = (
         qb.match()
         .node(ref_name="webhook", labels="webhook", properties={"id": webhook_id})
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags")
         .detach_delete(ref_name="webhook")
         .get()
     )
+    query = query.replace(
+        "DETACH DELETE webhook", "DETACH DELETE webhook DELETE t"
+    )  # Limitation in Cymple library, unable to stack DELETE
     execute_open_cypher_query(query)
 
 
@@ -988,3 +1021,35 @@ def get_matching_webhooks(event: EventBridgeEvent) -> list[Webhookfull]:
         Webhookfull(**deserialise_neptune_obj(result["webhook"]))
         for result in results["results"]
     ]
+
+
+@tracer.capture_method(capture_response=False)
+def query_object_flows(flow_ids: list[str], parameters: dict) -> list:
+    """Returns a list of filtered TAMS Flows from the Neptune Database, used by the Objects endpoint"""
+    _, where_literals = parse_api_gw_parameters(
+        {
+            k: v
+            for k, v in parameters.items()
+            if k
+            in [
+                "tag_values",
+                "tag_exists",
+            ]
+        }
+    )
+    query = (
+        qb.match()
+        .node(
+            ref_name="flow",
+            labels="flow",
+        )
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags")
+        .where_literal(
+            " AND ".join([f"flow.id in {json.dumps(flow_ids)}", *where_literals])
+        )
+        .return_literal("flow.id as flow_id")
+        .get()
+    )
+    results = execute_open_cypher_query(query)
+    return [result["flow_id"] for result in results["results"]]

@@ -21,9 +21,10 @@ from aws_lambda_powertools.event_handler.openapi.params import Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import query_segments_by_object_id, storage_table
+from neptune import query_object_flows
 from schema import Object
 from typing_extensions import Annotated
-from utils import generate_link_url, model_dump
+from utils import generate_link_url, model_dump, parse_tag_parameters
 
 tracer = Tracer()
 logger = Logger()
@@ -41,6 +42,9 @@ def get_objects_by_id(
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
+    param_tag_values, param_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters
+    )
     items, last_evaluated_key, limit_used = query_segments_by_object_id(
         object_id,
         projection="flow_id",
@@ -76,6 +80,18 @@ def get_objects_by_id(
             "first_referenced_by_flow": get_item.get("Item", {}).get("flow_id"),
         }
     )
+    # Filter referenced_by_flows by tag parameters if provided
+    if param_tag_values or param_tag_exists:
+        tagged_flows = query_object_flows(
+            schema_item.referenced_by_flows,
+            {
+                "tag_values": param_tag_values,
+                "tag_exists": param_tag_exists,
+            },
+        )
+        schema_item.referenced_by_flows = list(
+            set(schema_item.referenced_by_flows) & set(tagged_flows)
+        )
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,

@@ -150,12 +150,34 @@ def test_Register_Webhook_URL_POST_201_create(
     assert {**stub_webhook_basic, "status": "created"} == response_json
 
 
+def test_Register_Webhook_URL_POST_201_create_tags(
+    api_client_cognito, stub_webhook_tags, webhook_ids
+):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={**stub_webhook_tags, "api_key_value": "Bearer 21238dksdjqwpqscj9"},
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert "id" in response_json
+    webhook_ids.append(response_json.pop("id"))
+    assert 201 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert {**stub_webhook_tags, "status": "created"} == response_json
+
+
 def test_Register_Webhook_URL_POST_201_create_empty_events(
     api_client_cognito, stub_webhook_basic, webhook_ids
 ):
     # Arrange
     path = "/service/webhooks"
-    webhook = {**stub_webhook_basic, "events": [], "status": "disabled"}
+    webhook = {**stub_webhook_basic, "events": []}
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -170,7 +192,7 @@ def test_Register_Webhook_URL_POST_201_create_empty_events(
     assert 201 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert webhook == {**response_json, "events": []}
+    assert {**webhook, "status": "created"} == {**response_json, "events": []}
 
 
 def test_Register_Webhook_URL_POST_400_invalid_json(api_client_cognito):
@@ -255,6 +277,66 @@ def test_List_Webhook_URLs_HEAD_200(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
+def test_List_Webhook_URLs_HEAD_200_tag_name(api_client_cognito):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"tag.auth_classes": "news"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_List_Webhook_URLs_HEAD_200_tag_name_not_found(api_client_cognito):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"tag.auth_classes": "dummy"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_List_Webhook_URLs_HEAD_200_tag_exists_name_true(api_client_cognito):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"tag_exists.auth_classes": "true"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
+def test_List_Webhook_URLs_HEAD_200_tag_exists_name_false(api_client_cognito):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"tag_exists.auth_classes": "false"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "" == response.content.decode("utf-8")
+
+
 def test_List_Webhook_URLs_HEAD_200_limit(api_client_cognito):
     # Arrange
     path = "/service/webhooks"
@@ -284,7 +366,9 @@ def test_List_Webhook_URLs_HEAD_200_page(api_client_cognito):
     assert "" == response.content.decode("utf-8")
 
 
-def test_List_Webhook_URLs_GET_200(api_client_cognito, webhook_ids, stub_webhook_basic):
+def test_List_Webhook_URLs_GET_200(
+    api_client_cognito, webhook_ids, stub_webhook_basic, stub_webhook_tags
+):
     # Arrange
     path = "/service/webhooks"
     # Act
@@ -304,6 +388,130 @@ def test_List_Webhook_URLs_GET_200(api_client_cognito, webhook_ids, stub_webhook
         "id": webhook_ids[0],
         "status": "created",
     } in response_json
+    assert {
+        **stub_webhook_tags,
+        "id": webhook_ids[1],
+        "status": "created",
+    } in response_json
+
+
+def test_List_Webhook_URLs_GET_200_tag_name(
+    api_client_cognito, webhook_ids, stub_webhook_tags
+):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag.auth_classes": "news"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response_json)
+    assert {
+        **stub_webhook_tags,
+        "id": webhook_ids[1],
+        "status": "created",
+    } in response_json
+
+
+def test_List_Webhook_URLs_GET_200_tag_name_partial(api_client_cognito):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag.auth_classes": "new"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 0 == len(response_json)
+
+
+def test_List_Webhook_URLs_GET_200_tag_name_not_found(api_client_cognito):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag.auth_classes": "dummy"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 0 == len(response_json)
+
+
+def test_List_Webhook_URLs_GET_200_tag_exists_name_true(
+    api_client_cognito, webhook_ids, stub_webhook_tags
+):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.auth_classes": "true"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response_json)
+    assert {
+        **stub_webhook_tags,
+        "id": webhook_ids[1],
+        "status": "created",
+    } in response_json
+
+
+def test_List_Webhook_URLs_GET_200_tag_exists_name_false(
+    api_client_cognito, webhook_ids, stub_webhook_basic
+):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.auth_classes": "false"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 2 == len(response_json)
+    assert {
+        **stub_webhook_basic,
+        "id": webhook_ids[0],
+        "status": "created",
+    } in response_json
+
+
+def test_List_Webhook_URLs_GET_400_tag_exists_name_bad(api_client_cognito):
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.auth_classes": "bad"}
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    response_json = response.json()
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+    assert response_json["message"][0]["type"] == "bool_parsing"
 
 
 def test_List_Webhook_URLs_GET_200_limit(api_client_cognito):
@@ -350,7 +558,7 @@ def test_List_Webhook_URLs_GET_200_page(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response_json)
+    assert 2 == len(response_json)
 
 
 def test_Webhook_Details_HEAD_200(api_client_cognito, webhook_ids):

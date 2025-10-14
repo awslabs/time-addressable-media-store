@@ -279,12 +279,13 @@ class TestUtils:
             essence_param_value
         )
 
-        # Ensure tag values are structurd appropriately
-        for k, v in query_parameters["tag_values"].items():
-            assert return_dict["tag_properties"][k] == v
-
-        # Ensure tag_exists values are reflected in where literals
-        assert where_literals == ["t.`y` IS NOT NULL", "t.`z` IS NULL"]
+        # Ensure tag and tag_exists values are reflected in where literals
+        assert where_literals == [
+            '(t.`a` CONTAINS "\\"1\\"")',
+            '(t.`b` CONTAINS "\\"2\\"")',
+            "t.`y` IS NOT NULL",
+            "t.`z` IS NULL",
+        ]
 
         # Ensure misc properties are included appropriately
         assert return_dict["properties"]["misc"] == query_parameters["misc"]

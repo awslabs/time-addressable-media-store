@@ -17,7 +17,7 @@ RETURN_LITERAL = {
     "source": "source {.*, tags: t {.*}, source_collection: collect(DISTINCT c {.*, id: sc.id}), collected_by: collect(DISTINCT cb.id)}",
     "flow": "flow {.*, source_id: s.id, essence_parameters: e {.*}, tags: t {.*}, flow_collection: collect(DISTINCT c {.*, id: fc.id}), collected_by: collect(DISTINCT cb.id)}",
     "delete_request": "delete_request {.*, error: CASE WHEN e.type IS NULL THEN NULL ELSE e {.*} END}",
-    "webhook": "webhook {.*}",
+    "webhook": "webhook {.*, tags: t {.*}}",
 }
 PRESIGNED_URL_EXPIRES_IN = 3600
 SERVICE_INFO_ID = "1"

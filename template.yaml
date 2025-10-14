@@ -1507,6 +1507,13 @@ Resources:
                 - dynamodb:GetItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
       Events:
         headMediaObjectInformation:
           Type: Api

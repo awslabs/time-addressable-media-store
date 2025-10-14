@@ -197,11 +197,11 @@ def parse_tag_parameters(params: None) -> tuple[dict, dict]:
     if params is None:
         return (values, exists)
     for key, value in params.items():
-        if key.startswith("tag."):
-            values[key[len("tag.") :]] = value
-        if key.startswith("tag_exists."):
+        if key.startswith("tag.") or key.startswith("flow_tag."):
+            values[key[len(key.split(".", 1)[0]) + 1 :]] = value
+        if key.startswith("tag_exists.") or key.startswith("flow_tag_exists."):
             if value.lower() in ["true", "false"]:
-                exists[key[len("tag_exists.") :]] = value.lower() == "true"
+                exists[key[len(key.split(".", 1)[0]) + 1 :]] = value.lower() == "true"
             else:
                 raise BadRequestError(
                     [
@@ -245,7 +245,9 @@ def deserialise_neptune_obj(obj: dict) -> dict:
     """Return a new dict with serialised properties deserialised into dict/list"""
     deserialised = {}
     for prop_name, prop_value in obj.items():
-        if prop_name.startswith(constants.SERIALISE_PREFIX):
+        if prop_name == "tags":
+            deserialised["tags"] = deserialize_tags_dict(prop_value)
+        elif prop_name.startswith(constants.SERIALISE_PREFIX):
             actual_name = prop_name[len(constants.SERIALISE_PREFIX) :]
             deserialised[actual_name] = json.loads(prop_value)
         elif isinstance(prop_value, dict):
@@ -271,17 +273,19 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
                     return_dict["essence_properties"][key] = value.lower() == "true"
             elif key == "tag_values":
                 for tag_name, tag_value in value.items():
-                    return_dict["tag_properties"][tag_name] = tag_value
+                    prop_name = opencypher_property_name(tag_name)
+                    # Add quotes around each value to ensure partial matches are not found
+                    query_values = [f'"{v.strip()}"' for v in tag_value.split(",")]
+                    conditions = [
+                        f"t.{prop_name} CONTAINS {json.dumps(qv)}"
+                        for qv in query_values
+                    ]
+                    where_literals.append(f"({' OR '.join(conditions)})")
             elif key == "tag_exists":
                 for tag_name, tag_exists in value.items():
-                    if tag_exists:
-                        where_literals.append(
-                            f"t.{opencypher_property_name(tag_name)} IS NOT NULL"
-                        )
-                    else:
-                        where_literals.append(
-                            f"t.{opencypher_property_name(tag_name)} IS NULL"
-                        )
+                    prop_name = opencypher_property_name(tag_name)
+                    operator = "IS NOT NULL" if tag_exists else "IS NULL"
+                    where_literals.append(f"t.{prop_name} {operator}")
             else:
                 return_dict["properties"][key] = value
     return return_dict, where_literals
@@ -369,3 +373,29 @@ def get_default_value(value) -> dict | list | None:
 def opencypher_property_name(name: str) -> str:
     """Returns a safe OpenCypher property name, wrapping in backticks and escaping existing backticks if needed."""
     return f"`{name.replace('`', '``')}`"
+
+
+@tracer.capture_method(capture_response=False)
+def deserialize_tag_value(value: str) -> str | list[str]:
+    """Deserialize tag values, handling both old raw strings and new JSON strings"""
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return value
+
+
+@tracer.capture_method(capture_response=False)
+def deserialize_tags_dict(tags_dict: dict) -> dict:
+    """Deserialize all values in a tags dictionary"""
+    return {key: deserialize_tag_value(value) for key, value in tags_dict.items()}
+
+
+@tracer.capture_method(capture_response=False)
+def serialise_tags_dict(tags: dict, key_prefix: str = "") -> dict:
+    """Return a new dict with tag values always serialised into JSON strings"""
+    serialised = {}
+    for k, v in tags.items():
+        serialised[f"{key_prefix}{opencypher_property_name(k)}"] = (
+            json.dumps(v) if v is not None else None
+        )
+    return serialised
