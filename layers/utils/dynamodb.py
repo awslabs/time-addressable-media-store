@@ -289,7 +289,8 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 def validate_object_id(
     segment: Flowsegmentpost, flow_id: str
 ) -> tuple[bool, str | None, str | None]:
-    """Check supplied segment object_id can be used for the supplied flow_id, returns storage_id if valid"""
+    """Validate object_id can be used with flow_id, returning (is_valid, storage_id, error_message) and removing expire_at on first use"""
+
     get_item = storage_table.get_item(Key={"id": segment.object_id})
     storage_item = get_item.get("Item")
     if storage_item is None and not segment.get_urls:
