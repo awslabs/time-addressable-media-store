@@ -21,6 +21,7 @@ from neptune import (
     merge_delete_request,
     update_flow_segments_updated,
 )
+from schema import Flowsegmentpost
 from utils import pop_outliers, publish_event, put_message, put_message_batches
 
 tracer = Tracer()
@@ -108,7 +109,7 @@ def get_timerange_expression(
     expression_type: Type[Attr] | Type[Key],
     boundary: TimeRangeBoundary,
     filter_value: TimeRange,
-):
+) -> Attr | Key:
     """Returns a DynamoDB expression, for Key or Filter, to add the specfied timerange condition."""
     other_boundary = (
         TimeRangeBoundary.START
@@ -199,7 +200,7 @@ def delete_flow_segments(
     s3_queue: str,
     del_queue: str,
     item_dict: dict | None = None,
-):
+) -> None:
     """Performs the logic to delete flow segments exits gracefully if within 5 seconds of Lambda timeout"""
     delete_error = None
     args = get_key_and_args(flow_id, parameters)
@@ -285,80 +286,116 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 
 
 @tracer.capture_method(capture_response=False)
-def validate_object_id(object_id: str, flow_id: str) -> tuple[bool, list]:
-    """Check supplied object_id can be used for the supplied flow_id, returns storage_ids if valid"""
-    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
-    items = query["Items"]
-    if len(items) == 0:
-        # No matching object_id found so must be invalid
-        return False, []
-    object_item = items[0]
-    if object_item["flow_id"] == flow_id:
-        if object_item.get("expire_at"):
+def validate_object_id(
+    segment: Flowsegmentpost, flow_id: str
+) -> tuple[bool, str | None, str | None]:
+    """Validate object_id can be used with flow_id, returning (is_valid, storage_id, error_message) and removing expire_at on first use"""
+
+    get_item = storage_table.get_item(Key={"id": segment.object_id})
+    storage_item = get_item.get("Item")
+    if storage_item is None and not segment.get_urls:
+        # No matching object_id found and no get_urls supplied so must be invalid
+        return (
+            False,
+            None,
+            "Bad request. The object id does not exist and no get_urls supplied.",
+        )
+    if storage_item is None and segment.get_urls:
+        # No matching object_id found but get_urls supplied so this is valid
+        return True, None, None
+    if storage_item and segment.get_urls:
+        # Matching object_id found get_urls supplied which is not a valid use case
+        return (
+            False,
+            None,
+            "Bad request. A new object id is required when supplying get_urls.",
+        )
+    if storage_item["flow_id"] == flow_id:
+        if storage_item.get("expire_at"):
             # expire_at exists so this is first time use and needs updating to prevent TTL deletion
             storage_table.update_item(
                 Key={
-                    "id": object_id,
-                    "flow_id": flow_id,
+                    "id": segment.object_id,
                 },
                 AttributeUpdates={"expire_at": {"Action": "DELETE"}},
             )
-        # flow_id matches so is a valida object_id
-        return True, object_item.get("storage_ids", [])
-    if object_item.get("expire_at") is None:
+        # flow_id matches so is a valid object_id
+        return True, storage_item.get("storage_id"), None
+    if storage_item.get("expire_at") is None:
         # object_id already used therefore can be re-used by any flow_id
-        return True, object_item.get("storage_ids", [])
-    # All other options are invalid
-    return False, []
+        return True, storage_item.get("storage_id"), None
+    # First time use object_id must be used on flow_id it was created with
+    return (
+        False,
+        None,
+        "Bad request. The object id is not valid to be used for the flow id supplied.",
+    )
 
 
 @tracer.capture_method(capture_response=False)
 def delete_flow_storage_record(object_id: str) -> None:
     """Delete the DDB record associated with the supplied object_id"""
-    query = storage_table.query(KeyConditionExpression=Key("id").eq(object_id))
-    for item in query["Items"]:
-        storage_table.delete_item(
-            Key={
-                "id": item["id"],
-                "flow_id": item["flow_id"],
-            },
-        )
+    storage_table.delete_item(
+        Key={
+            "id": object_id,
+        },
+    )
 
 
 @tracer.capture_method(capture_response=False)
-def get_object_id_query_kwargs(object_id: str, parameters: dict) -> dict:
-    """Generate key expression and args for a dynamodb query operation"""
+def decode_and_validate_page(page: str, object_id: str) -> dict:
+    """Decode and validate base64 encoded pagination key"""
+    try:
+        decoded_page = base64.b64decode(page).decode("utf-8")
+        exclusive_start_key = json.loads(decoded_page)
+    except Exception as ex:
+        raise BadRequestError("Invalid page parameter value") from ex
+    if any(
+        f not in exclusive_start_key for f in ["flow_id", "object_id", "timerange_end"]
+    ):
+        raise BadRequestError("Invalid page parameter value")
+    if exclusive_start_key["object_id"] != object_id:
+        raise BadRequestError("Invalid page parameter value")
+    return exclusive_start_key
+
+
+@tracer.capture_method(capture_response=False)
+def query_segments_by_object_id(
+    object_id: str,
+    projection: str | None = None,
+    limit: int | None = None,
+    page: str | None = None,
+    fetch_all: bool = False,
+) -> tuple[list, dict | None, int | None]:
+    """Query segments by object_id using object-id-index"""
     kwargs = {
         "IndexName": "object-id-index",
-        "ProjectionExpression": "flow_id",
         "KeyConditionExpression": Key("object_id").eq(object_id),
-        "Limit": constants.DEFAULT_PAGE_LIMIT,
     }
-    # Pagination query string parameters
-    if parameters.get("limit"):
-        kwargs["Limit"] = min(parameters["limit"], constants.MAX_PAGE_LIMIT)
-    if parameters.get("page"):
-        try:
-            decoded_page = base64.b64decode(parameters["page"]).decode("utf-8")
-            exclusive_start_key = json.loads(decoded_page)
-        except UnicodeDecodeError as ex:
-            raise BadRequestError("Invalid page parameter value") from ex  # 400
-        except json.decoder.JSONDecodeError as ex:
-            raise BadRequestError("Invalid page parameter value") from ex  # 400
-        if any(
-            f not in exclusive_start_key
-            for f in ["flow_id", "object_id", "timerange_end"]
-        ):
-            raise BadRequestError("Invalid page parameter value")  # 400
-        if exclusive_start_key["object_id"] != object_id:
-            raise BadRequestError("Invalid page parameter value")  # 400
-        kwargs["ExclusiveStartKey"] = exclusive_start_key
-    return kwargs
+    if projection:
+        kwargs["ProjectionExpression"] = projection
+    if not fetch_all:
+        kwargs["Limit"] = (
+            min(limit, constants.MAX_PAGE_LIMIT)
+            if limit
+            else constants.DEFAULT_PAGE_LIMIT
+        )
+        if page:
+            kwargs["ExclusiveStartKey"] = decode_and_validate_page(page, object_id)
+
+    query = segments_table.query(**kwargs)
+    items = query["Items"]
+    while "LastEvaluatedKey" in query and (fetch_all or len(items) < kwargs["Limit"]):
+        kwargs["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**kwargs)
+        items.extend(query["Items"])
+    return items, query.get("LastEvaluatedKey"), kwargs.get("Limit")
 
 
 @lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_store_name() -> str:
+    """Get the store name from service configuration, defaults to 'tams'."""
     get_item = service_table.get_item(
         Key={"record_type": "service", "id": constants.SERVICE_INFO_ID}
     )
@@ -370,7 +407,8 @@ def get_store_name() -> str:
 
 
 @tracer.capture_method(capture_response=False)
-def get_storage_backend_dict(item, store_name) -> dict:
+def get_storage_backend_dict(item: dict, store_name: str) -> dict:
+    """Transform storage backend item into standardized dictionary format with label."""
     return {
         "storage_id": item["id"],
         "label": f'aws.{item["region"]}:s3:{store_name}',
@@ -381,6 +419,7 @@ def get_storage_backend_dict(item, store_name) -> dict:
 @lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_default_storage_backend() -> dict:
+    """Retrieve the default storage backend configuration from service table."""
     query = service_table.query(
         KeyConditionExpression=Key("record_type").eq("storage-backend"),
         FilterExpression=Attr("default_storage").eq(True),
@@ -388,15 +427,31 @@ def get_default_storage_backend() -> dict:
     items = query["Items"]
     if len(items) == 0:
         raise BadRequestError("No default storage backend found")  # 404
-    return dict(get_storage_backend_dict(items[0], get_store_name()))
+    return get_storage_backend_dict(items[0], get_store_name())
 
 
 @lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_storage_backend(storage_id: str) -> dict:
+    """Retrieve specific storage backend configuration by storage_id."""
     get_item = service_table.get_item(
         Key={"record_type": "storage-backend", "id": storage_id}
     )
     if not get_item.get("Item"):
         raise BadRequestError("Invalid storage backend identifier")  # 404
-    return dict(get_storage_backend_dict(get_item["Item"], get_store_name()))
+    return get_storage_backend_dict(get_item["Item"], get_store_name())
+
+
+@lru_cache()
+@tracer.capture_method(capture_response=False)
+def list_storage_backends() -> list[dict]:
+    """Retrieve all storage backend items from service table."""
+    args = {"KeyConditionExpression": Key("record_type").eq("storage-backend")}
+    query = service_table.query(**args)
+    items = query["Items"]
+    while "LastEvaluatedKey" in query:
+        args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = service_table.query(**args)
+        items.extend(query["Items"])
+    store_name = get_store_name()
+    return [get_storage_backend_dict(item, store_name) for item in items]
