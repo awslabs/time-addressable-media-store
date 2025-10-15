@@ -314,10 +314,8 @@ def validate_object_id(
         if storage_item.get("expire_at"):
             # expire_at exists so this is first time use and needs updating to prevent TTL deletion
             storage_table.update_item(
-                Key={
-                    "id": segment.object_id,
-                },
-                AttributeUpdates={"expire_at": {"Action": "DELETE"}},
+                Key={"id": segment.object_id},
+                UpdateExpression="REMOVE expire_at",
             )
         # flow_id matches so is a valid object_id
         return True, storage_item.get("storage_id"), None
