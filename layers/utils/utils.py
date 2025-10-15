@@ -377,18 +377,9 @@ def opencypher_property_name(name: str) -> str:
 
 
 @tracer.capture_method(capture_response=False)
-def deserialize_tag_value(value: str) -> str | list[str]:
-    """Deserialize tag values, handling both old raw strings and new JSON strings"""
-    try:
-        return json.loads(value)
-    except (json.JSONDecodeError, TypeError):
-        return value
-
-
-@tracer.capture_method(capture_response=False)
 def deserialize_tags_dict(tags_dict: dict) -> dict:
     """Deserialize all values in a tags dictionary"""
-    return {key: deserialize_tag_value(value) for key, value in tags_dict.items()}
+    return {key: json.loads(value) for key, value in tags_dict.items()}
 
 
 @tracer.capture_method(capture_response=False)
