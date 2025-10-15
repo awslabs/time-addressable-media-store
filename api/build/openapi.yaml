@@ -143,22 +143,20 @@ paths:
         in: query
         description: |
           Filter on webhooks that have a tag named {name} with a value in the given comma-seperated list of values.
-          The {name} could contain escaped characters to allow it to be used in a
-          URL.
+          The {name} and the value MUST be URL encoded where special characters are present.
           Where the tag's value is a string, at least one of the given values will match.
           Where the tag's value is an array, at least one value in the array will match at least one of the given values.
           Partial string matches of the values are not valid.
         schema:
-          type: string
-          pattern: ^([^,]+(,[^,]+)*)?$
+          $ref: '#/components/schemas/urltaglist'
       - name: tag_exists.{name}
         in: query
         description: |
-          Filter on webhooks that have a tag named {name} regardless of value. The
-          {name} could contain escaped characters to allow it to be used in a
-          URL. If set to true then the presence of the tag is filtered for. If set
-          to false then its absence is. If left out then no filtering on tag presence
-          is performed.
+          Filter on webhooks that have a tag named {name} regardless of value.
+          The {name} MUST be URL encoded where special characters are present.
+          If set to true then the presence of the tag is filtered for.
+          If set to false then its absence is.
+          If left out then no filtering on tag presence is performed.
         schema:
           type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
@@ -199,22 +197,20 @@ paths:
         in: query
         description: |
           Filter on webhooks that have a tag named {name} with a value in the given comma-seperated list of values.
-          The {name} could contain escaped characters to allow it to be used in a
-          URL.
+          The {name} and the value MUST be URL encoded where special characters are present.
           Where the tag's value is a string, at least one of the given values will match.
           Where the tag's value is an array, at least one value in the array will match at least one of the given values.
           Partial string matches of the values are not valid.
         schema:
-          type: string
-          pattern: ^([^,]+(,[^,]+)*)?$
+          $ref: '#/components/schemas/urltaglist'
       - name: tag_exists.{name}
         in: query
         description: |
-          Filter on webhooks that have a tag named {name} regardless of value. The
-          {name} could contain escaped characters to allow it to be used in a
-          URL. If set to true then the presence of the tag is filtered for. If set
-          to false then its absence is. If left out then no filtering on tag presence
-          is performed.
+          Filter on webhooks that have a tag named {name} regardless of value.
+          The {name} MUST be URL encoded where special characters are present.
+          If set to true then the presence of the tag is filtered for.
+          If set to false then its absence is.
+          If left out then no filtering on tag presence is performed.
         schema:
           type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
@@ -380,14 +376,13 @@ paths:
       - name: tag.{name}
         in: query
         description: |
-          Filter on Sources that have a tag named {name} and with a value in the given comma-seperated list of values.
-          {name} and the value MUST be URL encoded where special characters are present.
+          Filter on Sources that have a tag named {name} with a value in the given comma-seperated list of values.
+          The {name} and the value MUST be URL encoded where special characters are present.
           Where the tag's value is a string, at least one of the given values will match.
           Where the tag's value is an array, at least one value in the array will match at least one of the given values.
           Partial string matches of the values are not valid.
         schema:
-          type: string
-          pattern: ^([^,]+(,[^,]+)*)?$
+          $ref: '#/components/schemas/urltaglist'
       - name: tag_exists.{name}
         in: query
         description: |
@@ -442,14 +437,13 @@ paths:
       - name: tag.{name}
         in: query
         description: |
-          Filter on Sources that have a tag named {name} and with a value in the given comma-seperated list of values.
-          {name} and the value MUST be URL encoded where special characters are present.
+          Filter on Sources that have a tag named {name} with a value in the given comma-seperated list of values.
+          The {name} and the value MUST be URL encoded where special characters are present.
           Where the tag's value is a string, at least one of the given values will match.
           Where the tag's value is an array, at least one value in the array will match at least one of the given values.
           Partial string matches of the values are not valid.
         schema:
-          type: string
-          pattern: ^([^,]+(,[^,]+)*)?$
+          $ref: '#/components/schemas/urltaglist'
       - name: tag_exists.{name}
         in: query
         description: |
@@ -832,14 +826,13 @@ paths:
       - name: tag.{name}
         in: query
         description: |
-          Filter on flows that have a tag named {name} and with a value in the given comma-seperated list of values.
-          {name} and the value MUST be URL encoded where special characters are present.
+          Filter on flows that have a tag named {name} with a value in the given comma-seperated list of values.
+          The {name} and the value MUST be URL encoded where special characters are present.
           Where the tag's value is a string, at least one of the given values will match.
           Where the tag's value is an array, at least one value in the array will match at least one of the given values.
           Partial string matches of the values are not valid.
         schema:
-          type: string
-          pattern: ^([^,]+(,[^,]+)*)?$
+          $ref: '#/components/schemas/urltaglist'
       - name: tag_exists.{name}
         in: query
         description: |
@@ -920,14 +913,13 @@ paths:
       - name: tag.{name}
         in: query
         description: |
-          Filter on Flows that have a tag named {name} and with a value in the given comma-seperated list of values.
-          {name} and the value MUST be URL encoded where special characters are present.
+          Filter on flows that have a tag named {name} with a value in the given comma-seperated list of values.
+          The {name} and the value MUST be URL encoded where special characters are present.
           Where the tag's value is a string, at least one of the given values will match.
           Where the tag's value is an array, at least one value in the array will match at least one of the given values.
           Partial string matches of the values are not valid.
         schema:
-          type: string
-          pattern: ^([^,]+(,[^,]+)*)?$
+          $ref: '#/components/schemas/urltaglist'
       - name: tag_exists.{name}
         in: query
         description: |
@@ -1053,6 +1045,10 @@ paths:
                   summary: Image Flow - JPEG Codec
                   value:
                     $ref: examples/flow-get-200-image-jpeg.json
+                video_vfr:
+                  summary: Video Flow - H.264 Codec, Variable Frame Rate
+                  value:
+                    $ref: examples/flow-get-200-video-h264-vfr.json
                 ttml:
                   summary: Data Flow - TTML
                   description: TAMS can also be used for storing non-AV content such as subtitles or event data
@@ -1977,11 +1973,10 @@ paths:
         A service instance MAY support Media Objects that are held in external storage in another TAMS or other media storage system.
         The Flow Segment may in that case require the `get_urls` property to provide the information needed by clients to access the Media Object.
 
-        Clients MAY modify Flow Segments, but this should only be done in exceptional circumstances to correct metadata as such operations will likely break the idempotency of Segments.
-        Properties of Media Objects, such as `get_urls`, SHOULD be modified via the [`/objects`](#/operations/GET_objects) endpoints.
-        They SHOULD NOT be modified at this endpoint, and TAMS instences SHOULD reject such requests with a `400` error.
+        The list of instances of an object (and associated `get_urls` entries) can be modified via the [`/objects`](#/operations/GET_objects) endpoints, which provides a mechanism to register new instances of an object.
 
-        If a client needs to modify a Flow Segment, e.g. to correct metadata such as the `key_frame_count` or add additional URLs to `get_urls`, then the client SHOULD first delete the existing Segment and then write a new one.
+        Clients MAY modify Flow Segments, but this should only be done in exceptional circumstances to correct metadata such as `key_frame_count`, as such operations will likely break the idempotency of Segments.
+        If a client needs to modify a Flow Segment, then the client SHOULD first delete the existing Segment and then write a new one.
         The behaviour is undefined if the Segment exists and the service may return a 400 error response.
 
         For successful creation of all Segments in the request a 201 response should be provided.
@@ -1990,11 +1985,13 @@ paths:
 
         Clients are expected to decide how to break content into Media Objects, however those Objects SHOULD be large enough to avoid excessive round trip overheads in the underlying store (_e.g._ of the order of several megabytes) and where codecs with temporal re-ordering are used, Object SHOULD contain complete GOPs or decodable units.
 
-        For Media Objects that have been re-used from other Flows, the `sample_offset` and `sample_count` MAY be used to specify part of the Media Object to use:
+        For Media Objects that have been re-used from elsewhere, the `sample_offset` and `sample_count` MAY be used to specify part of the Media Object to use:
           - The `timerange` field indicates the new Segment's position in the Flow
           - The sample associated with the start of the `timerange` MUST be the one selected by `sample_offset`
           - Likewise, the sample associated with the end of the `timerange` MUST be the one selected by `sample_offset + sample_count - 1`, unless `timerange` has an exclusive end, in which case it will be  `sample_offset + sample_count`.
           - The timerange of the Segment MUST NOT overlap any other Segment in the same Flow.
+
+        When re-using Media Objects, requests which change object properties (e.g. `key_frame_count`) SHOULD be rejected.
       operationId: POST_flows-flowId-segments
       tags:
       - FlowSegments
@@ -3211,23 +3208,8 @@ components:
             required:
             - frame_width
             - frame_height
-            additionalProperties: false
+            unevaluatedProperties: false
             properties:
-              frame_rate:
-                description: The fixed number of frames per second. If this parameter is unset, the frame_rate is either unknown or variable.
-                type: object
-                required:
-                - numerator
-                properties:
-                  numerator:
-                    description: numerator
-                    type: integer
-                    exclusiveMinimum: 0
-                  denominator:
-                    description: denominator
-                    type: integer
-                    default: 1
-                    exclusiveMinimum: 0
               frame_width:
                 description: The width of the picture in pixels.
                 type: integer
@@ -3350,6 +3332,39 @@ components:
                   flags:
                     description: AVC / H.264 flags byte. For more information on the use of this property in codec strings, see https://developer.mozilla.org/en-US/docs/Web/Media/Formats/codecs_parameter#using_the_codecs_parameter
                     type: integer
+              frame_rate:
+                title: Fixed Frame Rate
+                description: The fixed number of frames per second. MUST be set if `vfr` is `false` or omitted. MUST NOT be set if `vfr` is `true`.
+                type: object
+                required:
+                - numerator
+                properties:
+                  numerator:
+                    description: numerator
+                    type: integer
+                    exclusiveMinimum: 0
+                  denominator:
+                    description: denominator
+                    type: integer
+                    default: 1
+                    exclusiveMinimum: 0
+              vfr:
+                description: If `true`, the frame rate of the Flow is variable and `frame_rate` MUST NOT be set. If `false` or omitted, the frame rate of the Flow is fixed and `frame_rate` MUST be set.
+                type: boolean
+                default: false
+            if:
+              properties:
+                vfr:
+                  enum:
+                  - false
+                  - null
+            then:
+              required:
+              - frame_rate
+            else:
+              not:
+                required:
+                - frame_rate
     httprequest:
       title: HTTP Request
       description: Gives information on a particular http request a client should perform
@@ -3571,15 +3586,12 @@ components:
       title: Tags
       description: Key is a freeform string. Value is a freeform string, or an array of freeform strings.
       type: object
-      propertyNames:
-        type: string
-        minLength: 1
       additionalProperties:
         anyOf:
-          - type: string
-          - type: array
-            items:
-              type: string
+        - type: string
+        - type: array
+          items:
+            type: string
     timerange:
       title: TimeRange
       description: |
@@ -3614,6 +3626,11 @@ components:
     urllabellist:
       title: Query String GET URL Label list
       description: A list of Media Object GET URL Labels, formatted for use in query string parameters
+      type: string
+      pattern: ^([^,]+(,[^,]+)*)?$
+    urltaglist:
+      title: Query String Tag value list
+      description: A list of tag values, formatted for use in query string parameters
       type: string
       pattern: ^([^,]+(,[^,]+)*)?$
     uuid:

@@ -300,6 +300,14 @@ def validate_object_id(
             None,
             "Bad request. The object id does not exist and no get_urls supplied.",
         )
+    if segment.get_urls:
+        labels = [get_url.label for get_url in segment.get_urls]
+        if len(labels) != len(set(labels)):
+            return (
+                False,
+                None,
+                "Bad request. All label value in get_urls must be unique.",
+            )
     if storage_item is None and segment.get_urls:
         # No matching object_id found but get_urls supplied so this is valid
         return True, None, None
@@ -314,10 +322,8 @@ def validate_object_id(
         if storage_item.get("expire_at"):
             # expire_at exists so this is first time use and needs updating to prevent TTL deletion
             storage_table.update_item(
-                Key={
-                    "id": segment.object_id,
-                },
-                AttributeUpdates={"expire_at": {"Action": "DELETE"}},
+                Key={"id": segment.object_id},
+                UpdateExpression="REMOVE expire_at",
             )
         # flow_id matches so is a valid object_id
         return True, storage_item.get("storage_id"), None
