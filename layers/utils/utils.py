@@ -197,24 +197,28 @@ def parse_tag_parameters(params: None) -> tuple[dict, dict]:
     if params is None:
         return (values, exists)
     for key, value in params.items():
-        key_split = key[len(key.split(".", 1)[0]) + 1 :]
-        if key.startswith("tag.") or key.startswith("flow_tag."):
-            values[key_split] = value
-        if key.startswith("tag_exists.") or key.startswith("flow_tag_exists."):
-            if value.lower() in ["true", "false"]:
-                exists[key_split] = value.lower() == "true"
-            else:
-                raise BadRequestError(
-                    [
-                        {
-                            "type": "bool_parsing",
-                            "loc": ["query", key],
-                            "msg": "Input should be a valid boolean, unable to interpret input",
-                            "input": value,
-                            "url": "https://errors.pydantic.dev/2.10/v/bool_parsing",
-                        }
-                    ]
-                )  # 400
+        try:
+            key_prefix, key_name = key.split(".", 1)
+        except ValueError:
+            continue  # Key's without a "." cannot be tag keys so continue
+        match key_prefix:
+            case "tag" | "flow_tag":
+                values[key_name] = value
+            case "tag_exists" | "flow_tag_exists":
+                if value.lower() in ("true", "false"):
+                    exists[key_name] = value.lower() == "true"
+                else:
+                    raise BadRequestError(
+                        [
+                            {
+                                "type": "bool_parsing",
+                                "loc": ["query", key],
+                                "msg": "Input should be a valid boolean, unable to interpret input",
+                                "input": value,
+                                "url": "https://errors.pydantic.dev/2.10/v/bool_parsing",
+                            }
+                        ]
+                    )  # 400
     return (values, exists)
 
 
