@@ -1,3 +1,4 @@
+import json
 import os
 from http import HTTPStatus
 from typing import Optional
@@ -147,7 +148,7 @@ def get_source_tag_value(
 @app.put("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def put_source_tag_value(
-    tag_value: Annotated[str, Body()],
+    tag_value: Annotated[str | list[str], Body()],
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
@@ -160,7 +161,7 @@ def put_source_tag_value(
         record_type,
         source_id,
         username,
-        {f"t.{opencypher_property_name(tag_name)}": tag_value},
+        {f"t.{opencypher_property_name(tag_name)}": json.dumps(tag_value)},
     )
     publish_event(
         f"{record_type}s/updated",

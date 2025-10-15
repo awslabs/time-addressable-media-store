@@ -314,6 +314,16 @@ def stub_webhook_basic():
     }
 
 
+@pytest.fixture(scope="session")
+def stub_webhook_tags():
+    return {
+        "url": "https://hook.example.com",
+        "api_key_name": "Authorization",
+        "events": ["sources/created", "sources/updated", "sources/deleted"],
+        "tags": {"auth_classes": ["news", "sports"]},
+    }
+
+
 #############
 # FUNCTIONS #
 #############

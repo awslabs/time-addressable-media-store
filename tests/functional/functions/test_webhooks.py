@@ -5,6 +5,8 @@ import uuid
 
 import boto3
 import pytest
+
+# pylint: disable=no-name-in-module
 from conftest import serialise_dict
 from pytest_lazy_fixtures import lf
 
@@ -44,10 +46,10 @@ def generate_opencyher_query(event_type, where_conditions):
             + rf'(webhook.SERIALISE_{k} IS NULL OR webhook.SERIALISE_{k} CONTAINS "\"{v}\"")'
         )
     return (
-        r"MATCH (webhook: webhook) WHERE "
+        r"MATCH (webhook: webhook)-[: has_tags]->(t: tags) WHERE "
         + rf'webhook.status IN ["created", "started"] AND webhook.SERIALISE_events CONTAINS "\"{event_type}\""'
         + where_expression
-        + r" RETURN webhook {.*}"
+        + r" RETURN webhook {.*, tags: t {.*}}"
     )
 
 

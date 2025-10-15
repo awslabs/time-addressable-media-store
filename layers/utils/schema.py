@@ -579,12 +579,12 @@ class Storagebackend(BaseModel):
     store_product: Optional[str] = Field(None, description="The storage product name.")
 
 
-class Tags(RootModel[Optional[Dict[str, str]]]):
+class Tags(RootModel[Optional[Dict[str, Union[str, List[str]]]]]):
     """
-    Key value is a freeform string.
+    Key is a freeform string. Value is a freeform string, or an array of freeform strings.
     """
 
-    root: Optional[Dict[str, str]] = None
+    root: Optional[Dict[str, Union[str, List[str]]]] = None
 
 
 class Timerange(
@@ -707,6 +707,7 @@ class Webhook(BaseModel):
         None,
         description="Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the [/flows/{flowId}/segments](#/operations/GET_flows-flowId-segments) API endpoint.",
     )
+    tags: Optional[Tags] = None
 
 
 class Status1(Enum):

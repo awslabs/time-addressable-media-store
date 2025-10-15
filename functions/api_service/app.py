@@ -41,7 +41,7 @@ from schema import (
     Webhookput,
 )
 from typing_extensions import Annotated
-from utils import generate_link_url, model_dump
+from utils import generate_link_url, model_dump, parse_tag_parameters
 
 tracer = Tracer()
 logger = Logger()
@@ -120,9 +120,14 @@ def get_webhooks(
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
+    param_tag_values, param_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters
+    )
     custom_headers = {}
     items, next_page, limit_used = query_webhooks(
         {
+            "tag_values": param_tag_values,
+            "tag_exists": param_tag_exists,
             "page": param_page,
             "limit": param_limit,
         }

@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -334,7 +335,7 @@ def get_flow_tag_value(
 @app.put("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def put_flow_tag_value(
-    tag_value: Annotated[str, Body()],
+    tag_value: Annotated[str | list[str], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
@@ -352,7 +353,7 @@ def put_flow_tag_value(
         record_type,
         flow_id,
         username,
-        {f"t.{opencypher_property_name(tag_name)}": tag_value},
+        {f"t.{opencypher_property_name(tag_name)}": json.dumps(tag_value)},
     )
     publish_event(
         f"{record_type}s/updated",
