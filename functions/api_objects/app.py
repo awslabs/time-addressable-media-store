@@ -292,6 +292,7 @@ def delete_objects_by_id(
                 ]
             ],
         )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
 
 
 @logger.inject_lambda_context(
