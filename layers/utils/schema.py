@@ -310,15 +310,6 @@ class Format4(Enum):
     urn_x_nmos_format_video = "urn:x-nmos:format:video"
 
 
-class FrameRate(BaseModel):
-    """
-    The fixed number of frames per second. If this parameter is unset, the frame_rate is either unknown or variable.
-    """
-
-    numerator: PositiveInt = Field(..., description="numerator")
-    denominator: Optional[PositiveInt] = Field(1, description="denominator")
-
-
 class InterlaceMode(Enum):
     """
     Interlaced video mode for frames in this Flow
@@ -414,18 +405,20 @@ class AvcParameters(BaseModel):
     )
 
 
+class FrameRate(BaseModel):
+    """
+    The fixed number of frames per second. MUST be set if `vfr` is `false` or omitted. MUST NOT be set if `vfr` is `true`.
+    """
+
+    numerator: PositiveInt = Field(..., description="numerator")
+    denominator: Optional[PositiveInt] = Field(1, description="denominator")
+
+
 class EssenceParameters3(BaseModel):
     """
     Describes the parameters of the essence inside this video Flow
     """
 
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    frame_rate: Optional[FrameRate] = Field(
-        None,
-        description="The fixed number of frames per second. If this parameter is unset, the frame_rate is either unknown or variable.",
-    )
     frame_width: PositiveInt = Field(
         ..., description="The width of the picture in pixels."
     )
@@ -468,6 +461,15 @@ class EssenceParameters3(BaseModel):
         None, title="Uncompressed Video Parameters"
     )
     avc_parameters: Optional[AvcParameters] = Field(None, title="AVC Codec Parameters")
+    frame_rate: Optional[FrameRate] = Field(
+        None,
+        description="The fixed number of frames per second. MUST be set if `vfr` is `false` or omitted. MUST NOT be set if `vfr` is `true`.",
+        title="Fixed Frame Rate",
+    )
+    vfr: Optional[bool] = Field(
+        False,
+        description="If `true`, the frame rate of the Flow is variable and `frame_rate` MUST NOT be set. If `false` or omitted, the frame rate of the Flow is fixed and `frame_rate` MUST be set.",
+    )
 
 
 class Httprequest(BaseModel):
@@ -616,6 +618,14 @@ class Urllabellist(RootModel[constr(pattern=r"^([^,]+(,[^,]+)*)?$")]):
         ...,
         description="A list of Media Object GET URL Labels, formatted for use in query string parameters",
         title="Query String GET URL Label list",
+    )
+
+
+class Urltaglist(RootModel[constr(pattern=r"^([^,]+(,[^,]+)*)?$")]):
+    root: constr(pattern=r"^([^,]+(,[^,]+)*)?$") = Field(
+        ...,
+        description="A list of tag values, formatted for use in query string parameters",
+        title="Query String Tag value list",
     )
 
 

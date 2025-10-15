@@ -17,4 +17,5 @@ essence_params = {
     "transfer_characteristic": "str",
     "unc_parameters": "dict",
     "vert_chroma_subs": "int",
+    "vfr": "bool",
 }

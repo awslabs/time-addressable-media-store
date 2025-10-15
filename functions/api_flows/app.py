@@ -75,6 +75,7 @@ from utils import (
     parse_tag_parameters,
     publish_event,
     put_message,
+    validate_frame_rate,
 )
 
 tracer = Tracer()
@@ -203,6 +204,9 @@ def put_flow_by_id(
 ):
     if flow.root.id.root != flow_id:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
+    # Validate vfr vs frame_rate essence_parameters as pydantic model not able to enforce conditions
+    if flow.root.format.value == Contentformat.urn_x_nmos_format_video.value:
+        validate_frame_rate(model_dump(flow.root.essence_parameters))
     try:
         existing_item = query_node(record_type, flow_id)
         if existing_item.get("read_only"):

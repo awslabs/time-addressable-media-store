@@ -395,3 +395,16 @@ def serialise_tags_dict(tags: dict, key_prefix: str = "") -> dict:
             json.dumps(v) if v is not None else None
         )
     return serialised
+
+
+@tracer.capture_method(capture_response=False)
+def validate_frame_rate(video_essence_parameters: dict) -> None:
+    vfr = video_essence_parameters.get("vfr", False)
+    if vfr and video_essence_parameters.get("frame_rate"):
+        raise BadRequestError(
+            "When vfr is true, the frame rate of the Flow is variable and frame_rate MUST NOT be set."
+        )  # 400
+    if not vfr and not video_essence_parameters.get("frame_rate"):
+        raise BadRequestError(
+            "When vfr is false or omitted, the frame rate of the Flow is fixed and frame_rate MUST be set."
+        )  # 400
