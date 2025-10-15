@@ -789,7 +789,7 @@ def test_Service_StorageBackends_HEAD_200(api_client_cognito):
     assert 200 == response.status_code
 
 
-def test_Service_StorageBackends_GET_200(api_client_cognito):
+def test_Service_StorageBackends_GET_200(api_client_cognito, storage_backends):
     # Arrange
     path = "/service/storage-backends"
     # Act
@@ -797,6 +797,7 @@ def test_Service_StorageBackends_GET_200(api_client_cognito):
         "GET",
         path,
     )
+    storage_backends.extend(response.json())
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert 200 == response.status_code
