@@ -486,15 +486,7 @@ def query_delete_requests() -> list:
 def query_webhooks(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Webhooks from the Neptune Database"""
     props, where_literals = parse_api_gw_parameters(
-        {
-            k: v
-            for k, v in parameters.items()
-            if k
-            in [
-                "tag_values",
-                "tag_exists",
-            ]
-        }
+        {k: parameters[k] for k in parameters.keys() & {"tag_values", "tag_exists"}}
     )
     page = int(parameters.get("page") or 0)
     limit = min(
@@ -1027,15 +1019,7 @@ def get_matching_webhooks(event: EventBridgeEvent) -> list[Webhookfull]:
 def query_object_flows(flow_ids: list[str], parameters: dict) -> list:
     """Returns a list of filtered TAMS Flows from the Neptune Database, used by the Objects endpoint"""
     _, where_literals = parse_api_gw_parameters(
-        {
-            k: v
-            for k, v in parameters.items()
-            if k
-            in [
-                "tag_values",
-                "tag_exists",
-            ]
-        }
+        {k: parameters[k] for k in parameters.keys() & {"tag_values", "tag_exists"}}
     )
     query = (
         qb.match()
