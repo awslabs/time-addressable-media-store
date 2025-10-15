@@ -197,11 +197,12 @@ def parse_tag_parameters(params: None) -> tuple[dict, dict]:
     if params is None:
         return (values, exists)
     for key, value in params.items():
+        key_split = key[len(key.split(".", 1)[0]) + 1 :]
         if key.startswith("tag.") or key.startswith("flow_tag."):
-            values[key[len(key.split(".", 1)[0]) + 1 :]] = value
+            values[key_split] = value
         if key.startswith("tag_exists.") or key.startswith("flow_tag_exists."):
             if value.lower() in ["true", "false"]:
-                exists[key[len(key.split(".", 1)[0]) + 1 :]] = value.lower() == "true"
+                exists[key_split] = value.lower() == "true"
             else:
                 raise BadRequestError(
                     [
