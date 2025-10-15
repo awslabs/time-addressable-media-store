@@ -509,6 +509,21 @@ class Mimetype(
     )
 
 
+class Objectsinstancespost2(BaseModel):
+    """
+    Register an uncontrolled Media Object instance via its `url`.
+    """
+
+    url: str = Field(
+        ...,
+        description="A URL to which a GET request can be made to directly retrieve the contents of the media object. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
+    )
+    label: Optional[str] = Field(
+        None,
+        description="Label identifying this Media Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends. If the 'label' is not set then this instance can't be filtered for using the 'accept_get_urls' API query parameter.",
+    )
+
+
 class Service(BaseModel):
     """
     Provides information about the service instance
@@ -1133,6 +1148,24 @@ class Objectcore(BaseModel):
     key_frame_count: Optional[int] = Field(
         None,
         description="The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point",
+    )
+
+
+class Objectsinstancespost1(BaseModel):
+    """
+    Request the duplication of a Media Object instance to a new Storage Backend, via it's `storage_id`.
+    """
+
+    storage_id: Uuid = Field(..., description="Storage backend identifier")
+
+
+class Objectsinstancespost(
+    RootModel[Union[Objectsinstancespost1, Objectsinstancespost2]]
+):
+    root: Union[Objectsinstancespost1, Objectsinstancespost2] = Field(
+        ...,
+        description="Register a Media Object instance in the store.",
+        title="Media object registration",
     )
 
 

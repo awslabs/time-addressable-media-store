@@ -2133,6 +2133,48 @@ paths:
         required: true
         schema:
           type: string
+      - name: verbose_storage
+        in: query
+        description: |
+          Include storage metadata in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+        schema:
+          default: false
+          type: boolean
+      - name: accept_get_urls
+        in: query
+        description: |
+          A comma separated list of labels of media object `get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
+          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
+          Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
+          Without `get_urls`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs for example.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          $ref: '#/components/schemas/urllabellist'
+      - name: accept_storage_ids
+        in: query
+        description: |
+          A comma separated list of `storage_id`s of media object `get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
+          Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
+          A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: string
+          pattern: ^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$
+      - name: presigned
+        in: query
+        description: |
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls`.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If omitted, both presigned and non-presigned URLs will be returned.
+          If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: boolean
       - name: flow_tag.{name}
         in: query
         description: |
@@ -2188,6 +2230,48 @@ paths:
         required: true
         schema:
           type: string
+      - name: verbose_storage
+        in: query
+        description: |
+          Include storage metadata in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+        schema:
+          default: false
+          type: boolean
+      - name: accept_get_urls
+        in: query
+        description: |
+          A comma separated list of labels of media object `get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
+          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
+          Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
+          Without `get_urls`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs for example.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          $ref: '#/components/schemas/urllabellist'
+      - name: accept_storage_ids
+        in: query
+        description: |
+          A comma separated list of `storage_id`s of media object `get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
+          Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
+          A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: string
+          pattern: ^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$
+      - name: presigned
+        in: query
+        description: |
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls`.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If omitted, both presigned and non-presigned URLs will be returned.
+          If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to
+          generate a large number of pre-signed URLs.
+          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+        schema:
+          type: boolean
       - name: flow_tag.{name}
         in: query
         description: |
@@ -2228,6 +2312,96 @@ paths:
           description: Bad request. Invalid query options.
         '404':
           description: The requested media object does not exist.
+  /objects/{objectId}/instances:
+    post:
+      summary: Register a Media Object instance
+      description: |
+        Request the service to create an Object instance on a new Storage Backend. Or add a new uncontrolled URL to `get_urls`.
+
+        To request the duplication of the Object to a new Storage Backend, clients POST a `storage_id` to this endpoint that does not currently have an instance of the Object. The API will then:
+
+        - Allocate storage for Media Object `objectId` on Storage Backend `storage_id`
+        - Copy the Media Object from an existing location to the newly allocated storage
+        - Start advertising the new copy in `get_urls` once ready
+
+        The API instances SHOULD be capable of handling the case where the only existant instances are uncontrolled.
+
+        Where a client has written a new uncontrolled Object instance, the client is responsible for ensuring that the Object written is complete and correct before registering it with this method.
+
+        All instances of an Object MUST be identical.
+      operationId: POST_objects-instances
+      tags:
+      - Objects
+      parameters:
+      - name: objectId
+        in: path
+        description: The Media Object identifier. The Object ID may include special characters such as `/` which should be URL encoded.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              controlled:
+                summary: Registering a controlled instance
+                value:
+                  $ref: examples/objects-instances-controlled-post.json
+              uncontrolled:
+                summary: Registering a uncontrolled instance
+                value:
+                  $ref: examples/objects-instances-uncontrolled-post.json
+            schema:
+              $ref: '#/components/schemas/objectsinstancespost'
+        required: true
+      responses:
+        '201':
+          description: Object instance successfully registered.
+        '400':
+          description: Bad request. Invalid request JSON.
+        '403':
+          description: Forbidden. You do not have permission to modify this Media Object.
+        '404':
+          description: The Media Object does not exist.
+    delete:
+      summary: Delete a Media Object instance
+      description: |
+        Delete an instance of a Media Object.
+
+        One of `storage_id` or `label` MUST be specified in the query parameters. `storage_id` SHOULD be used where `controlled` is `True` for the instance.
+
+        API instances should remove the Media Object instance from the `get_urls` list and then, if the instance is controlled, delete the Object instance from storage.
+
+        API instances SHOULD prevent clients from deleting all Object instances. Additionally, API instances MAY prevent clients from deleting all controlled Object instances. Where clients wish to remove all copies of an Object from the store, they should do so by deleting all Flows or Flow Segments which reference the Object.
+      operationId: DELETE_objects-instances
+      tags:
+      - Objects
+      parameters:
+      - name: objectId
+        in: path
+        description: The Media Object identifier. The Object ID may include special characters such as `/` which should be URL encoded.
+        required: true
+        schema:
+          type: string
+      - name: storage_id
+        in: query
+        description: The storage_id identifying the Media Object instance to be deleted.
+        schema:
+          type: string
+      - name: label
+        in: query
+        description: The label identifying the Media Object instance to be deleted.
+        schema:
+          type: string
+      responses:
+        '204':
+          description: No content. The Media Object instance has been deleted.
+        '400':
+          description: Bad request. Invalid query options.
+        '403':
+          description: Forbidden. You do not have permission to modify this Media Object.
+        '404':
+          description: The requested Object ID in the path is invalid.
   /flow-delete-requests:
     head:
       summary: List Flow Delete Requests
@@ -3447,6 +3621,32 @@ components:
         key_frame_count:
           description: The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point
           type: integer
+    objectsinstancespost:
+      type: object
+      description: Register a Media Object instance in the store.
+      title: Media object registration
+      oneOf:
+      - description: Request the duplication of a Media Object instance to a new Storage Backend, via it's `storage_id`.
+        title: Controlled instance
+        type: object
+        required:
+        - storage_id
+        properties:
+          storage_id:
+            description: Storage backend identifier
+            $ref: '#/components/schemas/uuid'
+      - description: Register an uncontrolled Media Object instance via its `url`.
+        title: Uncontrolled instance
+        type: object
+        required:
+        - url
+        properties:
+          url:
+            description: A URL to which a GET request can be made to directly retrieve the contents of the media object. Clients should include credentials if the provide URL is on the same origin as the API endpoint
+            type: string
+          label:
+            description: Label identifying this Media Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends. If the 'label' is not set then this instance can't be filtered for using the 'accept_get_urls' API query parameter.
+            type: string
     service:
       title: Service
       description: Provides information about the service instance
