@@ -408,3 +408,16 @@ def validate_frame_rate(video_essence_parameters: dict) -> None:
         raise BadRequestError(
             "When vfr is false or omitted, the frame rate of the Flow is fixed and frame_rate MUST be set."
         )  # 400
+
+
+def get_unique_get_urls(items: list[dict]) -> list[dict]:
+    """Extract unique GET URLs from a list of items containing get_urls arrays."""
+    seen = set()
+    unique_get_urls = []
+    for item in items:
+        for get_url in item.get("get_urls", []):
+            key = json.dumps(get_url, sort_keys=True)
+            if key not in seen:
+                seen.add(key)
+                unique_get_urls.append(get_url)
+    return unique_get_urls
