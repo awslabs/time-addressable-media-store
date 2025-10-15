@@ -461,3 +461,19 @@ def list_storage_backends() -> list[dict]:
         items.extend(query["Items"])
     store_name = get_store_name()
     return [get_storage_backend_dict(item, store_name) for item in items]
+
+
+@tracer.capture_method(capture_response=False)
+def append_to_segment_list(item: dict, attribute: str, value: dict | str) -> None:
+    """Append a value to a list attribute in a segment."""
+    segments_table.update_item(
+        Key={
+            "flow_id": item["flow_id"],
+            "timerange_end": item["timerange_end"],
+        },
+        UpdateExpression=f"SET {attribute} = list_append(if_not_exists({attribute}, :empty_list), :new_value)",
+        ExpressionAttributeValues={
+            ":new_value": [value],
+            ":empty_list": [],
+        },
+    )
