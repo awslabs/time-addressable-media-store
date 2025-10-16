@@ -351,16 +351,18 @@ def delete_flow_storage_record(object_id: str, storage_id: str | None = None) ->
             Key={"id": object_id},
         )
         return
-    get_item = storage_table.get_item(
-        Key={
-            "id": object_id,
-        },
-    )
-    if get_item.get("Item") and get_item.get("Item").get("storage_id") == storage_id:
+    try:
         storage_table.update_item(
             Key={"id": object_id},
             UpdateExpression="REMOVE storage_id",
+            ConditionExpression="storage_id = :storage_id",
+            ExpressionAttributeValues={":storage_id": storage_id},
         )
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            # existing storage_id does not exist or doesn't match, no action required.
+            return
+        raise
 
 
 @tracer.capture_method(capture_response=False)

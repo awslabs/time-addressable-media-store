@@ -251,7 +251,9 @@ def delete_objects_by_id(
 
     # Check if relevant items exist
     if len(items) == 0:
-        raise BadRequestError("Bad request. Invalid query options.")  # 400
+        raise NotFoundError(
+            "The label or storage_id supplied do not exist for the Object ID in the path."
+        )  # 404
 
     storage_ids = list(
         {storage_id for item in items for storage_id in item.get("storage_ids", [])}
