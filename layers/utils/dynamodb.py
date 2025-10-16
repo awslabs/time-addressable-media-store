@@ -488,7 +488,10 @@ def append_to_segment_list(item: dict, attribute: str, value: dict | str) -> Non
             "flow_id": item["flow_id"],
             "timerange_end": item["timerange_end"],
         },
-        UpdateExpression=f"SET {attribute} = list_append(if_not_exists({attribute}, :empty_list), :new_value)",
+        UpdateExpression="SET #attr = list_append(if_not_exists(#attr, :empty_list), :new_value)",
+        ExpressionAttributeNames={
+            "#attr": attribute,
+        },
         ExpressionAttributeValues={
             ":new_value": [value],
             ":empty_list": [],
