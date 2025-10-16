@@ -1,6 +1,8 @@
 # Time-addressable Media Store implementation
 
-This solution deploys the AWS Infrastructure required to create a sample implementation of the [BBC TAMS API](https://github.com/bbc/tams).
+This solution deploys the AWS Infrastructure required to create sample implementation of the [BBC TAMS API](https://github.com/bbc/tams).
+
+**NOTE: This solution is supplied as a reference TAMS API implementation. It is expected to be used in a development environment only to get familiar with the TAMS API. It is not supplied as a production-ready solution.**
 
 ## Pre-requisites
 
@@ -55,7 +57,7 @@ The first command will build the source of your application. The second command 
 - **EnableWebhooks**: Specify whether you want the solution deployed with Webhooks.
 - **VpcId**: Specify an existing VPC Id, leave blank to have one created.
 - **VpcAZs**: Specify a comma-separated list of availability zones (for example `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds. Leave blank if VPC being created.
-- **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC.
+- **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC. **NOTE: These MUST be *PRIVATE* Subnets**
 - **NeptuneDBInstanceClass**: Neptune Cluster Instance class, for example `db.serverless` or `db.r7g.large`
 - **NeptuneServerlessConfiguration**: Neptune Serverless Scaling Configuration. Must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1–128.
 - **DeployWaf**: Specify whether you want the solution behind a WAF.
