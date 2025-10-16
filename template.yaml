@@ -366,6 +366,23 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: missing
 
+  ObjectDuplicationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      KmsMasterKeyId: alias/aws/sqs
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ObjectDuplicationQueueDLQ.Arn
+        maxReceiveCount: 1
+
+  ObjectDuplicationQueueDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      KmsMasterKeyId: alias/aws/sqs
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 86400
+
   EventBus:
     Type: AWS::Events::EventBus
     Properties:
@@ -1396,6 +1413,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
+                - dynamodb:PutItem
                 - dynamodb:UpdateItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
@@ -1492,8 +1510,11 @@ Resources:
           POWERTOOLS_SERVICE_NAME: tams-segments
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           NEPTUNE_ENDPOINT: !GetAtt NeptuneStack.Outputs.Endpoint
+          SERVICE_TABLE: !Ref ServiceTable
           SEGMENTS_TABLE: !Ref FlowSegmentsTable
           STORAGE_TABLE: !Ref FlowStorageTable
+          DUPLICATION_QUEUE_URL: !Ref ObjectDuplicationQueue
+          S3_QUEUE_URL: !Ref CleanupS3Queue
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1505,8 +1526,26 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt FlowSegmentsTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource:
+                - !GetAtt ObjectDuplicationQueue.Arn
+                - !GetAtt CleanupS3Queue.Arn
             - Effect: Allow
               Action:
                 - neptune-db:ReadDataViaQuery
@@ -1537,6 +1576,28 @@ Resources:
               AuthorizationScopes:
                 - !FindInMap [OAuth, Scopes, CognitoAdmin]
                 - !FindInMap [OAuth, Scopes, Get]
+        postMediaObjectInstance:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /objects/{objectId}/instances
+            Method: Post
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Post]
+        deleteMediaObjectInstance:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /objects/{objectId}/instances
+            Method: Delete
+            Auth:
+              Authorizer: Authorizor
+              AuthorizationScopes:
+                - !FindInMap [OAuth, Scopes, CognitoAdmin]
+                - !FindInMap [OAuth, Scopes, Delete]
 
   FlowDeleteRequestsFunction:
     Type: AWS::Serverless::Function
@@ -1758,6 +1819,62 @@ Resources:
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
+  ObjectDuplicationFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      CodeUri: functions/object_duplication/
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:18
+        - !Ref UtilsLayer
+      Timeout: 900
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
+          POWERTOOLS_SERVICE_NAME: tams-object-duplication
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
+          SERVICE_TABLE: !Ref ServiceTable
+          SEGMENTS_TABLE: !Ref FlowSegmentsTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt FlowSegmentsTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource:
+                - !GetAtt ServiceTable.Arn
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ObjectDuplicationQueue.Arn
+            BatchSize: 10
+            Enabled: True
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
   SqsDeleteRequestsFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -1857,6 +1974,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
+                - dynamodb:UpdateItem
                 - dynamodb:DeleteItem
               Resource:
                 - !GetAtt FlowStorageTable.Arn
@@ -2137,3 +2255,8 @@ Outputs:
     Value: !Ref SqsObjectCleanupFunctionRole
     Export:
       Name: !Sub ${AWS::StackName}-AdditionalStorage-SqsObjectCleanupFunctionRole
+
+  AdditionalStorageObjectDuplicationFunctionRole:
+    Value: !Ref ObjectDuplicationFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-ObjectDuplicationFunctionRole

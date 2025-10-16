@@ -111,6 +111,24 @@ def webhook_ids():
 
 
 @pytest.fixture(scope="session")
+def storage_backends():
+    return []
+
+
+@pytest.fixture(scope="session")
+# pylint: disable=redefined-outer-name
+def default_storage_id(storage_backends):
+    return next(
+        (
+            storage_backend["id"]
+            for storage_backend in storage_backends
+            if storage_backend.get("default_storage", False)
+        ),
+        None,
+    )
+
+
+@pytest.fixture(scope="session")
 def media_objects():
     return []
 

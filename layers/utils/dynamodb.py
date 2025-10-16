@@ -339,13 +339,30 @@ def validate_object_id(
 
 
 @tracer.capture_method(capture_response=False)
-def delete_flow_storage_record(object_id: str) -> None:
-    """Delete the DDB record associated with the supplied object_id"""
-    storage_table.delete_item(
-        Key={
-            "id": object_id,
-        },
+def delete_flow_storage_record(object_id: str, storage_id: str | None = None) -> None:
+    """Remove storage_id from object's DDB record, or delete the record entirely if no segments reference it"""
+    query = segments_table.query(
+        IndexName="object-id-index",
+        KeyConditionExpression=Key("object_id").eq(object_id),
+        Select="COUNT",
     )
+    if query["Count"] == 0:
+        storage_table.delete_item(
+            Key={"id": object_id},
+        )
+        return
+    try:
+        storage_table.update_item(
+            Key={"id": object_id},
+            UpdateExpression="REMOVE storage_id",
+            ConditionExpression="storage_id = :storage_id",
+            ExpressionAttributeValues={":storage_id": storage_id},
+        )
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            # existing storage_id does not exist or doesn't match, no action required.
+            return
+        raise
 
 
 @tracer.capture_method(capture_response=False)
@@ -461,3 +478,96 @@ def list_storage_backends() -> list[dict]:
         items.extend(query["Items"])
     store_name = get_store_name()
     return [get_storage_backend_dict(item, store_name) for item in items]
+
+
+@tracer.capture_method(capture_response=False)
+def append_to_segment_list(item: dict, attribute: str, value: dict | str) -> None:
+    """Append a value to a list attribute in a segment."""
+    segments_table.update_item(
+        Key={
+            "flow_id": item["flow_id"],
+            "timerange_end": item["timerange_end"],
+        },
+        UpdateExpression="SET #attr = list_append(if_not_exists(#attr, :empty_list), :new_value)",
+        ExpressionAttributeNames={
+            "#attr": attribute,
+        },
+        ExpressionAttributeValues={
+            ":new_value": [value],
+            ":empty_list": [],
+        },
+    )
+
+
+@tracer.capture_method(capture_response=False)
+def remove_storage_id_from_segment(item: dict, storage_id: str) -> None:
+    """Remove a storage_id from a segment's storage_ids list with optimistic locking."""
+    current_item = item
+    for attempt in range(constants.DDB_MAX_RETRIES):
+        try:
+            filtered_ids = [
+                sid for sid in current_item["storage_ids"] if sid != storage_id
+            ]
+            segments_table.update_item(
+                Key={
+                    "flow_id": current_item["flow_id"],
+                    "timerange_end": current_item["timerange_end"],
+                },
+                UpdateExpression="SET storage_ids = :ids",
+                ConditionExpression="storage_ids = :old_ids",
+                ExpressionAttributeValues={
+                    ":ids": filtered_ids,
+                    ":old_ids": current_item["storage_ids"],
+                },
+            )
+            break
+        except ClientError as e:
+            if (
+                e.response["Error"]["Code"] == "ConditionalCheckFailedException"
+                and attempt < constants.DDB_MAX_RETRIES - 1
+            ):
+                current_item = segments_table.get_item(
+                    Key={
+                        "flow_id": item["flow_id"],
+                        "timerange_end": item["timerange_end"],
+                    }
+                )["Item"]
+                continue
+            raise
+
+
+@tracer.capture_method(capture_response=False)
+def remove_get_url_by_label_from_segment(item: dict, label: str) -> None:
+    """Remove a get_url dictionary with matching label from a segment's get_urls list with optimistic locking."""
+    current_item = item
+    for attempt in range(constants.DDB_MAX_RETRIES):
+        try:
+            filtered_urls = [
+                url for url in current_item["get_urls"] if url.get("label") != label
+            ]
+            segments_table.update_item(
+                Key={
+                    "flow_id": current_item["flow_id"],
+                    "timerange_end": current_item["timerange_end"],
+                },
+                UpdateExpression="SET get_urls = :urls",
+                ConditionExpression="get_urls = :old_urls",
+                ExpressionAttributeValues={
+                    ":urls": filtered_urls,
+                    ":old_urls": current_item["get_urls"],
+                },
+            )
+            break
+        except ClientError as e:
+            if (
+                e.response["Error"]["Code"] == "ConditionalCheckFailedException"
+                and attempt < constants.DDB_MAX_RETRIES - 1
+            ):
+                current_item = segments_table.get_item(
+                    Key={
+                        "flow_id": item["flow_id"],
+                        "timerange_end": item["timerange_end"],
+                    }
+                )["Item"]
+                continue
+            raise

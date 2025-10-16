@@ -14,8 +14,10 @@ pytestmark = [
 @pytest.mark.parametrize(
     "path, verb",
     [
-        ("/objects", "GET"),
-        ("/objects", "HEAD"),
+        ("/objects/{objectId}", "GET"),
+        ("/objects/{objectId}", "HEAD"),
+        ("/objects/{objectId}/instances", "POST"),
+        ("/objects/{objectId}/instances", "DELETE"),
     ],
 )
 def test_auth_401(verb, path, api_endpoint):
@@ -1671,6 +1673,267 @@ def test_Get_Media_Object_Information_GET_200_page(
     assert 1 == len(response_json["referenced_by_flows"])
 
 
+def test_Get_Media_Object_Information_GET_200_get_urls(
+    api_client_cognito, region, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    label = f"aws.{region}:s3:Example TAMS"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "accept_get_urls": label,
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" in response_json
+    assert 1 == len(response_json["get_urls"])
+    assert "label" in response_json["get_urls"][0]
+    assert label == response_json["get_urls"][0]["label"]
+
+
+def test_Get_Media_Object_Information_GET_200_get_urls_no_match(
+    api_client_cognito, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "accept_get_urls": "no_match",
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" not in response_json
+
+
+def test_Get_Media_Object_Information_GET_200_with_storage_ids_default(
+    api_client_cognito, media_objects, default_storage_id
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "accept_storage_ids": default_storage_id,
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" in response_json
+    assert 2 == len(response_json["get_urls"])
+
+
+def test_Get_Media_Object_Information_GET_200_with_storage_ids_multiple(
+    api_client_cognito, media_objects, default_storage_id, id_404
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "accept_storage_ids": ",".join([default_storage_id, id_404]),
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" in response_json
+    assert 2 == len(response_json["get_urls"])
+
+
+def test_Get_Media_Object_Information_GET_200_with_storage_ids_missing(
+    api_client_cognito, media_objects, id_404
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "accept_storage_ids": id_404,
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" not in response_json
+
+
+def test_Get_Media_Object_Information_GET_400_with_storage_ids_bad(
+    api_client_cognito, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "accept_storage_ids": "bad",
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_Get_Media_Object_Information_GET_200_with_presigned_true(
+    api_client_cognito, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "presigned": True,
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" in response_json
+    assert 1 == len(response_json["get_urls"])
+    assert "presigned" in response_json["get_urls"][0]
+    assert response_json["get_urls"][0]["presigned"]
+
+
+def test_Get_Media_Object_Information_GET_200_with_presigned_false(
+    api_client_cognito, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "presigned": False,
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" in response_json
+    assert 1 == len(response_json["get_urls"])
+
+
+def test_Get_Media_Object_Information_GET_200_with_verbose_true(
+    api_client_cognito, region, media_objects, default_storage_id
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "verbose_storage": True,
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" in response_json
+    assert 2 == len(response_json["get_urls"])
+    assert "store_type" in response_json["get_urls"][0]
+    assert "provider" in response_json["get_urls"][0]
+    assert "region" in response_json["get_urls"][0]
+    assert "store_product" in response_json["get_urls"][0]
+    assert "storage_id" in response_json["get_urls"][0]
+    assert "controlled" in response_json["get_urls"][0]
+    assert "http_object_store" == response_json["get_urls"][0]["store_type"]
+    assert "aws" == response_json["get_urls"][0]["provider"]
+    assert region == response_json["get_urls"][0]["region"]
+    assert "s3" == response_json["get_urls"][0]["store_product"]
+    assert default_storage_id == response_json["get_urls"][0]["storage_id"]
+    assert response_json["get_urls"][0]["controlled"]
+
+
+def test_Get_Media_Object_Information_GET_200_with_verbose_false(
+    api_client_cognito, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "verbose_storage": False,
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert "get_urls" in response_json
+    assert 2 == len(response_json["get_urls"])
+    assert "store_type" not in response_json["get_urls"][0]
+    assert "provider" not in response_json["get_urls"][0]
+    assert "region" not in response_json["get_urls"][0]
+    assert "store_product" not in response_json["get_urls"][0]
+    assert "storage_id" not in response_json["get_urls"][0]
+    assert "controlled" not in response_json["get_urls"][0]
+
+
 def test_Get_Media_Object_Information_GET_400(api_client_cognito, media_objects):
     # Arrange
     object_id = media_objects[5]["object_id"]
@@ -1705,3 +1968,110 @@ def test_Get_Media_Object_Information_GET_404(api_client_cognito):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "The requested media object does not exist." == response.json()["message"]
+
+
+def test_Register_Media_Object_Instance_POST_201(api_client_cognito, media_objects):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}/instances"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "label": "test-this",
+            "url": "https://example.com/test",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 201 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+
+
+def test_Register_Media_Object_Instance_POST_400(api_client_cognito, media_objects):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}/instances"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+
+
+def test_Register_Media_Object_Instance_POST_404(api_client_cognito, id_404):
+    # Arrange
+    path = f"/objects/{id_404}/instances"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "label": "test-this",
+            "url": "https://example.com/test",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+
+
+def test_Delete_Media_Object_Instance_DELETE_204(api_client_cognito, media_objects):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}/instances"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={
+            "label": "test-this",
+        },
+    )
+    # Assert
+    assert 204 == response.status_code
+
+
+def test_Delete_Media_Object_Instance_DELETE_400(api_client_cognito, media_objects):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}/instances"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 400 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+
+
+def test_Delete_Media_Object_Instance_DELETE_404(api_client_cognito, id_404):
+    # Arrange
+    path = f"/objects/{id_404}/instances"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+        params={
+            "label": "test-this",
+        },
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 404 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]

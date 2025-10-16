@@ -36,7 +36,7 @@ def delete_objects_batch(storage_backend, keys):
             Delete={"Objects": delete_batch},
         )
         for delete_item in delete_batch:
-            delete_flow_storage_record(delete_item["Key"])
+            delete_flow_storage_record(delete_item["Key"], storage_backend["id"])
 
 
 @tracer.capture_method(capture_response=False)
@@ -50,8 +50,8 @@ def record_handler(record: SQSRecord) -> None:
         if storage_ids is None:
             storage_ids = [default_storage_backend["id"]]
         elif len(storage_ids) == 0:
-            # Empty list means no cleanup needed
-            continue
+            # Empty list means no S3 cleanup needed, just flow storage record
+            delete_flow_storage_record(object_id)
 
         items, _, _ = query_segments_by_object_id(
             object_id, projection="storage_ids", fetch_all=True

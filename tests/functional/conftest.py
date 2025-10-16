@@ -21,6 +21,7 @@ os.environ["SERVICE_TABLE"] = "service-table"
 os.environ["SEGMENTS_TABLE"] = "segments-table"
 os.environ["STORAGE_TABLE"] = "storage-table"
 os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
+os.environ["DUPLICATION_QUEUE_URL"] = "duplication-queue-url"
 os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
 logger = logging.getLogger(__name__)
