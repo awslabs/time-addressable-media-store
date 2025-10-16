@@ -1,5 +1,3 @@
-import json
-
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.batch import (
@@ -31,7 +29,7 @@ transfer_config = TransferConfig(
 @tracer.capture_method(capture_response=False)
 def record_handler(record: SQSRecord) -> None:
     """Processes a single SQS record"""
-    body = json.loads(record.body)
+    body = record.json_body
     object_id = body["object_id"]
     dst_storage_id = body["destination_storage_id"]
     dst_storage_backend = get_storage_backend(dst_storage_id)
