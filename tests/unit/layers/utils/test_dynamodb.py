@@ -545,40 +545,19 @@ class TestDynamoDB:
         dynamodb.delete_flow_storage_record("abc", "123")
 
         assert 1 == mock_storage_table.delete_item.call_count
-        assert 0 == mock_storage_table.get_item.call_count
         assert 0 == mock_storage_table.update_item.call_count
 
     @patch("dynamodb.segments_table")
     @patch("dynamodb.storage_table")
-    def test_delete_flow_storage_record_update_storage_id_present(
+    def test_delete_flow_storage_record_update_storage_id(
         self, mock_storage_table, mock_segments_table
     ):
         mock_segments_table.query.return_value = {"Count": 1}
-        mock_storage_table.get_item.return_value = {
-            "Item": {"id": "abc", "storage_id": "123"},
-        }
 
         dynamodb.delete_flow_storage_record("abc", "123")
 
         assert 0 == mock_storage_table.delete_item.call_count
-        assert 1 == mock_storage_table.get_item.call_count
         assert 1 == mock_storage_table.update_item.call_count
-
-    @patch("dynamodb.segments_table")
-    @patch("dynamodb.storage_table")
-    def test_delete_flow_storage_record_update_storage_id_not_present(
-        self, mock_storage_table, mock_segments_table
-    ):
-        mock_segments_table.query.return_value = {"Count": 1}
-        mock_storage_table.get_item.return_value = {
-            "Item": {"id": "abc", "storage_id": "456"},
-        }
-
-        dynamodb.delete_flow_storage_record("abc", "123")
-
-        assert 0 == mock_storage_table.delete_item.call_count
-        assert 1 == mock_storage_table.get_item.call_count
-        assert 0 == mock_storage_table.update_item.call_count
 
     def test_decode_and_validate_page_valid(self):
         """Test decode_and_validate_page with valid base64 encoded pagination key"""

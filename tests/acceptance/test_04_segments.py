@@ -2050,9 +2050,7 @@ def test_Delete_Media_Object_Instance_DELETE_400(api_client_cognito, media_objec
     response = api_client_cognito.request(
         "DELETE",
         path,
-        params={
-            "storage_id": "test-this",
-        },
+        params={},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
