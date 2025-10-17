@@ -12,7 +12,7 @@ This CloudFormation template deploys a Lambda function that performs the necessa
 
 ## Prerequisites
 
-**⚠️ DOWNTIME REQUIRED: The TAMS system will be in an unusable state after upgrading the CloudFormation stack to v5.0 until all ETL processes in this Lambda function are completed. Plan for scheduled downtime during this upgrade.**
+**⚠️ DOWNTIME REQUIRED: The TAMS system will be in an unusable state after upgrading the CloudFormation stack to v5.0 until all ETL processes in this Lambda function are completed. Plan for scheduled downtime during this upgrade. The amount of downtime will vary depending on the volume of data held but is typically around 5 to 10 minutes.**
 
 Before deploying this upgrade template, you must have:
 
@@ -33,15 +33,16 @@ Before deploying this upgrade template, you must have:
 Deploy the CloudFormation template using the AWS CloudFormation Console:
 
 1. Open the [AWS CloudFormation Console](https://console.aws.amazon.com/cloudformation/)
-2. Click **Create stack** > **With new resources (standard)**
-3. Under **Specify template**, select **Upload a template file**
-4. Click **Choose file** and select `tams-4.1-5.0-upgrade-template.yaml`
-5. Click **Next**
+2. Choose **Create stack** > **With new resources (standard)**
+3. For **Specify template**, choose **Upload a template file**
+4. Choose **Choose file** and enter `tams-4.1-5.0-upgrade-template.yaml`
+5. Choose **Next**
 6. Enter a **Stack name** (for example, `tams-upgrade-4-1-to-5-0`)
 7. Fill in the parameters with values from your TAMS API v5.0 stack outputs and DynamoDB table names
-8. Click **Next** through the Configure stack options page
-9. On the Review page, acknowledge that CloudFormation will create IAM resources
-10. Click **Submit**
+8. Choose **Next** to proceed to the Configure stack options page
+9. Select all the options in the Capabilities and transforms box
+10. Choose **Next** to proceed to the Review and create
+11. Choose **Submit**
 
 ## Running the Upgrade
 
@@ -50,31 +51,34 @@ The Lambda function contains three separate ETL processes. Each must be run indi
 ### Step 1: Webhooks ETL
 
 1. Open the Lambda function in the AWS Console (named `<stack-name>-NeptuneImportFunction-<id>`)
-2. In the code editor, uncomment the line: `# webhooks_etl()`
+2. In the code editor, locate the line `etl_step = ""` set the value of this variable to `webhooks`: `etl_step = "webhooks"`
 3. Deploy the changes
-4. Execute the Lambda function (use "Test" with an empty test event)
-5. Verify completion in CloudWatch Logs
-6. Re-comment the line before proceeding
+4. Execute the Lambda function (choose "Test" with an empty test event)
+5. Verify completion in the Lambda Execution Results window. (`SUCCESS` appears in the output)
+
+**Note: The WebHooks ETL process can only be executed once. If run a second time it will create duplciate WebHooks in the TAMS Store.**
 
 ### Step 2: Storage ETL
 
-1. Uncomment the line: `# storage_etl(context)`
+1. In the code editor, locate the line `etl_step = "..."` set the value of this variable to `storage`: `etl_step = "storage"`
 2. Deploy the changes
-3. Execute the Lambda function
-4. Check CloudWatch Logs - if not all items were processed, the logs will display a `last_evaluated_key` value
+3. Execute the Lambda function (choose "Test" with an empty test event)
+4. Verify completion in the Lambda Execution Results window. If not all items were processed `PARTIAL` will be visible in the output.
 5. If a `last_evaluated_key` was logged, update the Lambda code to pass this value: `storage_etl(context, last_evaluated_key={value})` and re-run
-6. Repeat until all items are processed (no `last_evaluated_key` in logs)
-7. Re-comment the line before proceeding
+6. Repeat until all items are processe. (`SUCCESS` appears in the output)
+
+**Note: Since the ids of the items are preserved in this ETL process, re-running the process will not cause any harm.**
 
 ### Step 3: Tags ETL
 
-1. Uncomment the line: `# tags_etl(context)`
+1. In the code editor, locate the line `etl_step = "..."` set the value of this variable to `tags`: `etl_step = "tags"`
 2. Deploy the changes
-3. Execute the Lambda function
-4. Check CloudWatch Logs - if not all items were processed, the logs will indicate this
+3. Execute the Lambda function (choose "Test" with an empty test event)
+4. Verify completion in the Lambda Execution Results window. If not all items were processed `PARTIAL` will be visible in the output.
 5. If processing is incomplete, re-run the function (it will continue processing remaining items)
-6. Repeat until completion
-7. Re-comment the line
+6. Repeat until all items are processe. (`SUCCESS` appears in the output)
+
+**Note: Since the this ETL process updates the items in place and the query filters to only items than need processing re-running the process will not cause any harm.**
 
 ## Verification
 
@@ -93,7 +97,7 @@ After successfully completing all three ETL processes and verification:
 1. Delete the upgrade stack:
    - Open the [AWS CloudFormation Console](https://console.aws.amazon.com/cloudformation/)
    - Select the upgrade stack (for example, `tams-upgrade-4-1-to-5-0`)
-   - Click **Delete**
+   - Choose **Delete**
    - Confirm the deletion
 
 2. Delete the old DynamoDB tables:
@@ -106,4 +110,4 @@ After successfully completing all three ETL processes and verification:
 - The Lambda function has a 15-minute timeout and 10GB memory allocation
 - Storage and Tags ETL processes include timeout handling and can be re-run
 - Depending on the volume of data in your TAMS store, some ETL processes may need to be executed multiple times to migrate all data
-- Monitor CloudWatch Logs for progress and any error messages
+- Monitor Lambda Execution Results for progress and any error messages

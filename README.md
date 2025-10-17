@@ -57,7 +57,7 @@ The first command will build the source of your application. The second command 
 - **EnableWebhooks**: Specify whether you want the solution deployed with Webhooks.
 - **VpcId**: Specify an existing VPC Id, leave blank to have one created.
 - **VpcAZs**: Specify a comma-separated list of availability zones (for example `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds. Leave blank if VPC being created.
-- **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC. **NOTE: These MUST be *PRIVATE* Subnets**
+- **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC. **NOTE: These MUST be *PRIVATE* Subnets. When placed in a Public subnet Lambdas do not receive Public IPs and all network routing will fail. A Public subnet is determined by the default route being to an Internet Gateway.**
 - **NeptuneDBInstanceClass**: Neptune Cluster Instance class, for example `db.serverless` or `db.r7g.large`
 - **NeptuneServerlessConfiguration**: Neptune Serverless Scaling Configuration. Must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1–128.
 - **DeployWaf**: Specify whether you want the solution behind a WAF.
