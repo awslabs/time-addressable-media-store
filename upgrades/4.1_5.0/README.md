@@ -51,32 +51,26 @@ The Lambda function contains three separate ETL processes. Each must be run indi
 ### Step 1: Webhooks ETL
 
 1. Open the Lambda function in the AWS Console (named `<stack-name>-NeptuneImportFunction-<id>`)
-2. In the code editor, locate the line `etl_step = ""` set the value of this variable to `webhooks`: `etl_step = "webhooks"`
-3. Deploy the changes
-4. Execute the Lambda function (choose "Test" with an empty test event)
-5. Verify completion in the Lambda Execution Results window. (`SUCCESS` appears in the output)
+2. Execute the Lambda function (choose "Test" with an event of `{"etl_step": "webhooks"}`)
+3. Verify completion in the Lambda Execution Results window. (`SUCCESS` appears in the output)
 
 **Note: The WebHooks ETL process can only be executed once. If run a second time it will create duplciate WebHooks in the TAMS Store.**
 
 ### Step 2: Storage ETL
 
-1. In the code editor, locate the line `etl_step = "..."` set the value of this variable to `storage`: `etl_step = "storage"`
-2. Deploy the changes
-3. Execute the Lambda function (choose "Test" with an empty test event)
-4. Verify completion in the Lambda Execution Results window. If not all items were processed `PARTIAL` will be visible in the output.
-5. If a `last_evaluated_key` was logged, update the Lambda code to pass this value: `storage_etl(context, last_evaluated_key={value})` and re-run
-6. Repeat until all items are processe. (`SUCCESS` appears in the output)
+1. Execute the Lambda function (choose "Test" with an event of `{"etl_step": "storage"}`)
+2. Verify completion in the Lambda Execution Results window. If not all items were processed `PARTIAL` will be visible in the output.
+3. If a `last_evaluated_key` was logged, update the Lambda code to pass this value: `storage_etl(context, last_evaluated_key={value})` and re-run
+4. Repeat until all items are processe. (`SUCCESS` appears in the output)
 
 **Note: Since the ids of the items are preserved in this ETL process, re-running the process will not cause any harm.**
 
 ### Step 3: Tags ETL
 
-1. In the code editor, locate the line `etl_step = "..."` set the value of this variable to `tags`: `etl_step = "tags"`
-2. Deploy the changes
-3. Execute the Lambda function (choose "Test" with an empty test event)
-4. Verify completion in the Lambda Execution Results window. If not all items were processed `PARTIAL` will be visible in the output.
-5. If processing is incomplete, re-run the function (it will continue processing remaining items)
-6. Repeat until all items are processe. (`SUCCESS` appears in the output)
+1. Execute the Lambda function (choose "Test" with an event of `{"etl_step": "tags"}`)
+2. Verify completion in the Lambda Execution Results window. If not all items were processed `PARTIAL` will be visible in the output.
+3. If processing is incomplete, re-run the function (it will continue processing remaining items)
+4. Repeat until all items are processe. (`SUCCESS` appears in the output)
 
 **Note: Since the this ETL process updates the items in place and the query filters to only items than need processing re-running the process will not cause any harm.**
 

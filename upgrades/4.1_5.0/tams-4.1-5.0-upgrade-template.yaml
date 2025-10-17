@@ -222,10 +222,8 @@ Resources:
             print("SUCCESS - Tags ETL process completed successfully.")
 
 
-        # pylint: disable=unused-argument
         def lambda_handler(event, context):
-            # Update the value of the etl_step variable to run each etl process in turn.
-            etl_step = ""
+            etl_step = event["etl_step"]
             match etl_step:
                 case "webhooks":
                     webhooks_etl()
