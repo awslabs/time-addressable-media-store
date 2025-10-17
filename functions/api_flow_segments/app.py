@@ -301,14 +301,12 @@ def check_overlapping_segments(flow_id, segment_timerange):
 def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
-    valid_object_id, storage_id, validation_message = validate_object_id(
-        flow_segment, flow["id"]
-    )
-    if not valid_object_id:
+    validation = validate_object_id(flow_segment, flow["id"])
+    if not validation["valid"]:
         return generate_failed_segment(
             flow_segment.object_id,
             item_dict["timerange"],
-            validation_message,
+            validation["message"],
         )
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
@@ -323,8 +321,8 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
         0 if segment_timerange.includes_end() else 1
     )
-    if storage_id:
-        item_dict["storage_ids"] = [storage_id]
+    if validation["storage_id"]:
+        item_dict["storage_ids"] = [validation["storage_id"]]
     segments_table.put_item(
         Item={**item_dict, "flow_id": flow["id"]}, ReturnValues="ALL_OLD"
     )
