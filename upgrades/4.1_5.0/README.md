@@ -60,7 +60,7 @@ The Lambda function contains three separate ETL processes. Each must be run indi
 
 1. Execute the Lambda function (choose "Test" with an event of `{"etl_step": "storage"}`)
 2. Verify completion in the Lambda Execution Results window. If not all items were processed `PARTIAL` will be visible in the output.
-3. If a `last_evaluated_key` was logged, update the Lambda code to pass this value: `storage_etl(context, last_evaluated_key={value})` and re-run
+3. If a `last_evaluated_key` was logged, update the Lambda Test Event to include it: `{"etl_step": "storage", "last_evaluated_key": <value>}` and re-run
 4. Repeat until all items are processe. (`SUCCESS` appears in the output)
 
 **Note: Since the ids of the items are preserved in this ETL process, re-running the process will not cause any harm.**

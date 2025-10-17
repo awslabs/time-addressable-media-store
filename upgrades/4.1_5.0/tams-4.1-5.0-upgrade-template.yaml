@@ -161,7 +161,7 @@ Resources:
             print("SUCCESS - WebHooks ETL process completed successfully.")
 
 
-        def storage_etl(context, last_evaluated_key=None):
+        def storage_etl(context, last_evaluated_key):
             args = {}
             if last_evaluated_key:
                 args["ExclusiveStartKey"] = last_evaluated_key
@@ -224,10 +224,11 @@ Resources:
 
         def lambda_handler(event, context):
             etl_step = event["etl_step"]
+            last_evaluated_key = event.get("last_evaluated_key")
             match etl_step:
                 case "webhooks":
                     webhooks_etl()
                 case "storage":
-                    storage_etl(context)
+                    storage_etl(context, last_evaluated_key)
                 case "tags":
                     tags_etl(context)
