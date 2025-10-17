@@ -1,0 +1,234 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: TAMS API Stack Outputs
+        Parameters:
+          - LambdaSecurityGroup
+          - LambdaSubnetIds
+          - NeptuneClusterResourceId
+          - NeptuneEndpoint
+          - UtilsLayerArn
+      - Label:
+          default: Other
+        Parameters:
+          - WebhooksTableName
+          - OldStorageTableName
+          - NewStorageTableName
+    ParameterLabels:
+      LambdaSecurityGroup:
+        default: The LambdaSecurityGroup Output from the TAMS API CloudFormation Stack
+      LambdaSubnetIds:
+        default: The LambdaSubnetIds Output from the TAMS API CloudFormation Stack
+      NeptuneClusterResourceId:
+        default: The NeptuneClusterResourceId Output from the TAMS API CloudFormation Stack
+      NeptuneEndpoint:
+        default: The NeptuneEndpoint Output from the TAMS API CloudFormation Stack
+      UtilsLayerArn:
+        default: The UtilsLayerArn Output from the TAMS API CloudFormation Stack
+      WebhooksTableName:
+        default: The name of the DynamoDB table for Webhooks
+      OldStorageTableName:
+        default: The name of the OLD DynamoDB table for FlowStorage. The Old Table has the flow_id as the sort key
+      NewStorageTableName:
+        default: The name of the NEW DynamoDB table for FlowStorage. The New Table does not have a sort key
+
+Parameters:
+  LambdaSecurityGroup:
+    Type: String
+
+  LambdaSubnetIds:
+    Type: CommaDelimitedList
+
+  NeptuneClusterResourceId:
+    Type: String
+
+  NeptuneEndpoint:
+    Type: String
+
+  UtilsLayerArn:
+    Type: String
+
+  WebhooksTableName:
+    Type: String
+
+  OldStorageTableName:
+    Type: String
+
+  NewStorageTableName:
+    Type: String
+
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc defined in Globals section
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      Timeout: 900
+      MemorySize: 10240
+      Handler: index.lambda_handler
+      Runtime: python3.13
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: INFO
+          WEBHOOKS_TABLE: !Ref WebhooksTableName
+          OLD_STORAGE_TABLE: !Ref OldStorageTableName
+          NEW_STORAGE_TABLE: !Ref NewStorageTableName
+          NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Ref UtilsLayerArn
+      VpcConfig:
+        SubnetIds: !Ref LambdaSubnetIds
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+              Resource:
+                - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${WebhooksTableName}
+                - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${OldStorageTableName}
+            - Effect: Allow
+              Action:
+                - dynamodb:BatchWriteItem
+              Resource:
+                - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${NewStorageTableName}
+            - Effect: Allow
+              Action:
+                - neptune-db:ReadDataViaQuery
+                - neptune-db:WriteDataViaQuery
+                - neptune-db:DeleteDataViaQuery
+              Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneClusterResourceId}/*
+              Condition:
+                StringEquals:
+                  neptune-db:QueryLanguage: OpenCypher
+      InlineCode: |
+        import os
+        import uuid
+        import boto3
+        from neptune import execute_open_cypher_query, merge_webhook
+
+        # pylint: disable=no-member
+        import constants
+
+        dynamodb = boto3.resource("dynamodb")
+        webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
+        old_storage_table = dynamodb.Table(os.environ["OLD_STORAGE_TABLE"])
+        new_storage_table = dynamodb.Table(os.environ["NEW_STORAGE_TABLE"])
+
+
+        def transform_storage_item(item):
+            storage_ids = item.pop("storage_ids")
+            return {**item, "storage_id": storage_ids[0]}
+
+
+        def webhooks_etl():
+            # Need to scan all items into memory so that we can then group them correctly for the amended structure used in Neptune
+            scan = webhooks_table.scan()
+            items = scan["Items"]
+            print(f"Read {len(items)} records from the DynamoDB Table...")
+            while "LastEvaluatedKey" in scan:
+                scan = webhooks_table.scan(ExclusiveStartKey=scan["LastEvaluatedKey"])
+                items.extend(scan["Items"])
+                print(f'Read a further {len(scan["Items"])} records from the DynamoDB Table...')
+            webhooks_dict = {}
+            print(f"A total of {len(items)} records read from the DynamoDB Table...")
+            for item in items:
+                event = item.pop("event")
+                if item["url"] in webhooks_dict:
+                    webhooks_dict[item["url"]]["events"].append(event)
+                else:
+                    webhooks_dict[item["url"]] = {**item, "events": [event]}
+            for webhook_dict in webhooks_dict.values():
+                webhook_dict["id"] = str(uuid.uuid4())
+                webhook_dict["status"] = "created"
+                merge_webhook(webhook_dict, None)
+            print(f"Wrote {len(webhooks_dict)} Webhooks to the Neptune database.")
+            print("SUCCESS - WebHooks ETL process completed successfully.")
+
+
+        def storage_etl(context, last_evaluated_key):
+            args = {}
+            if last_evaluated_key:
+                args["ExclusiveStartKey"] = last_evaluated_key
+                print(
+                    "LastEvaluatedKey supplied, resuming from previous scan of the OLD DynamoDB table..."
+                )
+            else:
+                print(
+                    "No LastEvaluatedKey supplied, starting a fresh scan of the OLD DynamoDB table..."
+                )
+            with new_storage_table.batch_writer() as batch:
+                scan = old_storage_table.scan(**args)
+                print(f'Read {len(scan["Items"])} records from the OLD DynamoDB Table...')
+                for item in scan["Items"]:
+                    batch.put_item(Item=transform_storage_item(item))
+                print(f'Wrote {len(scan["Items"])} new records to the NEW DynamoDB Table...')
+                while (
+                    "LastEvaluatedKey" in scan
+                    and context.get_remaining_time_in_millis() > constants.LAMBDA_TIME_REMAINING
+                ):
+                    args["ExclusiveStartKey"] = scan["LastEvaluatedKey"]
+                    scan = old_storage_table.scan(**args)
+                    print(f'Read {len(scan["Items"])} records from the OLD DynamoDB Table...')
+                    for item in scan["Items"]:
+                        batch.put_item(Item=transform_storage_item(item))
+                    print(
+                        f'Wrote {len(scan["Items"])} new records to the NEW DynamoDB Table...'
+                    )
+                if "LastEvaluatedKey" in scan:
+                    print(
+                        "PARTIAL - Lambda timed out before all items were processed, restart the ETL using the following last_evaluated_key value..."
+                    )
+                    print("last_evaluated_key: ", scan["LastEvaluatedKey"])
+                else:
+                    print("SUCCESS - Storage ETL process completed successfully.")
+
+
+        def tags_etl(context):
+            query = "MATCH (n:tags) WITH n, [prop IN keys(n) WHERE NOT (n[prop] STARTS WITH '\"' OR n[prop] STARTS WITH '[')] AS valid_props WHERE size(valid_props) > 0 RETURN n.`~id` AS node_id, valid_props"
+            results = execute_open_cypher_query(query)
+            print(
+                f'Read {len(results["results"])} non-serialised tag values from the Neptune database...'
+            )
+            for result in results["results"]:
+                if context.get_remaining_time_in_millis() <= constants.LAMBDA_TIME_REMAINING:
+                    print(
+                        "PARTIAL - Lambda timed out before all items were processed, re-run the tags_etl to continue"
+                    )
+                    return
+                set_clauses = ", ".join(
+                    [f"n.`{prop}` = '\"' + n.`{prop}` + '\"'" for prop in result["valid_props"]]
+                )
+                set_query = f'MATCH (n:tags {{`~id`: "{result["node_id"]}"}}) SET {set_clauses} RETURN n'
+                execute_open_cypher_query(set_query)
+            print(
+                f'Updated {len(results["results"])} serialised tag values in the Neptune database...'
+            )
+            print("SUCCESS - Tags ETL process completed successfully.")
+
+
+        def lambda_handler(event, context):
+            etl_step = event["etl_step"]
+            last_evaluated_key = event.get("last_evaluated_key")
+            match etl_step:
+                case "webhooks":
+                    webhooks_etl()
+                case "storage":
+                    storage_etl(context, last_evaluated_key)
+                case "tags":
+                    tags_etl(context)
