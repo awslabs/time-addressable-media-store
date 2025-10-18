@@ -20,10 +20,10 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
 )
 from botocore.config import Config
 from botocore.exceptions import ClientError
-from mediatimestamp.immutable import TimeRange
+from mediatimestamp.immutable import TimeRange, Timestamp
 from params import essence_params
 from pydantic import BaseModel
-from schema import FailedSegment
+from schema import FailedSegment, Flowsegmentpost
 
 tracer = Tracer()
 
@@ -410,6 +410,7 @@ def validate_frame_rate(video_essence_parameters: dict) -> None:
         )  # 400
 
 
+@tracer.capture_method(capture_response=False)
 def get_unique_get_urls(items: list[dict]) -> list[dict]:
     """Extract unique GET URLs from a list of items containing get_urls arrays."""
     seen = set()
@@ -421,3 +422,21 @@ def get_unique_get_urls(items: list[dict]) -> list[dict]:
                 seen.add(key)
                 unique_get_urls.append(get_url)
     return unique_get_urls
+
+
+@tracer.capture_method(capture_response=False)
+def calculate_object_timerange(segment: Flowsegmentpost) -> str:
+    """Calculate object_timerange from segment fields"""
+    if segment.object_timerange:
+        return segment.object_timerange.root
+    if segment.ts_offset:
+        offset = Timestamp.from_str(segment.ts_offset.root)
+        timerange = TimeRange.from_str(segment.timerange.root)
+        return str(
+            TimeRange(
+                timerange.start - offset,
+                timerange.end - offset,
+                timerange.inclusivity,
+            )
+        )
+    return segment.timerange.root

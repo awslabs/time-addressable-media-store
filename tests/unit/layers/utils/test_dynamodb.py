@@ -470,10 +470,10 @@ class TestDynamoDB:
         return_item = {}
         mock_storage_table.get_item.return_value = return_item
 
-        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
+        result = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
-        assert not result
+        assert not result["valid"]
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_matched_flow_id_expire_present(
@@ -485,10 +485,10 @@ class TestDynamoDB:
         return_item = {"Item": {"id": "abc", "flow_id": "123", "expire_at": 12345}}
         mock_storage_table.get_item.return_value = return_item
 
-        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
+        result = dynamodb.validate_object_id(segment, flow_id)
 
         assert 1 == mock_storage_table.update_item.call_count
-        assert result
+        assert result["valid"]
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_matched_flow_id_expire_not_present(
@@ -500,10 +500,10 @@ class TestDynamoDB:
         return_item = {"Item": {"id": "abc", "flow_id": "123"}}
         mock_storage_table.get_item.return_value = return_item
 
-        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
+        result = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
-        assert result
+        assert result["valid"]
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_not_matched_flow_id_expire_present(
@@ -515,10 +515,10 @@ class TestDynamoDB:
         return_item = {"Item": {"id": "abc", "flow_id": "123", "expire_at": 12345}}
         mock_storage_table.get_item.return_value = return_item
 
-        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
+        result = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
-        assert not result
+        assert not result["valid"]
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_not_matched_flow_id_expire_not_present(
@@ -530,10 +530,10 @@ class TestDynamoDB:
         return_item = {"Item": {"id": "abc", "flow_id": "123"}}
         mock_storage_table.get_item.return_value = return_item
 
-        result, _, _ = dynamodb.validate_object_id(segment, flow_id)
+        result = dynamodb.validate_object_id(segment, flow_id)
 
         assert 0 == mock_storage_table.update_item.call_count
-        assert result
+        assert result["valid"]
 
     @patch("dynamodb.segments_table")
     @patch("dynamodb.storage_table")

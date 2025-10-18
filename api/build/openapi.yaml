@@ -1776,6 +1776,13 @@ paths:
           Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
         schema:
           type: boolean
+      - name: include_object_timerange
+        in: query
+        description: |
+          If set to `true`, the underlying object's timerange should appear in the response (if it differs from the segment timerange).
+          Assume `false` if omitted.
+        schema:
+          type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1824,9 +1831,9 @@ paths:
         The examples provided here are for the "http_object_store" Storage Backend type which MUST include a `get_urls` property that contains the HTTP URLs for downloading the Media Object - service implementations should generate this internally.
 
         The Flow Segment may include timing adjustment information that the client needs to apply when extracting the samples from the Media Object.
-        It may also use a subset of the samples in the Media Object.
-        - The timestamp of a sample on the Flow Segment's timeline (`segment_ts`) is the timestamp of that sample embedded in or derived from the internal timing of the Media Object (`media_object_ts`) adjusted by `ts_offset`: `segment_ts = media_object_ts + ts_offset`.
-        - In addition, the Segment's `timerange` start MUST be at `sample_offset` samples from the start of the presentation timeline of the Media Object, and `timerange` end MUST be at `sample_offset + sample_count` samples.
+        The timestamp of a sample on the Flow Segment's timeline (`segment_ts`) is the timestamp of that sample embedded in or derived from the internal timing of the Media Object (`media_object_ts`) adjusted by `ts_offset`: `segment_ts = media_object_ts + ts_offset`.
+
+        It may also use a subset of the samples in the Media Object, and if the `include_object_timerange=true` parameter is set, the object's timerange will also be returned to aid identifying which samples to skip.
 
         Clients should use the pagination options to limit the results to a timerange and/or count.
         Service implementations may also limit the results returned.
@@ -1896,6 +1903,13 @@ paths:
           Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
         schema:
           type: boolean
+      - name: include_object_timerange
+        in: query
+        description: |
+          If set to `true`, the underlying object's timerange should appear in the response (if it differs from the Flow Segment's `timerange`).
+          Assume `false` if omitted.
+        schema:
+          type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1940,9 +1954,9 @@ paths:
                 sample_count:
                   summary: Partial Segment
                   description: |
-                    This example takes part of an existing Segment, offsets it with `ts_offset` and then selects a subset of the samples within using `ts_offset` for the second Segment in the sequence.
+                    This example shows re-use of existing Media Objects
                   value:
-                    $ref: examples/flow-segments-get-200-sample-offset.json
+                    $ref: examples/flow-segments-get-200-object-timerange.json
                 multiple_urls:
                   summary: Multiple URLs
                   description: |
@@ -1963,9 +1977,9 @@ paths:
 
         For newly-written Media Objects, the client is responsible for ensuring that the Segment written to the TAMS service instance obeys the following restrictions:
           - All samples in the Object SHOULD be used by the Segment.
+          - If the Segment does not use all samples in the Object, `object_timerange` MUST be set to the timerange of media in the object, on the Media Object's timeline
           - The timestamps of each sample in the Media Object MUST equal its position on the Flow timeline, OR `ts_offset` MUST be set such that `media_object_ts + ts_offset = segment_ts`
           - The timerange of the Segment MUST NOT overlap any other Segment in the same Flow. The behaviour is undefined if there is an overlap with existing Segments and a service may return a 400 error response.
-          - The `sample_offset` SHOULD be zero.
 
         A service instance SHOULD reject registrations of Flow Segments with a 400 error response if it references a newly created Media Object in the local TAMS storage that was not intended to be used for the Flow.
         A service instance SHOULD accept Flow Segments that reference an existing Media Object in the local TAMS storage that was originally created for another Flow.
@@ -1985,13 +1999,12 @@ paths:
 
         Clients are expected to decide how to break content into Media Objects, however those Objects SHOULD be large enough to avoid excessive round trip overheads in the underlying store (_e.g._ of the order of several megabytes) and where codecs with temporal re-ordering are used, Object SHOULD contain complete GOPs or decodable units.
 
-        For Media Objects that have been re-used from elsewhere, the `sample_offset` and `sample_count` MAY be used to specify part of the Media Object to use:
+        For Media Objects that have been re-used from other Flows, the `timerange` MAY specify only part of the duration of the object:
           - The `timerange` field indicates the new Segment's position in the Flow
-          - The sample associated with the start of the `timerange` MUST be the one selected by `sample_offset`
-          - Likewise, the sample associated with the end of the `timerange` MUST be the one selected by `sample_offset + sample_count - 1`, unless `timerange` has an exclusive end, in which case it will be  `sample_offset + sample_count`.
           - The timerange of the Segment MUST NOT overlap any other Segment in the same Flow.
+          - The Flow Segment's `timerange` start and end, once offset by `ts_offset`, MUST be contained entirely within the Media Object's `timerange`
 
-        When re-using Media Objects, requests which change object properties (e.g. `key_frame_count`) SHOULD be rejected.
+        When re-using Media Objects, requests which change object properties (e.g. `key_frame_count` or `object_timerange`) SHOULD be rejected.
       operationId: POST_flows-flowId-segments
       tags:
       - FlowSegments
@@ -2144,7 +2157,7 @@ paths:
       - name: accept_get_urls
         in: query
         description: |
-          A comma separated list of labels of media object `get_urls` to include in the response.
+          A comma separated list of labels of Media Object `get_urls` to include in the response.
           Omitting `accept_get_urls` will result in no filtering of `get_urls`.
           An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
           Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
@@ -2156,7 +2169,7 @@ paths:
       - name: accept_storage_ids
         in: query
         description: |
-          A comma separated list of `storage_id`s of media object `get_urls` to include in the response.
+          A comma separated list of `storage_id`s of Media Object `get_urls` to include in the response.
           Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
           Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
           A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
@@ -2241,7 +2254,7 @@ paths:
       - name: accept_get_urls
         in: query
         description: |
-          A comma separated list of labels of media object `get_urls` to include in the response.
+          A comma separated list of labels of Media Object `get_urls` to include in the response.
           Omitting `accept_get_urls` will result in no filtering of `get_urls`.
           An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
           Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
@@ -2253,7 +2266,7 @@ paths:
       - name: accept_storage_ids
         in: query
         description: |
-          A comma separated list of `storage_id`s of media object `get_urls` to include in the response.
+          A comma separated list of `storage_id`s of Media Object `get_urls` to include in the response.
           Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
           Media object `get_urls` with no label or storage ID cannot be filtered for; they will only be returned if `accept_get_urls` is omitted, and `accept_storage_ids` is omitted or empty.
           A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
@@ -2311,7 +2324,7 @@ paths:
         '400':
           description: Bad request. Invalid query options.
         '404':
-          description: The requested media object does not exist.
+          description: The requested Media Object does not exist.
   /objects/{objectId}/instances:
     post:
       summary: Register a Media Object instance
@@ -3240,12 +3253,17 @@ components:
           last_duration:
             description: The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative
             $ref: '#/components/schemas/timestamp'
+          object_timerange:
+            description: The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline.
+            $ref: '#/components/schemas/timerange'
           sample_offset:
-            description: The start of the Segment represented as a count of samples from the start of the Media Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set.
+            description: 'The start of the Segment represented as a count of samples from the start of the Media Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set. DEPRECATED: Use object_timerange instead - see AppNote 0036. Service implementations SHOULD continue to store and return it if set.'
             type: integer
+            deprecated: true
           sample_count:
-            description: The count of samples in the Segment (which may be fewer than in the Media Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples
+            description: 'The count of samples in the Segment (which may be fewer than in the Media Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. DEPRECATED: Use object_timerange instead - see AppNote 0036. Service implementations SHOULD continue to store and return it if set.'
             type: integer
+            deprecated: true
       - $ref: '#/components/schemas/objectcore'
     flowsegmentbulkfailure:
       title: Failed Segments
@@ -3289,15 +3307,20 @@ components:
         timerange:
           description: The timerange for the samples contained in the Segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](#/schemas/timerange) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.
           $ref: '#/components/schemas/timerange'
+        object_timerange:
+          description: The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline. If not given at first registration of an Object, defaults to `timerange - ts_offset` on the assumption that the Flow Segment uses the entire Media Object. Clients should not set this when Media Objects are re-used. Service implementations should reject requests where `object_timerange` is set to a value that conflicts with the existing Media Object metadata.
+          $ref: '#/components/schemas/timerange'
         last_duration:
           description: The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](#/schemas/timestamp) type, but cannot be negative
           $ref: '#/components/schemas/timestamp'
         sample_offset:
-          description: The start of the Segment represented as a count of samples from the start of the Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set. Must be set if the Flow Segment doesn't start at the beginning of the Media Object.
+          description: 'The start of the Segment represented as a count of samples from the start of the Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. Assumed to be 0 if not set. Must be set if the Flow Segment doesn''t start at the beginning of the Media Object. DEPRECATED: Use object_timerange instead - see AppNote 0036. Service implementations SHOULD continue to store and return it if set.'
           type: integer
+          deprecated: true
         sample_count:
-          description: The count of samples in the Segment (which may be fewer than in the Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Must be set if the Flow Segment doesn't use the entire Media Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples
+          description: 'The count of samples in the Segment (which may be fewer than in the Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Must be set if the Flow Segment doesn''t use the entire Media Object. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. DEPRECATED: Use object_timerange instead - see AppNote 0036. Service implementations SHOULD continue to store and return it if set.'
           type: integer
+          deprecated: true
         get_urls:
           description: A list of URLs to which a GET request can be made to directly retrieve the contents of the Media Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat them as identical, however service instances may sort the list such that the preferred URL is first. `get_urls` should only be used to add uncontrolled URLs. URLs for the provided object_id controlled by the service instance will be populated automatically by the service instance.
           type: array
@@ -3305,6 +3328,7 @@ components:
             type: object
             required:
             - url
+            - label
             properties:
               url:
                 description: A URL to which a GET request can be made to directly retrieve the contents of the Media Object. Clients should include credentials if the provide URL is on the same origin as the API endpoint
@@ -3568,11 +3592,13 @@ components:
       pattern: ^(application|audio|font|example|image|message|model|multipart|text|video|x-(?:[0-9A-Za-z!#$%&'*+.^_`|~-]+))/([0-9A-Za-z!#$%&'*+.^_`|~-]+)$
     object:
       title: Object
+      unevaluatedProperties: false
       allOf:
       - type: object
         required:
         - id
         - referenced_by_flows
+        - timerange
         properties:
           id:
             description: The Media Object identifier.
@@ -3585,6 +3611,9 @@ components:
           first_referenced_by_flow:
             description: The first Flow that had a Flow Segment reference the Media Object in this store instance. This Flow is also present in 'referenced_by_flows' if it is still referenced by the Flow. This property is optional and may in some implementations become unset if the Flow no longer references the media object, e.g. because it was deleted.
             $ref: '#/components/schemas/uuid'
+          timerange:
+            description: The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline.
+            $ref: '#/components/schemas/timerange'
       - $ref: '#/components/schemas/objectcore'
     objectcore:
       type: object
@@ -3640,6 +3669,7 @@ components:
         type: object
         required:
         - url
+        - label
         properties:
           url:
             description: A URL to which a GET request can be made to directly retrieve the contents of the media object. Clients should include credentials if the provide URL is on the same origin as the API endpoint
