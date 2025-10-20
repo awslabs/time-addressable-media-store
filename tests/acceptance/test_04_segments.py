@@ -1147,6 +1147,28 @@ def test_List_Flow_Segments_GET_200_timerange(api_client_cognito, stub_video_flo
     assert 2 == len(response.json())
 
 
+def test_List_Flow_Segments_GET_200_include_object_timerange(
+    api_client_cognito, stub_multi_flow
+):
+    """List segment including object_timerange"""
+    # Arrange
+    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"timerange": "[-60:0_-30:0)", "include_object_timerange": "true"},
+    )
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response.json())
+    assert "object_timerange" in response.json()[0]
+    assert "[5:0_6:0)" == response.json()[0]["object_timerange"]
+
+
 def test_List_Flow_Segments_GET_400(api_client_cognito, stub_video_flow):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -1622,6 +1644,7 @@ def test_Get_Media_Object_Information_GET_200(
     assert object_id == response_json["id"]
     assert 2 == len(response_json["referenced_by_flows"])
     assert stub_video_flow["id"] == response_json["first_referenced_by_flow"]
+    assert "timerange" in response_json
 
 
 def test_Get_Media_Object_Information_GET_200_limit(api_client_cognito, media_objects):
