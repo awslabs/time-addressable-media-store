@@ -298,7 +298,7 @@ class GetUrl(BaseModel):
     )
     label: str = Field(
         ...,
-        description="Label identifying this URL. Service implementations should reject any requests using labels that are already associated with Storage Backends. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.",
+        description="Label identifying this URL. Service implementations should reject any requests using labels that are already associated with Storage Backends. Service implementations should reject any requests containing multiple `get_urls` with the same `label`.",
     )
 
 
@@ -520,7 +520,7 @@ class Objectsinstancespost2(BaseModel):
     )
     label: str = Field(
         ...,
-        description="Label identifying this Media Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends. If the 'label' is not set then this instance can't be filtered for using the 'accept_get_urls' API query parameter.",
+        description="Label identifying this Media Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends.",
     )
 
 
