@@ -359,17 +359,13 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
             ExpressionAttributeValues={":timerange": object_timerange},
         )
         stored_timerange = object_timerange
-    # Validate object_timerange matches stored value for reuse
-    if (
-        not is_first_time_use
-        and segment.object_timerange
-        and segment.object_timerange != storage_item["timerange"]
-    ):
+    # object_timerange must not be specified on object re-use
+    if not is_first_time_use and segment.object_timerange:
         return {
             "valid": False,
             "storage_id": None,
             "object_timerange": None,
-            "message": "Bad request. The object_timerange does not match the stored timerange for this object_id.",
+            "message": "Bad request. The object_timerange should not be specified when Media Objects as re-used.",
         }
     # Valid: either flow_id matches or object_id is reusable
     return {
