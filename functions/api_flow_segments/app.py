@@ -93,6 +93,9 @@ def get_flow_segments_by_id(
     param_presigned: Annotated[Optional[bool], Query(alias="presigned")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
+    param_include_object_timerange: Annotated[
+        Optional[bool], Query(alias="include_object_timerange")
+    ] = None,
 ):
     try:
         Uuid(root=flow_id)
@@ -152,6 +155,10 @@ def get_flow_segments_by_id(
             body=None,
             headers=custom_headers,
         )
+    # Remove object_timerange from items if not requested
+    if not param_include_object_timerange:
+        for item in items:
+            item.pop("object_timerange", None)
     populate_get_urls(
         items,
         param_accept_get_urls,
@@ -301,14 +308,12 @@ def check_overlapping_segments(flow_id, segment_timerange):
 def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
-    valid_object_id, storage_id, validation_message = validate_object_id(
-        flow_segment, flow["id"]
-    )
-    if not valid_object_id:
+    validation = validate_object_id(flow_segment, flow["id"])
+    if not validation["valid"]:
         return generate_failed_segment(
             flow_segment.object_id,
             item_dict["timerange"],
-            validation_message,
+            validation["message"],
         )
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
@@ -323,8 +328,13 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     item_dict["timerange_end"] = segment_timerange.end.to_nanosec() - (
         0 if segment_timerange.includes_end() else 1
     )
-    if storage_id:
-        item_dict["storage_ids"] = [storage_id]
+    if validation["storage_id"]:
+        item_dict["storage_ids"] = [validation["storage_id"]]
+    if (
+        validation["object_timerange"]
+        and validation["object_timerange"] != item_dict["timerange"]
+    ):
+        item_dict["object_timerange"] = validation["object_timerange"]
     segments_table.put_item(
         Item={**item_dict, "flow_id": flow["id"]}, ReturnValues="ALL_OLD"
     )

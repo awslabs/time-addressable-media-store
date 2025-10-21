@@ -102,7 +102,7 @@ def get_objects_by_id(
             headers=custom_headers,
         )
     get_item = storage_table.get_item(
-        Key={"id": object_id}, ProjectionExpression="flow_id"
+        Key={"id": object_id}, ProjectionExpression="flow_id, timerange"
     )
     combined_item = {
         "object_id": object_id,
@@ -123,6 +123,9 @@ def get_objects_by_id(
             "id": object_id,
             "referenced_by_flows": set([item["flow_id"] for item in items]),
             "first_referenced_by_flow": get_item.get("Item", {}).get("flow_id"),
+            "timerange": get_item.get("Item", {}).get("timerange")
+            or items[0].get("object_timerange")
+            or items[0]["timerange"],
             "get_urls": combined_item.get("get_urls"),
             "key_frame_count": next(
                 (

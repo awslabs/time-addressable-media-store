@@ -22,7 +22,13 @@ from neptune import (
     update_flow_segments_updated,
 )
 from schema import Flowsegmentpost
-from utils import pop_outliers, publish_event, put_message, put_message_batches
+from utils import (
+    calculate_object_timerange,
+    pop_outliers,
+    publish_event,
+    put_message,
+    put_message_batches,
+)
 
 tracer = Tracer()
 
@@ -286,56 +292,88 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 
 
 @tracer.capture_method(capture_response=False)
-def validate_object_id(
-    segment: Flowsegmentpost, flow_id: str
-) -> tuple[bool, str | None, str | None]:
-    """Validate object_id can be used with flow_id, returning (is_valid, storage_id, error_message) and removing expire_at on first use"""
-
+def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
+    """Validate object_id can be used with flow_id, returning (valid, storage_id, object_timerange, message)"""
     get_item = storage_table.get_item(Key={"id": segment.object_id})
     storage_item = get_item.get("Item")
-    if storage_item is None and not segment.get_urls:
-        # No matching object_id found and no get_urls supplied so must be invalid
-        return (
-            False,
-            None,
-            "Bad request. The object id does not exist and no get_urls supplied.",
-        )
-    if segment.get_urls:
+    # Handle case where object_id doesn't exist
+    if storage_item is None:
+        if not segment.get_urls:
+            # No matching object_id and no get_urls supplied so invalid
+            return {
+                "valid": False,
+                "storage_id": None,
+                "object_timerange": None,
+                "message": "Bad request. The object id does not exist and no get_urls supplied.",
+            }
         labels = [get_url.label for get_url in segment.get_urls]
+        # get_urls supplied with duplicate labels
         if len(labels) != len(set(labels)):
-            return (
-                False,
-                None,
-                "Bad request. All label value in get_urls must be unique.",
-            )
-    if storage_item is None and segment.get_urls:
-        # No matching object_id found but get_urls supplied so this is valid
-        return True, None, None
-    if storage_item and segment.get_urls:
-        # Matching object_id found get_urls supplied which is not a valid use case
-        return (
-            False,
-            None,
-            "Bad request. A new object id is required when supplying get_urls.",
+            return {
+                "valid": False,
+                "storage_id": None,
+                "object_timerange": None,
+                "message": "Bad request. All label value in get_urls must be unique.",
+            }
+        # Add item to dynamodb so that the "first_reference_by" field in the objects endpoint reports correctly
+        object_timerange = calculate_object_timerange(segment)
+        storage_table.put_item(
+            Item={
+                "id": segment.object_id,
+                "flow_id": flow_id,
+                "timerange": object_timerange,
+            }
         )
-    if storage_item["flow_id"] == flow_id:
-        if storage_item.get("expire_at"):
-            # expire_at exists so this is first time use and needs updating to prevent TTL deletion
-            storage_table.update_item(
-                Key={"id": segment.object_id},
-                UpdateExpression="REMOVE expire_at",
-            )
-        # flow_id matches so is a valid object_id
-        return True, storage_item.get("storage_id"), None
-    if storage_item.get("expire_at") is None:
-        # object_id already used therefore can be re-used by any flow_id
-        return True, storage_item.get("storage_id"), None
+        # No matching object_id and get_urls supplied so this is valid
+        return {
+            "valid": True,
+            "storage_id": None,
+            "object_timerange": object_timerange,
+            "message": None,
+        }
+    # object_id exists - get_urls not allowed when called from segments endpoint
+    if segment.get_urls:
+        return {
+            "valid": False,
+            "storage_id": None,
+            "object_timerange": None,
+            "message": "Bad request. An unused object id is required when supplying get_urls.",
+        }
+    is_first_time_use = storage_item.get("expire_at") is not None
+    flow_id_matches = storage_item["flow_id"] == flow_id
+    stored_timerange = storage_item.get("timerange")
     # First time use object_id must be used on flow_id it was created with
-    return (
-        False,
-        None,
-        "Bad request. The object id is not valid to be used for the flow id supplied.",
-    )
+    if is_first_time_use and not flow_id_matches:
+        return {
+            "valid": False,
+            "storage_id": None,
+            "object_timerange": None,
+            "message": "Bad request. The object id is not valid to be used for the flow id supplied.",
+        }
+    # Remove expiration on first use with matching flow_id
+    if is_first_time_use and flow_id_matches:
+        object_timerange = calculate_object_timerange(segment)
+        storage_table.update_item(
+            Key={"id": segment.object_id},
+            UpdateExpression="REMOVE expire_at SET timerange = :timerange",
+            ExpressionAttributeValues={":timerange": object_timerange},
+        )
+        stored_timerange = object_timerange
+    # object_timerange must not be specified on object re-use
+    if not is_first_time_use and segment.object_timerange:
+        return {
+            "valid": False,
+            "storage_id": None,
+            "object_timerange": None,
+            "message": "Bad request. The object_timerange should not be specified when Media Objects are re-used.",
+        }
+    # Valid: either flow_id matches or object_id is reusable
+    return {
+        "valid": True,
+        "storage_id": storage_item.get("storage_id"),
+        "object_timerange": stored_timerange,
+        "message": None,
+    }
 
 
 @tracer.capture_method(capture_response=False)
