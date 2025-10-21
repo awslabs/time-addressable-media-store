@@ -365,7 +365,7 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
             "valid": False,
             "storage_id": None,
             "object_timerange": None,
-            "message": "Bad request. The object_timerange should not be specified when Media Objects as re-used.",
+            "message": "Bad request. The object_timerange should not be specified when Media Objects are re-used.",
         }
     # Valid: either flow_id matches or object_id is reusable
     return {
