@@ -124,7 +124,7 @@ def get_flow_segments_by_id(
     while "LastEvaluatedKey" in query and len(items) < args["Limit"]:
         args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
         query = segments_table.query(**args)
-        items.extend(query["Items"])
+        items.extend(query["Items"][: args["Limit"] - len(items)])
     match len(items):
         case 0:
             custom_headers["X-Paging-Timerange"] = "()"
@@ -137,12 +137,13 @@ def get_flow_segments_by_id(
                 )
             )
     if "LastEvaluatedKey" in query:
-        custom_headers["X-Paging-NextKey"] = str(
-            query["LastEvaluatedKey"]["timerange_end"]
+        next_key = (
+            items[-1]["timerange_end"]
+            if items
+            else query["LastEvaluatedKey"]["timerange_end"]
         )
-        custom_headers["Link"] = generate_link_url(
-            app.current_event, str(query["LastEvaluatedKey"]["timerange_end"])
-        )
+        custom_headers["X-Paging-NextKey"] = str(next_key)
+        custom_headers["Link"] = generate_link_url(app.current_event, str(next_key))
     # Set Paging Limit header if paging limit being used is not the one specified
     if "LastEvaluatedKey" in query or param_limit != args["Limit"]:
         custom_headers["X-Paging-Limit"] = str(args["Limit"])
