@@ -122,14 +122,12 @@ Resources:
         import boto3
         from neptune import execute_open_cypher_query, merge_webhook
 
-        # pylint: disable=no-member
-        import constants
+        LAMBDA_TIME_REMAINING = 15000
 
         dynamodb = boto3.resource("dynamodb")
         webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
         old_storage_table = dynamodb.Table(os.environ["OLD_STORAGE_TABLE"])
         new_storage_table = dynamodb.Table(os.environ["NEW_STORAGE_TABLE"])
-
 
         def transform_storage_item(item):
             storage_ids = item.pop("storage_ids")
@@ -180,7 +178,7 @@ Resources:
                 print(f'Wrote {len(scan["Items"])} new records to the NEW DynamoDB Table...')
                 while (
                     "LastEvaluatedKey" in scan
-                    and context.get_remaining_time_in_millis() > constants.LAMBDA_TIME_REMAINING
+                    and context.get_remaining_time_in_millis() > LAMBDA_TIME_REMAINING
                 ):
                     args["ExclusiveStartKey"] = scan["LastEvaluatedKey"]
                     scan = old_storage_table.scan(**args)
@@ -206,7 +204,7 @@ Resources:
                 f'Read {len(results["results"])} non-serialised tag values from the Neptune database...'
             )
             for result in results["results"]:
-                if context.get_remaining_time_in_millis() <= constants.LAMBDA_TIME_REMAINING:
+                if context.get_remaining_time_in_millis() <= LAMBDA_TIME_REMAINING:
                     print(
                         "PARTIAL - Lambda timed out before all items were processed, re-run the tags_etl to continue"
                     )
