@@ -72,7 +72,7 @@ The Lambda function contains three separate ETL processes. Each must be run indi
 3. If processing is incomplete, re-run the function (it will continue processing remaining items)
 4. Repeat until all items are processed. (`SUCCESS` appears in the output)
 
-**Note: Since this ETL process updates the items in place and the query filters to only items than need processing re-running the process will not cause any harm.**
+**Note: Since this ETL process updates the items in place, and the query filters to only items that need processing, re-running the process will not cause any harm.**
 
 ## Verification
 
