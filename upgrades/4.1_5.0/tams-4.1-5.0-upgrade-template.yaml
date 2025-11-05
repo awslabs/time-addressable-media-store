@@ -118,6 +118,7 @@ Resources:
                   neptune-db:QueryLanguage: OpenCypher
       InlineCode: |
         import os
+        import json
         import uuid
         import boto3
         from neptune import execute_open_cypher_query, merge_webhook
@@ -128,6 +129,7 @@ Resources:
         webhooks_table = dynamodb.Table(os.environ["WEBHOOKS_TABLE"])
         old_storage_table = dynamodb.Table(os.environ["OLD_STORAGE_TABLE"])
         new_storage_table = dynamodb.Table(os.environ["NEW_STORAGE_TABLE"])
+
 
         def transform_storage_item(item):
             storage_ids = item.pop("storage_ids")
@@ -198,7 +200,7 @@ Resources:
 
 
         def tags_etl(context):
-            query = "MATCH (n:tags) WITH n, [prop IN keys(n) WHERE NOT (n[prop] STARTS WITH '\"' OR n[prop] STARTS WITH '[')] AS valid_props WHERE size(valid_props) > 0 RETURN n.`~id` AS node_id, valid_props"
+            query = "MATCH (n:tags) WITH n, [prop IN keys(n) WHERE NOT (n[prop] STARTS WITH '\"' OR n[prop] STARTS WITH '[')] AS valid_props WHERE size(valid_props) > 0 RETURN n.`~id` AS node_id, valid_props, properties(n) AS props"
             results = execute_open_cypher_query(query)
             print(
                 f'Read {len(results["results"])} non-serialised tag values from the Neptune database...'
@@ -210,7 +212,10 @@ Resources:
                     )
                     return
                 set_clauses = ", ".join(
-                    [f"n.`{prop}` = '\"' + n.`{prop}` + '\"'" for prop in result["valid_props"]]
+                    [
+                        f"n.`{prop}` = {json.dumps(json.dumps(result['props'][prop]))}"
+                        for prop in result["valid_props"]
+                    ]
                 )
                 set_query = f'MATCH (n:tags {{`~id`: "{result["node_id"]}"}}) SET {set_clauses} RETURN n'
                 execute_open_cypher_query(set_query)
