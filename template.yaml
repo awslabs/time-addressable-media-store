@@ -175,6 +175,8 @@ Resources:
           - id: W78
             reason: Backup not required
     Properties:
+      SSESpecification:
+        SSEEnabled: True
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: record_type
@@ -199,6 +201,8 @@ Resources:
           - id: W78
             reason: Backup not required
     Properties:
+      SSESpecification:
+        SSEEnabled: True
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: flow_id
@@ -234,6 +238,8 @@ Resources:
           - id: W78
             reason: Backup not required
     Properties:
+      SSESpecification:
+        SSEEnabled: True
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: id
@@ -270,6 +276,11 @@ Resources:
           - BucketKeyEnabled: False
             ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
 
   CrStorageBackendFunction:
     Type: AWS::Serverless::Function
