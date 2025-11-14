@@ -61,6 +61,14 @@ Parameters:
     ConstraintDescription: A valid AWS Lambda Function Arn
     AllowedPattern: ^$|arn:aws[a-z-]*:lambda:[a-z0-9-]+:\d{12}:function:[a-zA-Z0-9-_]+$
 
+Rules:
+  AuthParameterValidation:
+    Assertions:
+      - Assert: !Or
+          - !Equals [!Ref JwtIssuerUrl, ""]
+          - !Equals [!Ref LambdaAuthorizerArn, ""]
+        AssertDescription: Only one of JwtIssuerUrl or LambdaAuthorizerArn can be provided, not both.
+
 Mappings:
   Solution:
     Constants:
