@@ -63,7 +63,7 @@ def access_token(stack, session, region):
         "client_id": client_id,
         "client_secret": client_secret,
         "grant_type": "client_credentials",
-        "scope": "tams-api/read tams-api/write tams-api/delete",
+        "scope": "tams-api/admin tams-api/read tams-api/write tams-api/delete",
     }
     resp = requests.post(stack["outputs"]["TokenUrl"], data=form_data, timeout=30)
     resp.raise_for_status()
