@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: TAMS API Cognito Stack
+
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref AWS::StackName
+      Schema:
+        - Name: email
+          Required: True
+          Mutable: True
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: True
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Priority: 1
+            Name: verified_email
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Sub
+        - ${AWS::AccountId}-tams-${id}
+        - id: !Select [4, !Split ['-', !Select [2, !Split [/, !Ref 'AWS::StackId']]]]
+
+  UserPoolResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Name: tams-api
+      Identifier: tams-api
+      Scopes:
+        - ScopeName: admin
+          ScopeDescription: Admin access
+        - ScopeName: read
+          ScopeDescription: Read access
+        - ScopeName: write
+          ScopeDescription: Write access
+        - ScopeName: delete
+          ScopeDescription: Delete access
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: server-to-server
+      GenerateSecret: True
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AuthSessionValidity: 3
+      RefreshTokenValidity: 30
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      TokenValidityUnits:
+        RefreshToken: days
+        AccessToken: minutes
+        IdToken: minutes
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthFlowsUserPoolClient: True
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthFlows:
+        - client_credentials
+      AllowedOAuthScopes:
+        - tams-api/admin
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+
+  UserPoolClientWeb:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: web-client
+      GenerateSecret: False
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      AuthSessionValidity: 3
+      RefreshTokenValidity: 30
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      TokenValidityUnits:
+        RefreshToken: days
+        AccessToken: minutes
+        IdToken: minutes
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthFlowsUserPoolClient: True
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - tams-api/admin
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+      CallbackURLs:
+        - https://localhost
+      LogoutURLs:
+        - https://localhost
+
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: tams-api-web-client
+      AllowUnauthenticatedIdentities: False
+      CognitoIdentityProviders:
+        - ClientId: !Ref UserPoolClientWeb
+          ProviderName: !Sub cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+
+  AuthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref IdentityPool
+              ForAnyValue:StringLike:
+                cognito-identity.amazonaws.com:amr: authenticated
+
+  IdentityPoolRoleMap:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt AuthRole.Arn
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+
+  TokenUrl:
+    Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+
+  UserPoolClientWebId:
+    Value: !Ref UserPoolClientWeb
+
+  IdentityPoolId:
+    Value: !Ref IdentityPool
+
+  AuthRoleName:
+    Value: !Ref AuthRole

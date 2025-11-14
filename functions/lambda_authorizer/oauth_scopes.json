@@ -1,0 +1,385 @@
+{
+    "/": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read",
+            "tams-api/write",
+            "tams-api/delete"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read",
+            "tams-api/write",
+            "tams-api/delete"
+        ]
+    },
+    "/service": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read",
+            "tams-api/write",
+            "tams-api/delete"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read",
+            "tams-api/write",
+            "tams-api/delete"
+        ],
+        "POST": [
+            "tams-api/admin"
+        ]
+    },
+    "/service/storage-backends": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read",
+            "tams-api/write",
+            "tams-api/delete"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read",
+            "tams-api/write",
+            "tams-api/delete"
+        ]
+    },
+    "/service/webhooks": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "POST": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/service/webhooks/{webhookId}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/sources": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/sources/{sourceId}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/sources/{sourceId}/tags": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/sources/{sourceId}/tags/{name}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/sources/{sourceId}/description": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/sources/{sourceId}/label": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/flows/{flowId}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/delete"
+        ]
+    },
+    "/flows/{flowId}/tags": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/flows/{flowId}/tags/{name}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/description": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/label": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/read_only": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/flow_collection": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/max_bit_rate": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/avg_bit_rate": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/storage": {
+        "POST": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flows/{flowId}/segments": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "POST": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/delete"
+        ]
+    },
+    "/objects/{objectId}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/objects/{objectId}/instances": {
+        "POST": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
+    "/flow-delete-requests": {
+        "HEAD": [
+            "tams-api/admin"
+        ],
+        "GET": [
+            "tams-api/admin"
+        ]
+    },
+    "/flow-delete-requests/{request-id}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/delete"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/delete"
+        ]
+    }
+}
