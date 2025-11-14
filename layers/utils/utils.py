@@ -47,7 +47,7 @@ def base_delete_request_dict(
         "updated": now,
         "status": "created",
         "flow_id": flow_id,
-        "created_by": request_context.authorizer.raw_event["username"],
+        "created_by": get_username(request_context),
     }
 
 
@@ -89,6 +89,11 @@ def put_message_batches(queue: str, items: list) -> list:
             QueueUrl=queue,
             MessageBody=json.dumps(message),
         )
+
+
+@tracer.capture_method(capture_response=False)
+def get_username(request_context: APIGatewayEventRequestContext) -> str:
+    return request_context.authorizer.raw_event["username"]
 
 
 @tracer.capture_method(capture_response=False)
