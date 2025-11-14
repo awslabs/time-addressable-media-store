@@ -28,7 +28,6 @@ If you are choosing to use an existing VPC then you should ensure that the subne
 | sqs      | Interface     |
 | events   | Interface     |
 | ssm      | Interface     |
-| lambda   | Interface     |
 
 ## Deploy the sample application
 
@@ -54,13 +53,14 @@ The first command will build the source of your application. The second command 
 
 - **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
 - **AWS Region**: The AWS region you want to deploy your app to.
-- **EnableWebhooks**: Specify whether you want the solution deployed with Webhooks.
 - **VpcId**: Specify an existing VPC Id, leave blank to have one created.
 - **VpcAZs**: Specify a comma-separated list of availability zones (for example `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds. Leave blank if VPC being created.
 - **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC. **NOTE: These MUST be *PRIVATE* Subnets. When placed in a Public subnet Lambdas do not receive Public IPs and all network routing will fail. A Public subnet is determined by the default route being to an Internet Gateway.**
 - **NeptuneDBInstanceClass**: Neptune Cluster Instance class, for example `db.serverless` or `db.r7g.large`
 - **NeptuneServerlessConfiguration**: Neptune Serverless Scaling Configuration. Must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1–128.
 - **DeployWaf**: Specify whether you want the solution behind a WAF.
+- **JwtIssuerUrl**: [Optional] The URL for the issuer of the JWT tokens you wish to authenticate with (e.g., your own identity provider). Leave this blank if you wish to deploy Cognito for auth or if providing your own Lambda Authorizer. **Note: Only one of JwtIssuerUrl or LambdaAuthorizerArn can be provided.**
+- **LambdaAuthorizerArn**: [Optional] The ARN of an existing Lambda Authorizer to use for custom authentication logic. Leave blank to use the default Lambda Authorizer (which validates JWT tokens from either Cognito or your specified issuer). **Note: Only one of JwtIssuerUrl or LambdaAuthorizerArn can be provided.**
 - **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
 - **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
 - **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
@@ -71,11 +71,33 @@ You can find your API Gateway Endpoint URL in the output values displayed after 
 
 **Note:** An associated repository [time-addressable-media-store-tools](https://github.com/aws-samples/time-addressable-media-store-tools) is available to be used as a sample to give you a basic Web UI to help visualize your TAMS Store.
 
-Access to the API is controlled by Cognito. The solution comes with an App Client already created for you. If required, you can create others for differing access patterns as required.
+### Authorization
 
-Whether you are using the pre-configured App Client or whether you create your own, you will need to authenticate with the API using an `Authorization` header. The header follows the traditional `Bearer {token}` syntax.
+The API uses a Lambda Authorizer to validate JWT tokens and enforce scope-based authorization. You have three authentication options:
 
-The guide below assumes you are using **Client credentials** [OAuth 2.0 grant](https://docs.aws.amazon.com/cognito/latest/developerguide/federation-endpoints-oauth-grants.html) for "machine-to-machine" access using the pre-configured App Client. It also describes how to generate the access token you will need to place in the header.
+1. **Use the deployed Cognito User Pool** (default when both `JwtIssuerUrl` and `LambdaAuthorizerArn` are left blank)
+   - Cognito User Pool is deployed
+   - A Lambda Authorizer is deployed to validate Cognito-issued JWT tokens
+
+2. **Use your own JWT issuer** (by providing `JwtIssuerUrl` during deployment)
+   - Cognito is NOT deployed
+   - A Lambda Authorizer is deployed to validate JWT tokens from your specified issuer
+   - Useful when you have an existing identity provider that issues JWT tokens
+
+3. **Use your own Lambda Authorizer** (by providing `LambdaAuthorizerArn` during deployment)
+   - Cognito is NOT deployed
+   - No Lambda Authorizer is deployed
+   - You provide your own custom authorization logic
+
+**Note:** Only one of `JwtIssuerUrl` or `LambdaAuthorizerArn` can be provided. If you provide either parameter, Cognito will not be created and Cognito-related outputs will be empty.
+
+#### Using Cognito (Default)
+
+The solution comes with an App Client already created for you. If required, you can create others for differing access patterns as required.
+
+You will need to authenticate with the API using an `Authorization` header. The header follows the traditional `Bearer {token}` syntax.
+
+The guide below assumes you are using **Client credentials** [OAuth 2.0 grant](https://docs.aws.amazon.com/cognito/latest/developerguide/federation-endpoints-oauth-grants.html) for "machine-to-machine" access using the pre-configured App Client.
 
 To request an access token, you will require 4 pieces of information:
 
@@ -87,6 +109,7 @@ To request an access token, you will require 4 pieces of information:
 - **Token URL**: This can be retrieved from the Outputs of the Cloudformation Stack created during deployment.
 
 - **OAuth scope(s)**: Access to API methods is controlled by specific scopes. The options available are:
+  - tams-api/admin - full administrative access to all methods
   - tams-api/read - required for GET and HEAD methods
   - tams-api/write - required for PUT and POST methods
   - tams-api/delete - required for DELETE methods
@@ -101,9 +124,9 @@ curl -X POST -d 'client_id=XXX&client_secret=XXX&grant_type=client_credentials&s
 
 This request will return JSON that will contain the `access_token`. Take the value of this token and create the `Authorization` header. Pass this header on all requests to the API to be authenticated.
 
-Currently Authorization is purely handled by which OAuth scopes are assigned to the App Client within Cognito. Creating a new client with only `tams-api/read` will result in "read only" access to the API.
+Authorization is handled by the Lambda Authorizer which validates the JWT token and checks that the supplied OAuth scopes match the required scopes for the requested API method.
 
-### Addtional Storage
+### Additional Storage
 
 [Version 7](https://github.com/bbc/tams/releases/tag/7.0) of the TAMS API specification introduced new functionality that allows the client to choose between different "storage backends" where available.
 
