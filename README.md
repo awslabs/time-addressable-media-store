@@ -91,6 +91,42 @@ The API uses a Lambda Authorizer to validate JWT tokens and enforce scope-based 
 
 **Note:** Only one of `JwtIssuerUrl` or `LambdaAuthorizerArn` can be provided. If you provide either parameter, Cognito will not be created and Cognito-related outputs will be empty.
 
+#### JWT Token Requirements (When Using Your Own JWT Issuer)
+
+If you provide your own JWT issuer via the `JwtIssuerUrl` parameter, your JWT tokens must include the following claims:
+
+- **iss** (required): The issuer URL, must match the `JwtIssuerUrl` you provided during deployment
+- **scope** (required): Space-separated string of OAuth scopes (for example, "tams-api/read tams-api/write")
+- **sub** (required): Subject identifier, used as a fallback for the username when `username` is not provided
+- **username** (optional): Username of the authenticated user. If not provided, the `sub` claim will be used. This value is recorded in the `created_by` and `updated_by` fields when resources are created or modified
+
+Example JWT payload:
+```json
+{
+  "iss": "https://your-identity-provider.com",
+  "sub": "user-12345",
+  "username": "john.doe@example.com",
+  "scope": "tams-api/read tams-api/write",
+  "exp": 1234567890
+}
+```
+
+#### Custom Lambda Authorizer Requirements
+
+If you provide your own Lambda Authorizer via the `LambdaAuthorizerArn` parameter, your authorizer must return a context object with the following structure:
+
+```json
+{
+  "context": {
+    "scopes": "[\"tams-api/read\", \"tams-api/write\"]",
+    "username": "john.doe@example.com"
+  }
+}
+```
+
+- **scopes** (required): JSON-encoded string containing an array of OAuth scope strings
+- **username** (required): String identifying the user making the request. This value is recorded in the `created_by` and `updated_by` fields when resources are created or modified
+
 #### Using Cognito (Default)
 
 The solution comes with an App Client already created for you. If required, you can create others for differing access patterns as required.
