@@ -68,10 +68,8 @@ from utils import (
     base_delete_request_dict,
     generate_link_url,
     generate_presigned_url,
-    get_username,
     model_dump,
     opencypher_property_name,
-    parse_claims,
     parse_tag_parameters,
     publish_event,
     put_message,
@@ -236,7 +234,7 @@ def put_flow_by_id(
     else:
         flow.root.created = now
     # Set these if not supplied
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     if not flow.root.created_by and not existing_item:
         flow.root.created_by = username
     if not flow.root.updated_by and existing_item:
@@ -352,7 +350,7 @@ def put_flow_tag_value(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type,
         flow_id,
@@ -386,7 +384,7 @@ def delete_flow_tag_value(
         )  # 403
     if tag_name not in item["tags"]:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type,
         flow_id,
@@ -431,7 +429,7 @@ def put_flow_description(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.description": description}
     )
@@ -459,7 +457,7 @@ def delete_flow_description(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.description": None}
     )
@@ -501,7 +499,7 @@ def put_flow_label(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(record_type, flow_id, username, {"flow.label": label})
     publish_event(
         f"{record_type}s/updated",
@@ -527,7 +525,7 @@ def delete_flow_label(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(record_type, flow_id, username, {"flow.label": None})
     publish_event(
         f"{record_type}s/updated",
@@ -574,7 +572,7 @@ def put_flow_flow_collection(
         )  # 403
     if not validate_flow_collection(flow_id, flow_collection):
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_flow_collection(flow_id, username, model_dump(flow_collection))
     publish_event(
         f"{record_type}s/updated",
@@ -600,7 +598,7 @@ def delete_flow_flow_collection(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_flow_collection(flow_id, username, [])
     publish_event(
         f"{record_type}s/updated",
@@ -640,7 +638,7 @@ def put_flow_max_bit_rate(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.max_bit_rate": max_bit_rate}
     )
@@ -668,7 +666,7 @@ def delete_flow_max_bit_rate(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.max_bit_rate": None}
     )
@@ -710,7 +708,7 @@ def put_flow_avg_bit_rate(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.avg_bit_rate": avg_bit_rate}
     )
@@ -738,7 +736,7 @@ def delete_flow_avg_bit_rate(
             403,
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
         )  # 403
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.avg_bit_rate": None}
     )
@@ -773,7 +771,7 @@ def put_flow_read_only(
 ):
     if not check_node_exists(record_type, flow_id):
         raise NotFoundError("The requested flow does not exist.")  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = app.current_event.request_context.authorizer.raw_event["username"]
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.read_only": read_only}
     )

@@ -5,7 +5,6 @@ import urllib.parse
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
-from functools import lru_cache
 from itertools import batched
 
 import boto3
@@ -19,7 +18,6 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
     APIGatewayEventRequestContext,
 )
 from botocore.config import Config
-from botocore.exceptions import ClientError
 from mediatimestamp.immutable import TimeRange, Timestamp
 from params import essence_params
 from pydantic import BaseModel
@@ -35,9 +33,6 @@ s3 = boto3.client(
     config=Config(s3={"addressing_style": "virtual"}),
     # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 )
-idp = boto3.client("cognito-idp")
-user_pool_id = os.environ.get("USER_POOL_ID", "")
-cognito_lambda = os.environ.get("COGNITO_LAMBDA_NAME", "")
 
 
 @tracer.capture_method(capture_response=False)
@@ -52,7 +47,7 @@ def base_delete_request_dict(
         "updated": now,
         "status": "created",
         "flow_id": flow_id,
-        "created_by": get_username(parse_claims(request_context)),
+        "created_by": request_context.authorizer.raw_event["username"],
     }
 
 
@@ -94,50 +89,6 @@ def put_message_batches(queue: str, items: list) -> list:
             QueueUrl=queue,
             MessageBody=json.dumps(message),
         )
-
-
-@tracer.capture_method(capture_response=False)
-def parse_claims(request_context: APIGatewayEventRequestContext) -> tuple[str, str]:
-    """Extract just the username and client_id values from the authorizer claims"""
-    return (
-        request_context.authorizer.claims.get("username", ""),
-        request_context.authorizer.claims.get("client_id", ""),
-    )
-
-
-@lru_cache()
-@tracer.capture_method(capture_response=False)
-def get_user_pool() -> dict:
-    """Retrieve the user pool details"""
-    return idp.describe_user_pool(UserPoolId=user_pool_id)["UserPool"]
-
-
-@lru_cache()
-@tracer.capture_method(capture_response=False)
-def get_username(claims_tuple: tuple[str, str]) -> str:
-    """Dervive a suitable username from the API Gateway request details"""
-    invoke = lmda.invoke(
-        FunctionName=cognito_lambda,
-        InvocationType="RequestResponse",
-        LogType="None",
-        Payload=json.dumps(
-            {
-                "username": claims_tuple[0],
-                "client_id": claims_tuple[1],
-            }
-        ),
-    )
-    if invoke["StatusCode"] != 200:
-        raise ClientError(
-            operation_name="LambdaInvoke",
-            error_response={
-                "Error": {
-                    "Message": invoke["FunctionError"],
-                    "Code": invoke["StatusCode"],
-                }
-            },
-        )
-    return json.loads(invoke["Payload"].read().decode("utf-8"))
 
 
 @tracer.capture_method(capture_response=False)
