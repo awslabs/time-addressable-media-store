@@ -59,7 +59,7 @@ The first command will build the source of your application. The second command 
 - **NeptuneDBInstanceClass**: Neptune Cluster Instance class, for example `db.serverless` or `db.r7g.large`
 - **NeptuneServerlessConfiguration**: Neptune Serverless Scaling Configuration. Must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1–128.
 - **DeployWaf**: Specify whether you want the solution behind a WAF.
-- **JwtIssuerUrl**: [Optional] The URL for the issuer of the JWT tokens you wish to authenticate with (e.g., your own identity provider). Leave this blank if you wish to deploy Cognito for auth or if providing your own Lambda Authorizer. **Note: Only one of JwtIssuerUrl or LambdaAuthorizerArn can be provided.**
+- **JwtIssuerUrl**: [Optional] The URL for the issuer of the JWT tokens you wish to authenticate with (for example, your own identity provider). Leave this blank if you wish to deploy Cognito for auth or if providing your own Lambda Authorizer. **Note: Only one of JwtIssuerUrl or LambdaAuthorizerArn can be provided.**
 - **LambdaAuthorizerArn**: [Optional] The ARN of an existing Lambda Authorizer to use for custom authentication logic. Leave blank to use the default Lambda Authorizer (which validates JWT tokens from either Cognito or your specified issuer). **Note: Only one of JwtIssuerUrl or LambdaAuthorizerArn can be provided.**
 - **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
 - **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
@@ -101,6 +101,7 @@ If you provide your own JWT issuer via the `JwtIssuerUrl` parameter, your JWT to
 - **username** (optional): Username of the authenticated user. If not provided, the `sub` claim will be used. This value is recorded in the `created_by` and `updated_by` fields when resources are created or modified
 
 Example JWT payload:
+
 ```json
 {
   "iss": "https://your-identity-provider.com",
