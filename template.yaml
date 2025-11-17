@@ -127,8 +127,9 @@ Resources:
             reason: ReservedConcurrentExecutions not required
     Properties:
       VpcConfig: !Ref AWS::NoValue
-      Timeout: 10
-      MemorySize: 256
+      AutoPublishAlias: live
+      SnapStart:
+        ApplyOn: PublishedVersions
       CodeUri: functions/lambda_authorizer/
       Layers:
         - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
@@ -198,7 +199,7 @@ Resources:
         DefaultAuthorizer: Authorizer
         Authorizers:
           Authorizer:
-            FunctionArn: !If [CreateLambdaAuthorizer, !GetAtt LambdaAuthorizerFunction.Arn, !Ref LambdaAuthorizerArn]
+            FunctionArn: !If [CreateLambdaAuthorizer, !Ref LambdaAuthorizerFunction.Alias, !Ref LambdaAuthorizerArn]
             FunctionPayloadType: REQUEST
             Identity:
               Headers:

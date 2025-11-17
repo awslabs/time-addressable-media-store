@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import boto3
 import jwt
 import requests
-from aws_lambda_powertools import Logger
+from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.utilities.data_classes import event_source
 from aws_lambda_powertools.utilities.data_classes.api_gateway_authorizer_event import (
     APIGatewayAuthorizerRequestEvent,
@@ -18,6 +18,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from botocore.exceptions import ClientError
 
 logger = Logger()
+metrics = Metrics()
 
 idp = boto3.client("cognito-idp")
 
@@ -26,6 +27,7 @@ idp = boto3.client("cognito-idp")
 _jwks_cache: dict[str, dict] = {}
 _jwks_cache_time: dict[str, float] = {}
 jwks_cache_ttl = int(os.environ.get("JWKS_CACHE_TTL", 86400))
+allowed_issuers = os.environ.get("ALLOWED_ISSUERS", "").split(",")
 
 # Load at module initialization instead of lazy loading
 file_path = os.path.join(os.path.dirname(__file__), "oauth_scopes.json")
@@ -71,7 +73,7 @@ def get_jwks(issuer: str) -> dict:
     return _jwks_cache[issuer]
 
 
-def verify_jwt(token: str, allowed_issuers: list) -> dict:
+def verify_jwt(token: str) -> dict:
     """Verify and decode JWT token"""
     unverified = jwt.decode(token, options={"verify_signature": False})
     issuer = unverified.get("iss")
@@ -102,6 +104,16 @@ def verify_jwt(token: str, allowed_issuers: list) -> dict:
         issuer=issuer,
         options={"verify_aud": False},
     )
+
+
+# Pre-warm JWKS cache for SnapStart
+for allowed_issuer in allowed_issuers:
+    if allowed_issuer.strip():
+        try:
+            get_jwks(allowed_issuer.strip())
+            logger.info(f"Pre-warmed JWKS cache for {allowed_issuer}")
+        except (ValueError, requests.exceptions.RequestException) as e:
+            logger.warning(f"Failed to pre-warm JWKS for {allowed_issuer}: {e}")
 
 
 @cache
@@ -188,6 +200,7 @@ def get_username(claims: dict, issuer: str) -> str:
 
 
 @logger.inject_lambda_context(log_event=True)
+@metrics.log_metrics(capture_cold_start_metric=True)
 # pylint: disable=no-value-for-parameter
 @event_source(data_class=APIGatewayAuthorizerRequestEvent)
 # pylint: disable=unused-argument
@@ -198,10 +211,9 @@ def lambda_handler(event: APIGatewayAuthorizerRequestEvent, context: LambdaConte
         raise PermissionError("Unauthorized")
 
     token = auth_header.removeprefix("Bearer ").removeprefix("bearer ")
-    allowed_issuers = os.environ.get("ALLOWED_ISSUERS", "").split(",")
 
     try:
-        claims = verify_jwt(token, allowed_issuers)
+        claims = verify_jwt(token)
         supplied_scopes = claims.get("scope", "").split() if "scope" in claims else []
         arn = event.parsed_arn
         policy = APIGatewayAuthorizerResponse(

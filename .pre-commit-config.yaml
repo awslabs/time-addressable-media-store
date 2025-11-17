@@ -32,7 +32,7 @@ repos:
 
   # CloudFormation Lint
   - repo: https://github.com/aws-cloudformation/cfn-python-lint
-    rev: v1.19.0
+    rev: v1.40.4
     hooks:
       - id: cfn-python-lint
         name: cfn-lint
