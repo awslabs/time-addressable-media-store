@@ -117,6 +117,31 @@ def api_event_factory():
 
 
 @pytest.fixture
+def auth_event_factory():
+    """
+    Factory fixture to create API Gateway Authorizer events for Lambda function testing.
+
+    Returns:
+        function: A factory function that creates API Gateway Authorizer event dictionaries
+    """
+
+    def _create_event(http_method, resource, path, headers=None):
+        event = {
+            "type": "REQUEST",
+            "methodArn": f"arn:aws:execute-api:eu-west-1:123456789012:abcde12345/Prod/{http_method}{path}",
+            "resource": resource,
+            "path": path,
+            "httpMethod": http_method,
+            "headers": {},
+        }
+        if headers:
+            event["headers"] = headers
+        return event
+
+    return _create_event
+
+
+@pytest.fixture
 def lambda_context():
     """Provides a mock Lambda context object for testing Lambda functions."""
 
