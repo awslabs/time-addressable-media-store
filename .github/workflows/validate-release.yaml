@@ -1,0 +1,43 @@
+name: Validate Release Version
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract tag version
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Extract template version
+        id: template
+        run: |
+          version=$(grep -A 1 "ServiceVersion:" template.yaml | grep -oP '\d+\.\d+\.\d+')
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: compare
+        run: |
+          if [ "${{ steps.tag.outputs.version }}" != "${{ steps.template.outputs.version }}" ]; then
+            echo "ERROR: Tag version (${{ steps.tag.outputs.version }}) does not match template version (${{ steps.template.outputs.version }})"
+            echo "mismatch=true" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          echo "✓ Versions match: ${{ steps.tag.outputs.version }}"
+
+      - name: Delete invalid tag and release
+        if: failure() && steps.compare.outputs.mismatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ${{ github.ref_name }} --yes || true
+          git push --delete origin ${{ github.ref_name }}
+          echo "Deleted invalid tag and release ${{ github.ref_name }}"
