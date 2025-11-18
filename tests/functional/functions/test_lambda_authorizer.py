@@ -1,4 +1,3 @@
-import json
 from unittest.mock import patch
 
 import jwt
@@ -74,7 +73,7 @@ def test_bad_bearer_token(lambda_context, auth_event_factory, lambda_authorizer)
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.decode")
 def test_invalid_issuer(
     mock_decode, lambda_context, auth_event_factory, lambda_authorizer
@@ -91,7 +90,7 @@ def test_invalid_issuer(
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.decode")
 @patch("lambda_authorizer.app.requests.get")
 def test_jwks_fetch_fails(
@@ -112,7 +111,7 @@ def test_jwks_fetch_fails(
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.decode")
 @patch("lambda_authorizer.app.jwt.get_unverified_header")
 @patch("lambda_authorizer.app.get_jwks")
@@ -138,7 +137,7 @@ def test_missing_kid_in_jwks(
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.decode")
 @patch("lambda_authorizer.app.jwt.get_unverified_header")
 @patch("lambda_authorizer.app.get_jwks")
@@ -164,7 +163,7 @@ def test_missing_algorithm_in_header(
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -196,7 +195,7 @@ def test_invalid_signature(
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -230,7 +229,7 @@ def test_expired_token(
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.decode")
 def test_token_missing_issuer(
     mock_decode, lambda_context, auth_event_factory, lambda_authorizer
@@ -247,7 +246,7 @@ def test_token_missing_issuer(
         lambda_authorizer.lambda_handler(event, lambda_context)
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -286,7 +285,7 @@ def test_valid_token_success(
     assert response["policyDocument"]["Statement"][0]["Effect"] == "Allow"
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -320,7 +319,7 @@ def test_deny_when_no_scopes_supplied(
     assert response["policyDocument"]["Statement"][0]["Effect"] == "Deny"
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -354,7 +353,7 @@ def test_deny_when_scopes_dont_match_required(
     assert response["policyDocument"]["Statement"][0]["Effect"] == "Deny"
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -392,9 +391,9 @@ def test_context_includes_username_from_sub(
     assert response["context"]["username"] == "user123"
 
 
-@patch.dict(
-    "os.environ",
-    {"ALLOWED_ISSUERS": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC123"},
+@patch(
+    "lambda_authorizer.app.allowed_issuers",
+    ["https://cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC123"],
 )
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
@@ -447,7 +446,7 @@ def test_context_username_from_cognito_email(
     assert response["context"]["username"] == "user@example.com"
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
