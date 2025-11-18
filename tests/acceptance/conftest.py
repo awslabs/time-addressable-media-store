@@ -55,54 +55,79 @@ def api_endpoint(stack):
 
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def access_token(stack, session, region):
-    user_pool_id = stack["outputs"]["UserPoolId"]
-    client_id = stack["outputs"]["UserPoolClientId"]
-    client_secret = get_client_secret(session, user_pool_id, client_id, region)
-    form_data = {
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "grant_type": "client_credentials",
-        "scope": "tams-api/admin tams-api/read tams-api/write tams-api/delete",
-    }
-    resp = requests.post(stack["outputs"]["TokenUrl"], data=form_data, timeout=30)
-    resp.raise_for_status()
-    token_response = resp.json()
-    return token_response["access_token"]
+def token_factory(stack, session, region):
+    """Create tokens with specific scopes (cached per scope combination)."""
+    cache = {}
+
+    def _get_token(scopes=None):
+        cache_key = tuple(sorted(scopes)) if scopes else None
+        if cache_key in cache:
+            return cache[cache_key]
+
+        user_pool_id = stack["outputs"]["UserPoolId"]
+        client_id = stack["outputs"]["UserPoolClientId"]
+        client_secret = get_client_secret(session, user_pool_id, client_id, region)
+        form_data = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "client_credentials",
+        }
+        if scopes:
+            form_data["scope"] = " ".join(scopes)
+        # If no scopes supplied Cognito will automatically add all allowed scopes
+        resp = requests.post(stack["outputs"]["TokenUrl"], data=form_data, timeout=30)
+        resp.raise_for_status()
+        token = resp.json()["access_token"]
+        cache[cache_key] = token
+        return token
+
+    return _get_token
 
 
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def api_client_cognito(access_token, api_endpoint):
-    class ApiGwSession(requests.Session):
-        def __init__(self, base_url=None, default_headers=None):
-            if default_headers is None:
-                default_headers = {}
-            self.base_url = base_url
-            self.default_headers = default_headers
-            super(ApiGwSession, self).__init__()
+def api_client_factory(api_endpoint, token_factory):
+    """Factory to create API clients with specific scopes (defaults to all scopes)."""
 
-        def request(
-            self, method, url, *args, params=None, data=None, headers=None, **kwargs
-        ):
-            url = f"{self.base_url}{url}"
-            merged_headers = deepcopy(self.default_headers)
-            if isinstance(headers, dict):
-                merged_headers.update(headers)
-            return super(ApiGwSession, self).request(
-                method,
-                url,
-                params,
-                data,
-                headers=merged_headers,
-                timeout=30,
-                *args,
-                **kwargs,
-            )
+    def _get_client(scopes=None):
+        token = token_factory(scopes)
 
-    hds = {"Authorization": f"Bearer {access_token}"}
+        class ApiGwSession(requests.Session):
+            def __init__(self, base_url=None, default_headers=None):
+                if default_headers is None:
+                    default_headers = {}
+                self.base_url = base_url
+                self.default_headers = default_headers
+                super(ApiGwSession, self).__init__()
 
-    return ApiGwSession(api_endpoint, hds)
+            def request(
+                self, method, url, *args, params=None, data=None, headers=None, **kwargs
+            ):
+                url = f"{self.base_url}{url}"
+                merged_headers = deepcopy(self.default_headers)
+                if isinstance(headers, dict):
+                    merged_headers.update(headers)
+                return super(ApiGwSession, self).request(
+                    method,
+                    url,
+                    params,
+                    data,
+                    headers=merged_headers,
+                    timeout=30,
+                    *args,
+                    **kwargs,
+                )
+
+        return ApiGwSession(api_endpoint, {"Authorization": f"Bearer {token}"})
+
+    return _get_client
+
+
+@pytest.fixture(scope="session")
+# pylint: disable=redefined-outer-name
+def api_client_cognito(api_client_factory):
+    """API client with all scopes for backward compatibility."""
+    return api_client_factory()
 
 
 @pytest.fixture(scope="session")
