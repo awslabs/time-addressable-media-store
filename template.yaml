@@ -73,7 +73,7 @@ Mappings:
   Solution:
     Constants:
       ApiVersion: "8.0"
-      ServiceVersion: 6.0.0.beta
+      ServiceVersion: 6.0.0-beta.0
 
 Conditions:
   CreateVpc: !Equals [!Ref VpcId, ""]
