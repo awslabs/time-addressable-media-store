@@ -1663,25 +1663,19 @@ Outputs:
       Name: !Sub ${AWS::StackName}-ApiEndpoint
 
   UserPoolId:
-    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.UserPoolId, ""]
+    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.UserPoolId, '-']
     Export:
       Name: !Sub ${AWS::StackName}-UserPoolId
 
   TokenUrl:
-    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.TokenUrl, ""]
+    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.TokenUrl, '-']
     Export:
       Name: !Sub ${AWS::StackName}-TokenUrl
 
   UserPoolClientId:
-    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.UserPoolClientId, ""]
+    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.UserPoolClientId, '-']
     Export:
       Name: !Sub ${AWS::StackName}-UserPoolClientId
-
-  UserPoolClientWebId:
-    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.UserPoolClientWebId, ""]
-
-  IdentityPoolId:
-    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.IdentityPoolId, ""]
 
   MediaStorageBucket:
     Value: !Ref MediaStorageBucket
@@ -1696,11 +1690,6 @@ Outputs:
 
   CleanupS3QueueUrl:
     Value: !Ref CleanupS3Queue
-
-  AuthRoleName:
-    Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.AuthRoleName, ""]
-    Export:
-      Name: !Sub ${AWS::StackName}-AuthRoleName
 
   NeptuneEndpoint:
     Value: !GetAtt NeptuneStack.Outputs.Endpoint
