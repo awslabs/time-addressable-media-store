@@ -208,7 +208,16 @@ def get_user_pool_id_from_issuer(issuer: str) -> str:
 
 def is_cognito_issuer(issuer: str) -> bool:
     """Check if issuer is from AWS Cognito"""
-    return "cognito" in issuer.lower() and "amazonaws.com" in issuer.lower()
+    try:
+        hostname = urlparse(issuer).hostname
+        # Check hostname is not None and ends with .amazonaws.com and contains 'cognito'
+        return (
+            hostname is not None
+            and hostname.endswith(".amazonaws.com")
+            and "cognito" in hostname
+        )
+    except Exception:
+        return False
 
 
 def get_username(claims: dict, issuer: str) -> str:
