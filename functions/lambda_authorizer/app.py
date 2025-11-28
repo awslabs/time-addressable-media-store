@@ -272,6 +272,17 @@ def get_username(claims: dict, issuer: str) -> str:
     return claims.get("sub", "")
 
 
+def get_auth_classes(claims: dict) -> list[str]:
+    """Get auth classes from claims"""
+    if "groups" in claims:
+        return claims["groups"]
+    if "cognito:groups" in claims:
+        return claims["cognito:groups"]
+    if "auth_classes" in claims:
+        return claims["auth_classes"]
+    return []
+
+
 @logger.inject_lambda_context(log_event=True)
 @metrics.log_metrics(capture_cold_start_metric=True)
 # pylint: disable=no-value-for-parameter
@@ -298,6 +309,7 @@ def lambda_handler(event: APIGatewayAuthorizerRequestEvent, context: LambdaConte
                     if event.http_method in ("PUT", "DELETE", "POST")
                     else claims.get("sub", "")
                 ),
+                "auth_classes": json.dumps(get_auth_classes(claims)),
             },
             region=arn.region,
             aws_account_id=arn.aws_account_id,

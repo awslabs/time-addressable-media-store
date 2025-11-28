@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 import jwt
@@ -447,6 +448,122 @@ def test_context_username_from_cognito_email(
 
 
 @patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
+@patch("lambda_authorizer.app.jwt.PyJWK")
+@patch("lambda_authorizer.app.get_jwks")
+@patch("lambda_authorizer.app.jwt.decode")
+@patch("lambda_authorizer.app.jwt.get_unverified_header")
+def test_context_includes_auth_classes_from_claim(
+    mock_header,
+    mock_decode,
+    mock_jwks,
+    mock_pyjwk,
+    lambda_context,
+    auth_event_factory,
+    lambda_authorizer,
+):
+    """
+    Test auth_classes from auth_classes claim
+    """
+    # Act
+    event = auth_event_factory("GET", "/", "/", {"Authorization": "Bearer valid_token"})
+    mock_decode.side_effect = [
+        {"iss": "https://allowed-issuer.com", "sub": "user123"},
+        {
+            "iss": "https://allowed-issuer.com",
+            "sub": "user123",
+            "scope": "tams-api/read",
+            "auth_classes": ["admin", "editor"],
+        },
+    ]
+    mock_header.return_value = {"kid": "key123", "alg": "RS256"}
+    mock_jwks.return_value = {"keys": [{"kid": "key123"}]}
+    mock_pyjwk.return_value.key = "mock_public_key"
+
+    # Act
+    response = lambda_authorizer.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert json.loads(response["context"]["auth_classes"]) == ["admin", "editor"]
+
+
+@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.jwt.PyJWK")
+@patch("lambda_authorizer.app.get_jwks")
+@patch("lambda_authorizer.app.jwt.decode")
+@patch("lambda_authorizer.app.jwt.get_unverified_header")
+def test_context_includes_auth_classes_from_cognito_groups(
+    mock_header,
+    mock_decode,
+    mock_jwks,
+    mock_pyjwk,
+    lambda_context,
+    auth_event_factory,
+    lambda_authorizer,
+):
+    """
+    Test auth_classes from cognito:groups claim
+    """
+    # Arrange
+    event = auth_event_factory("GET", "/", "/", {"Authorization": "Bearer valid_token"})
+    mock_decode.side_effect = [
+        {"iss": "https://allowed-issuer.com", "sub": "user123"},
+        {
+            "iss": "https://allowed-issuer.com",
+            "sub": "user123",
+            "scope": "tams-api/read",
+            "cognito:groups": ["group1", "group2"],
+        },
+    ]
+    mock_header.return_value = {"kid": "key123", "alg": "RS256"}
+    mock_jwks.return_value = {"keys": [{"kid": "key123"}]}
+    mock_pyjwk.return_value.key = "mock_public_key"
+
+    # Act
+    response = lambda_authorizer.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert json.loads(response["context"]["auth_classes"]) == ["group1", "group2"]
+
+
+@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.jwt.PyJWK")
+@patch("lambda_authorizer.app.get_jwks")
+@patch("lambda_authorizer.app.jwt.decode")
+@patch("lambda_authorizer.app.jwt.get_unverified_header")
+def test_context_auth_classes_empty_when_no_groups(
+    mock_header,
+    mock_decode,
+    mock_jwks,
+    mock_pyjwk,
+    lambda_context,
+    auth_event_factory,
+    lambda_authorizer,
+):
+    """
+    Test auth_classes is empty array when no groups present
+    """
+    # Arrange
+    event = auth_event_factory("GET", "/", "/", {"Authorization": "Bearer valid_token"})
+    mock_decode.side_effect = [
+        {"iss": "https://allowed-issuer.com", "sub": "user123"},
+        {
+            "iss": "https://allowed-issuer.com",
+            "sub": "user123",
+            "scope": "tams-api/read",
+        },
+    ]
+    mock_header.return_value = {"kid": "key123", "alg": "RS256"}
+    mock_jwks.return_value = {"keys": [{"kid": "key123"}]}
+    mock_pyjwk.return_value.key = "mock_public_key"
+
+    # Act
+    response = lambda_authorizer.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert json.loads(response["context"]["auth_classes"]) == []
+
+
+@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
