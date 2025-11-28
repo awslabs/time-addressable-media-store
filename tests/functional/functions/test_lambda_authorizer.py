@@ -486,7 +486,7 @@ def test_context_includes_auth_classes_from_claim(
     assert json.loads(response["context"]["auth_classes"]) == ["admin", "editor"]
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -525,7 +525,7 @@ def test_context_includes_auth_classes_from_cognito_groups(
     assert json.loads(response["context"]["auth_classes"]) == ["group1", "group2"]
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
@@ -563,7 +563,7 @@ def test_context_auth_classes_empty_when_no_groups(
     assert json.loads(response["context"]["auth_classes"]) == []
 
 
-@patch.dict("os.environ", {"ALLOWED_ISSUERS": "https://allowed-issuer.com"})
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
 @patch("lambda_authorizer.app.jwt.PyJWK")
 @patch("lambda_authorizer.app.get_jwks")
 @patch("lambda_authorizer.app.jwt.decode")
