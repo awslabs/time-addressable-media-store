@@ -139,6 +139,7 @@ Resources:
           POWERTOOLS_SERVICE_NAME: tams-lambda-authorizer
           POWERTOOLS_METRICS_NAMESPACE: TAMS
           ALLOWED_ISSUERS: !If [CreateCognito, !Sub 'https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${CognitoStack.Outputs.UserPoolId}', !Ref JwtIssuerUrl]
+          AWS_URL_SUFFIX: !Ref AWS::URLSuffix
     Condition: CreateLambdaAuthorizer
 
   LambdaAuthorizerFunctionRoleCognitoPolicy:
