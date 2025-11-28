@@ -22,10 +22,15 @@ metrics = Metrics()
 
 idp = boto3.client("cognito-idp")
 
+REQUESTS_GET_TIMEOUT = 5
 
 # Cache for JWKS - keyed by issuer
 _jwks_cache: dict[str, dict] = {}
 _jwks_cache_time: dict[str, float] = {}
+# Cache for OIDC config - keyed by issuer
+_oidc_config_cache: dict[str, dict] = {}
+_oidc_config_cache_time: dict[str, float] = {}
+
 jwks_cache_ttl = int(os.environ.get("JWKS_CACHE_TTL", 86400))
 allowed_issuers = os.environ.get("ALLOWED_ISSUERS", "").split(",")
 
@@ -48,8 +53,46 @@ def resource_to_arn_path(resource: str) -> str:
     return re.sub(r"\{[^}]+\}", "*", resource)
 
 
+def get_oidc_config(issuer: str) -> dict:
+    """Fetch and cache OIDC configuration per issuer"""
+    current_time = time.time()
+
+    if (
+        issuer in _oidc_config_cache
+        and (current_time - _oidc_config_cache_time.get(issuer, 0)) < jwks_cache_ttl
+    ):
+        return _oidc_config_cache[issuer]
+
+    # Validate the issuer URL scheme
+    parsed_issuer = urlparse(issuer)
+    if parsed_issuer.scheme not in ("https", "http"):
+        raise ValueError(f"Invalid issuer URL scheme: {parsed_issuer.scheme}")
+
+    discovery_url = f"{issuer}/.well-known/openid-configuration"
+
+    try:
+        response = requests.get(discovery_url, timeout=REQUESTS_GET_TIMEOUT)
+        response.raise_for_status()
+        config = response.json()
+
+        _oidc_config_cache[issuer] = config
+        _oidc_config_cache_time[issuer] = current_time
+
+        logger.info(
+            "Fetched OIDC config.",
+            extra={"issuer": issuer, "jwks_uri": config.get("jwks_uri")},
+        )
+        return config
+    except requests.exceptions.RequestException as e:
+        logger.warning(
+            "Failed to fetch OIDC config.",
+            extra={"issuer": issuer, "exception": str(e)},
+        )
+        raise
+
+
 def get_jwks(issuer: str) -> dict:
-    """Fetch and cache JWKS per issuer"""
+    """Fetch and cache JWKS per issuer using OIDC discovery"""
     current_time = time.time()
 
     if (
@@ -63,9 +106,28 @@ def get_jwks(issuer: str) -> dict:
     if parsed_issuer.scheme not in ("https", "http"):
         raise ValueError(f"Invalid issuer URL scheme: {parsed_issuer.scheme}")
 
-    jwks_url = f"{issuer}/.well-known/jwks.json"
+    # Try to get JWKS URL from OIDC discovery first
+    try:
+        oidc_config = get_oidc_config(issuer)
+        jwks_url = oidc_config.get("jwks_uri")
 
-    response = requests.get(jwks_url, timeout=5)
+        if not jwks_url:
+            logger.warning(
+                "No jwks_uri in OIDC config, falling back to standard path.",
+                extra={"issuer": issuer},
+            )
+            jwks_url = f"{issuer}/.well-known/jwks.json"
+    # pylint: disable=broad-exception-caught
+    except Exception as e:
+        logger.warning(
+            "OIDC discovery failed, trying standard path",
+            extra={"issuer": issuer, "exception": str(e)},
+        )
+        jwks_url = f"{issuer}/.well-known/jwks.json"
+
+    logger.info("Fetching JWKS.", extra={"jwks_uri": jwks_url})
+
+    response = requests.get(jwks_url, timeout=REQUESTS_GET_TIMEOUT)
     response.raise_for_status()
 
     _jwks_cache[issuer] = response.json()
@@ -111,9 +173,14 @@ for allowed_issuer in allowed_issuers:
     if allowed_issuer.strip():
         try:
             get_jwks(allowed_issuer.strip())
-            logger.info(f"Pre-warmed JWKS cache for {allowed_issuer}")
+            logger.info(
+                "Pre-warmed JWKS cache.", extra={"allowed_issuer": allowed_issuer}
+            )
         except (ValueError, requests.exceptions.RequestException) as e:
-            logger.warning(f"Failed to pre-warm JWKS for {allowed_issuer}: {e}")
+            logger.warning(
+                "Failed to pre-warm JWKS.",
+                extra={"allowed_issuer": allowed_issuer, "exception": str(e)},
+            )
 
 
 @cache
@@ -153,17 +220,35 @@ def get_user_pool_id_from_issuer(issuer: str) -> str:
     return issuer.split("/")[-1]
 
 
+def is_cognito_issuer(issuer: str) -> bool:
+    """Check if issuer is from AWS Cognito"""
+    escaped_suffix = re.escape(os.environ.get("AWS_URL_SUFFIX", "amazonaws.com"))
+    pattern = (
+        rf"^https://cognito-idp\.[a-z0-9-]+\.{escaped_suffix}/[a-z0-9-]+_[a-zA-Z0-9]+$"
+    )
+    return re.match(pattern, issuer) is not None
+
+
 def get_username(claims: dict, issuer: str) -> str:
     """
     Derive username from claims using Cognito API if issuer is Cognito.
+    For Keycloak and other IdPs, uses standard OIDC claims.
     Falls back to claim values if Cognito API calls fail.
     """
+
+    # For Keycloak and other non-Cognito issuers, use standard OIDC claims
+    if not is_cognito_issuer(issuer):
+        # Keycloak standard claims (in priority order)
+        return (
+            claims.get("preferred_username")  # Keycloak default username
+            or claims.get("email")  # Email as fallback
+            or claims.get("username")  # Generic username claim
+            or claims.get("sub")  # Subject as last resort
+            or ""
+        )
+
+    # Cognito-specific logic
     username = claims.get("username")
-
-    # For non-Cognito issuers, use claims directly
-    if "cognito" not in issuer.lower():
-        return username or claims.get("sub", "")
-
     user_pool_id = get_user_pool_id_from_issuer(issuer)
 
     # Try to get email from Cognito if username is present
@@ -179,8 +264,8 @@ def get_username(claims: dict, issuer: str) -> str:
                     return user_attributes["email"]
         except ClientError as e:
             logger.warning(
-                f"Failed to get user pool or attributes for {username}: {str(e)}. "
-                "Using username from claims."
+                "Failed to get user pool or attributes, using username from claims.",
+                extra={"username": username, "exception": str(e)},
             )
         return username
 
@@ -191,12 +276,23 @@ def get_username(claims: dict, issuer: str) -> str:
             return user_pool_client["ClientName"]
         except ClientError as e:
             logger.warning(
-                f"Failed to get user pool client {claims['client_id']}: {str(e)}. "
-                "Using sub from claims."
+                "Failed to get user pool client, using sub from claims.",
+                extra={"client_id": claims["client_id"], "exception": str(e)},
             )
 
     # Final fallback to sub or empty string
     return claims.get("sub", "")
+
+
+def get_auth_classes(claims: dict) -> list[str]:
+    """Get auth classes from claims"""
+    if "groups" in claims:
+        return claims["groups"]
+    if "cognito:groups" in claims:
+        return claims["cognito:groups"]
+    if "auth_classes" in claims:
+        return claims["auth_classes"]
+    return []
 
 
 @logger.inject_lambda_context(log_event=True)
@@ -225,6 +321,7 @@ def lambda_handler(event: APIGatewayAuthorizerRequestEvent, context: LambdaConte
                     if event.http_method in ("PUT", "DELETE", "POST")
                     else claims.get("sub", "")
                 ),
+                "auth_classes": json.dumps(get_auth_classes(claims)),
             },
             region=arn.region,
             aws_account_id=arn.aws_account_id,
@@ -241,13 +338,21 @@ def lambda_handler(event: APIGatewayAuthorizerRequestEvent, context: LambdaConte
 
     except (PermissionError, jwt.PyJWTError, ValueError) as e:
         # Catches authorization, JWT validation, and URL validation errors
-        logger.error(f"Authorization failed: {str(e)}")
+        logger.error("Authorization failed.", extra={"exception": str(e)})
         raise PermissionError("Unauthorized") from e
     except requests.exceptions.RequestException as e:
         # Catches all requests-related errors (Timeout, HTTPError, ConnectionError, etc.)
-        logger.error(f"Request failed while fetching JWKS: {str(e)}", exc_info=True)
+        logger.error(
+            "Request failed while fetching JWKS.",
+            extra={"exception": str(e)},
+            exc_info=True,
+        )
         raise PermissionError("Unauthorized") from e
     except Exception as e:
         # Catch-all for any unexpected errors
-        logger.error(f"Unexpected authorization error: {str(e)}", exc_info=True)
+        logger.error(
+            "Unexpected authorization error.",
+            extra={"exception": str(e)},
+            exc_info=True,
+        )
         raise PermissionError("Unauthorized") from e
