@@ -16,8 +16,8 @@ from aws_lambda_powertools.event_handler import (
 )
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
+    ForbiddenError,
     NotFoundError,
-    ServiceError,
 )
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
@@ -209,9 +209,8 @@ def put_flow_by_id(
     try:
         existing_item = query_node(record_type, flow_id)
         if existing_item.get("read_only"):
-            raise ServiceError(
-                403,
-                "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+            raise ForbiddenError(
+                "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
             )  # 403
     except ValueError:
         existing_item = {}
@@ -263,9 +262,8 @@ def delete_flow_by_id(
             "The requested Flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     # Get flow timerange, if timerange is empty delete flow sync, otherwise return a delete request
     flow_timerange = TimeRange.from_str(get_flow_timerange(flow_id))
@@ -347,9 +345,8 @@ def put_flow_tag_value(
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
@@ -379,9 +376,8 @@ def delete_flow_tag_value(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     if tag_name not in item["tags"]:
         raise NotFoundError("The requested flow ID in the path is invalid.")  # 404
@@ -426,9 +422,8 @@ def put_flow_description(
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
@@ -454,9 +449,8 @@ def delete_flow_description(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
@@ -496,9 +490,8 @@ def put_flow_label(
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flow_id, username, {"flow.label": label})
@@ -522,9 +515,8 @@ def delete_flow_label(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(record_type, flow_id, username, {"flow.label": None})
@@ -567,9 +559,8 @@ def put_flow_flow_collection(
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     if not validate_flow_collection(flow_id, flow_collection):
         raise BadRequestError("Bad request. Invalid flow collection.")  # 400
@@ -595,9 +586,8 @@ def delete_flow_flow_collection(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_flow_collection(flow_id, username, [])
@@ -635,9 +625,8 @@ def put_flow_max_bit_rate(
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
@@ -663,9 +652,8 @@ def delete_flow_max_bit_rate(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
@@ -705,9 +693,8 @@ def put_flow_avg_bit_rate(
     except ValueError as e:
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
@@ -733,9 +720,8 @@ def delete_flow_avg_bit_rate(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
@@ -816,9 +802,8 @@ def post_flow_storage_by_id(
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     flow: Flow = Flow(**item)
     if flow.root.container is None:
