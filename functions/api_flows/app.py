@@ -551,7 +551,7 @@ def get_flow_flow_collection(
 @app.put("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
 def put_flow_flow_collection(
-    flow_collection: Flowcollection,
+    flow_collection: Annotated[Flowcollection, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -773,7 +773,7 @@ def put_flow_read_only(
 @app.post("/flows/<flowId>/storage")
 @tracer.capture_method(capture_response=False)
 def post_flow_storage_by_id(
-    flow_storage_post: Flowstoragepost,
+    flow_storage_post: Annotated[Flowstoragepost, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     if flow_storage_post.limit and flow_storage_post.object_ids:
