@@ -12,8 +12,8 @@ from aws_lambda_powertools.event_handler import (
 )
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
+    ForbiddenError,
     NotFoundError,
-    ServiceError,
 )
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
@@ -187,9 +187,8 @@ def post_flow_segments_by_id(
     except ValueError as e:
         raise NotFoundError("The flow does not exist.") from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     if not item.get("container"):
         raise BadRequestError("Bad request. The flow 'container' is not set.")  # 400
@@ -228,9 +227,8 @@ def delete_flow_segments_by_id(
             "The requested flow ID in the path is invalid."
         ) from e  # 404
     if item.get("read_only"):
-        raise ServiceError(
-            403,
-            "Forbidden. You do not have permission to modify this flow. It may be marked read-only.",
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
     timerange_to_delete = TimeRange.from_str(get_flow_timerange(flow_id))
     if param_timerange:
