@@ -1,0 +1,40 @@
+name: Auto Release on Version Change
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "template.yaml"
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get current version
+        id: current
+        run: |
+          version=$(grep -A 1 "ServiceVersion:" template.yaml | grep -oP '\d+\.\d+\.\d+')
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Get previous version
+        id: previous
+        run: |
+          version=$(git show HEAD^:template.yaml | grep -A 1 "ServiceVersion:" | grep -oP '\d+\.\d+\.\d+' || echo "")
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Create draft release
+        if: steps.previous.outputs.version != steps.current.outputs.version && steps.current.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.current.outputs.version }}" \
+            --draft \
+            --generate-notes \
+            --title "v${{ steps.current.outputs.version }}"
