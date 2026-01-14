@@ -136,7 +136,8 @@ def get_flow_segments_by_id(
                     TimeRange.from_str(items[-1]["timerange"])
                 )
             )
-    if "LastEvaluatedKey" in query:
+    has_more_results = "LastEvaluatedKey" in query and len(items) == args["Limit"]
+    if has_more_results:
         next_key = (
             items[-1]["timerange_end"]
             if items
@@ -145,7 +146,7 @@ def get_flow_segments_by_id(
         custom_headers["X-Paging-NextKey"] = str(next_key)
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_key))
     # Set Paging Limit header if paging limit being used is not the one specified
-    if "LastEvaluatedKey" in query or param_limit != args["Limit"]:
+    if has_more_results or param_limit != args["Limit"]:
         custom_headers["X-Paging-Limit"] = str(args["Limit"])
     custom_headers["X-Paging-Count"] = str(len(items))
     custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
