@@ -36,7 +36,6 @@ from utils import (
     get_username,
     model_dump,
     opencypher_property_name,
-    parse_claims,
     parse_tag_parameters,
     publish_event,
 )
@@ -156,7 +155,7 @@ def put_source_tag_value(
         raise NotFoundError(
             "The requested Source does not exist, or the tag name in the path is invalid."
         )  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type,
         source_id,
@@ -187,7 +186,7 @@ def delete_source_tag(
         raise NotFoundError(
             "The requested Source ID or tag in the path is invalid."
         )  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type,
         source_id,
@@ -225,7 +224,7 @@ def put_source_description(
 ):
     if not check_node_exists(record_type, source_id):
         raise NotFoundError("The requested Source does not exist.")  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type, source_id, username, {"source.description": description}
     )
@@ -244,7 +243,7 @@ def delete_source_description(
 ):
     if not check_node_exists(record_type, source_id):
         raise NotFoundError("The Source ID in the path is invalid.")  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type, source_id, username, {"source.description": None}
     )
@@ -281,7 +280,7 @@ def put_source_label(
 ):
     if not check_node_exists(record_type, source_id):
         raise NotFoundError("The requested Source does not exist.")  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type, source_id, username, {"source.label": label}
     )
@@ -300,7 +299,7 @@ def delete_source_label(
 ):
     if not check_node_exists(record_type, source_id):
         raise NotFoundError("The requested Source ID in the path is invalid.")  # 404
-    username = get_username(parse_claims(app.current_event.request_context))
+    username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type, source_id, username, {"source.label": None}
     )

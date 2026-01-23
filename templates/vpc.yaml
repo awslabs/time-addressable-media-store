@@ -165,19 +165,6 @@ Resources:
         - !Ref PrivateSubnet0
         - !Ref PrivateSubnet1
 
-  LambdaEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.lambda
-      VpcId: !Ref Vpc
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SecurityGroupIds:
-        - !Ref EndpointSecurityGroup
-      SubnetIds:
-        - !Ref PrivateSubnet0
-        - !Ref PrivateSubnet1
-
 Outputs:
 
   VpcId:

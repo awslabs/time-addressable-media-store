@@ -1,12 +1,10 @@
 import json
 import math
-import os
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
-from botocore.exceptions import ClientError
 from mediatimestamp.immutable import TimeRange, Timestamp
 
 pytestmark = [
@@ -80,47 +78,6 @@ class TestUtils:
             utils.put_message_batches(queue_url, items)
 
             assert mock_sqs.send_message.call_count == len(items)
-
-    @patch("utils.idp")
-    def test_get_user_pool_calls_correctly(self, mock_idp):
-        expected = "userpool123"
-        mock_idp.describe_user_pool.return_value = {"UserPool": expected}
-
-        result = utils.get_user_pool()
-        kw_args = mock_idp.describe_user_pool.call_args[1]
-
-        assert mock_idp.describe_user_pool.call_count == 1
-        assert kw_args["UserPoolId"] == os.environ["USER_POOL_ID"]
-        assert result == expected
-
-    @patch("utils.lmda")
-    def test_get_username_calls_lambda(self, mock_lmda):
-        utils.get_username.cache_clear()
-        claims_tuple = ("user123", "client123")
-        expected = {"username": "XXXXXXX"}
-
-        response_payload_mock = MagicMock()
-        response_payload_mock.read.return_value = json.dumps(expected).encode("utf-8")
-        mock_lmda.invoke.return_value = {
-            "StatusCode": 200,
-            "Payload": response_payload_mock,
-        }
-
-        result = utils.get_username(claims_tuple)
-        kw_args = mock_lmda.invoke.call_args[1]
-
-        assert mock_lmda.invoke.call_count == 1
-        assert result == expected
-        assert kw_args["FunctionName"] == os.environ["COGNITO_LAMBDA_NAME"]
-
-    @patch("utils.lmda")
-    def test_get_username_throws_on_status(self, mock_lmda):
-        utils.get_username.cache_clear()
-        claims_tuple = ("user123", "client123")
-
-        mock_lmda.invoke.return_value = {"StatusCode": 500, "FunctionError": {}}
-        with pytest.raises(ClientError):
-            utils.get_username(claims_tuple)
 
     def test_pop_outliers_empty_list(self, time_range_one_day):
         items = []

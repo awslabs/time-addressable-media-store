@@ -20,6 +20,7 @@ cymple = "^0.12.0"
 moto = "^5.1.5"
 datamodel-code-generator = "^0.31.0"
 pytest-lazy-fixtures = "^1.1.4"
+pyjwt = "^2.10.1"
 
 [project]
 name = "time-addressable-media-store"

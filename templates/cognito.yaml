@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: TAMS API Cognito Stack
+
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref AWS::StackName
+      Schema:
+        - Name: email
+          Required: True
+          Mutable: True
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: True
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Priority: 1
+            Name: verified_email
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Sub
+        - ${AWS::AccountId}-tams-${id}
+        - id: !Select [4, !Split ['-', !Select [2, !Split [/, !Ref 'AWS::StackId']]]]
+
+  UserPoolResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Name: tams-api
+      Identifier: tams-api
+      Scopes:
+        - ScopeName: admin
+          ScopeDescription: Admin access
+        - ScopeName: read
+          ScopeDescription: Read access
+        - ScopeName: write
+          ScopeDescription: Write access
+        - ScopeName: delete
+          ScopeDescription: Delete access
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub ${AWS::StackName}-all-scopes
+      GenerateSecret: True
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AuthSessionValidity: 3
+      RefreshTokenValidity: 30
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      TokenValidityUnits:
+        RefreshToken: days
+        AccessToken: minutes
+        IdToken: minutes
+      PreventUserExistenceErrors: ENABLED
+      AllowedOAuthFlowsUserPoolClient: True
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthFlows:
+        - client_credentials
+      AllowedOAuthScopes:
+        - tams-api/admin
+        - tams-api/read
+        - tams-api/write
+        - tams-api/delete
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+
+  TokenUrl:
+    Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
