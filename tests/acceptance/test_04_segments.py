@@ -1841,6 +1841,52 @@ def test_Get_Media_Object_Information_GET_400_with_storage_ids_bad(
     assert 0 < len(response_json["message"])
 
 
+def test_Get_Media_Object_Information_GET_200_tag_name(
+    api_client_cognito, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "tag.test": "something else",
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response_json["referenced_by_flows"])
+
+
+def test_Get_Media_Object_Information_GET_200_tag_exists_name(
+    api_client_cognito, media_objects
+):
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={
+            "tag_exists.test": "true",
+        },
+    )
+    response_json = response.json()
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert 200 == response.status_code
+    assert "content-type" in response_headers_lower
+    assert "application/json" == response_headers_lower["content-type"]
+    assert 1 == len(response_json["referenced_by_flows"])
+
+
 def test_Get_Media_Object_Information_GET_200_with_presigned_true(
     api_client_cognito, media_objects
 ):
