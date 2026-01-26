@@ -1,10 +1,13 @@
 import json
 import math
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    ForbiddenError,
+)
 from mediatimestamp.immutable import TimeRange, Timestamp
 
 pytestmark = [
@@ -266,3 +269,334 @@ class TestUtils:
         assert mock_s3.generate_presigned_url.call_count == 1
         assert result == expected
         assert kw_args["ExpiresIn"] == utils.constants.PRESIGNED_URL_EXPIRES_IN
+
+    @pytest.mark.parametrize(
+        "auth_classes_json,expected",
+        [
+            ('["class1", "class2"]', {"class1", "class2"}),
+            ("[]", set()),
+            ('["single"]', {"single"}),
+        ],
+    )
+    def test_get_auth_classes(self, auth_classes_json, expected):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"auth_classes": auth_classes_json}
+        # Act
+        result = utils.get_auth_classes(mock_context)
+        # Assert
+        assert result == expected
+
+    def test_get_auth_classes_missing_key(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {}
+        # Act
+        result = utils.get_auth_classes(mock_context)
+        # Assert
+        assert result == set()
+
+    @pytest.mark.parametrize(
+        "scopes_json,expected",
+        [
+            (
+                '["tams-api/admin", "tams-api/read"]',
+                {"tams-api/admin", "tams-api/read"},
+            ),
+            ("[]", set()),
+            ('["tams-api/admin"]', {"tams-api/admin"}),
+        ],
+    )
+    def test_get_scopes(self, scopes_json, expected):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": scopes_json}
+        # Act
+        result = utils.get_scopes(mock_context)
+        # Assert
+        assert result == expected
+
+    def test_get_scopes_missing_key(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {}
+        # Act
+        result = utils.get_scopes(mock_context)
+        # Assert
+        assert result == set()
+
+    def test_is_admin_with_admin_scope(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": '["tams-api/admin"]'}
+        # Act
+        result = utils.is_admin(mock_context)
+        # Assert
+        assert result is True
+
+    def test_is_admin_without_admin_scope(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": '["tams-api/read"]'}
+        # Act
+        result = utils.is_admin(mock_context)
+        # Assert
+        assert result is False
+
+    def test_is_admin_with_empty_scopes(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": "[]"}
+        # Act
+        result = utils.is_admin(mock_context)
+        # Assert
+        assert result is False
+
+    def test_check_entity_authorization_admin_user(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": '["tams-api/admin"]'}
+        entity = {"tags": {}}
+        # Act
+        result = utils.check_entity_authorization(mock_context, entity)
+        # Assert
+        assert result is True
+
+    def test_check_entity_authorization_matching_classes_list(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1", "class2"]',
+        }
+        entity = {"tags": {"auth_classes": ["class2", "class3"]}}
+        # Act
+        result = utils.check_entity_authorization(mock_context, entity)
+        # Assert
+        assert result is True
+
+    def test_check_entity_authorization_matching_classes_string(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {"auth_classes": "class1"}}
+        # Act
+        result = utils.check_entity_authorization(mock_context, entity)
+        # Assert
+        assert result is True
+
+    def test_check_entity_authorization_no_match(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {"auth_classes": ["class2", "class3"]}}
+        # Act
+        result = utils.check_entity_authorization(mock_context, entity)
+        # Assert
+        assert result is False
+
+    def test_check_entity_authorization_no_auth_classes_tag(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {}}
+        # Act
+        result = utils.check_entity_authorization(mock_context, entity)
+        # Assert
+        assert result is False
+
+    def test_check_entity_authorization_empty_user_classes(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": "[]", "auth_classes": "[]"}
+        entity = {"tags": {"auth_classes": ["class1"]}}
+        # Act
+        result = utils.check_entity_authorization(mock_context, entity)
+        # Assert
+        assert result is False
+
+    def test_require_entity_authorization_authorized(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {"auth_classes": ["class1"]}}
+        # Act
+        utils.require_entity_authorization(mock_context, entity)
+
+    def test_require_entity_authorization_unauthorized(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {"auth_classes": ["class2"]}}
+        # Act
+        with pytest.raises(ForbiddenError) as exc_info:
+            utils.require_entity_authorization(mock_context, entity)
+        # Assert
+        assert "You do not have permission to access this resource" in str(
+            exc_info.value
+        )
+
+    def test_apply_auth_classes_filter_no_user_filter(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1", "class2"]',
+        }
+        tag_values = {}
+        # Act
+        result_values = utils.apply_auth_classes_filter(mock_context, tag_values)
+        # Assert
+        assert set(result_values["auth_classes"].split(",")) == {"class1", "class2"}
+
+    def test_apply_auth_classes_filter_with_user_filter_intersection(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1", "class2", "class3"]',
+        }
+        tag_values = {"auth_classes": "class2,class4"}
+        # Act
+        result_values = utils.apply_auth_classes_filter(mock_context, tag_values)
+        # Assert
+        assert result_values["auth_classes"] == "class2"
+
+    def test_apply_auth_classes_filter_with_user_filter_no_intersection(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        tag_values = {"auth_classes": "class2,class3"}
+        # Act
+        result_values = utils.apply_auth_classes_filter(mock_context, tag_values)
+        # Assert
+        assert result_values["auth_classes"] is None
+
+    def test_apply_auth_classes_filter_empty_user_classes(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": "[]", "auth_classes": "[]"}
+        tag_values = {}
+        # Act
+        result_values = utils.apply_auth_classes_filter(mock_context, tag_values)
+        # Assert
+        assert result_values["auth_classes"] is None
+
+    def test_apply_auth_classes_filter_admin_bypass(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": '["tams-api/admin"]'}
+        tag_values = {"test_tag": "test"}
+        # Act
+        result_values = utils.apply_auth_classes_filter(mock_context, tag_values)
+        # Assert
+        assert result_values == tag_values
+
+    def test_require_auth_classes_tag_update_permission_admin_bypass(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {"scopes": '["tams-api/admin"]'}
+        entity = {"tags": {"auth_classes": ["class1"]}}
+        # Act
+        utils.require_auth_classes_tag_update_permission(
+            mock_context, entity, ["class2"]
+        )
+
+    def test_require_auth_classes_tag_update_permission_valid_update_list(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1", "class2"]',
+        }
+        entity = {"tags": {"auth_classes": ["class1"]}}
+        # Act
+        utils.require_auth_classes_tag_update_permission(
+            mock_context, entity, ["class2"]
+        )
+
+    def test_require_auth_classes_tag_update_permission_valid_update_string(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1", "class2"]',
+        }
+        # Act
+        entity = {"tags": {"auth_classes": "class1"}}
+
+        utils.require_auth_classes_tag_update_permission(mock_context, entity, "class2")
+
+    def test_require_auth_classes_tag_update_permission_no_existing_access(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class3"]',
+        }
+        entity = {"tags": {"auth_classes": ["class1", "class2"]}}
+        # Act
+        with pytest.raises(ForbiddenError) as exc_info:
+            utils.require_auth_classes_tag_update_permission(
+                mock_context, entity, ["class3"]
+            )
+        # Assert
+        assert "existing auth_classes" in str(exc_info.value)
+
+    def test_require_auth_classes_tag_update_permission_no_new_access(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {"auth_classes": ["class1"]}}
+        # Act
+        with pytest.raises(ForbiddenError) as exc_info:
+            utils.require_auth_classes_tag_update_permission(
+                mock_context, entity, ["class2", "class3"]
+            )
+        # Asset
+        assert "new auth_classes" in str(exc_info.value)
+
+    def test_require_auth_classes_tag_update_permission_no_existing_tag(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {}}
+        # Act
+        utils.require_auth_classes_tag_update_permission(
+            mock_context, entity, ["class1"]
+        )
+
+    def test_require_auth_classes_tag_update_permission_empty_new_classes(self):
+        # Arrange
+        mock_context = MagicMock()
+        mock_context.authorizer.raw_event = {
+            "scopes": "[]",
+            "auth_classes": '["class1"]',
+        }
+        entity = {"tags": {"auth_classes": ["class1"]}}
+        # Act
+        utils.require_auth_classes_tag_update_permission(mock_context, entity, [])

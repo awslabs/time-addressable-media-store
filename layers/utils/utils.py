@@ -12,7 +12,10 @@ import boto3
 # pylint: disable=no-member
 import constants
 from aws_lambda_powertools import Tracer
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import (
+    BadRequestError,
+    ForbiddenError,
+)
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import (
     APIGatewayEventRequestContext,
@@ -93,7 +96,114 @@ def put_message_batches(queue: str, items: list) -> list:
 
 @tracer.capture_method(capture_response=False)
 def get_username(request_context: APIGatewayEventRequestContext) -> str:
+    """Extract username from the request context authorizer"""
     return request_context.authorizer.raw_event["username"]
+
+
+@tracer.capture_method(capture_response=False)
+def get_auth_classes(request_context: APIGatewayEventRequestContext) -> set[str]:
+    """Extract authorization classes from the request context authorizer"""
+    auth_classes = request_context.authorizer.raw_event.get("auth_classes", "[]")
+    return set(json.loads(auth_classes))
+
+
+@tracer.capture_method(capture_response=False)
+def get_scopes(request_context: APIGatewayEventRequestContext) -> set[str]:
+    """Extract OAuth scopes from the request context authorizer"""
+    scopes = request_context.authorizer.raw_event.get("scopes", "[]")
+    return set(json.loads(scopes))
+
+
+@tracer.capture_method(capture_response=False)
+def is_admin(request_context: APIGatewayEventRequestContext) -> bool:
+    """Check if the request has admin scope"""
+    return constants.ADMIN_SCOPE in get_scopes(request_context)
+
+
+@tracer.capture_method(capture_response=False)
+def check_entity_authorization(
+    request_context: APIGatewayEventRequestContext, entity: dict
+) -> bool:
+    """Check if user is authorized to access the entity based on auth_classes"""
+    if is_admin(request_context):
+        return True
+
+    entity_auth_classes = entity.get("tags", {}).get("auth_classes")
+    if entity_auth_classes is None:
+        return False
+
+    if isinstance(entity_auth_classes, str):
+        entity_auth_classes = [entity_auth_classes]
+
+    user_auth_classes = get_auth_classes(request_context)
+    return bool(set(user_auth_classes) & set(entity_auth_classes))
+
+
+@tracer.capture_method(capture_response=False)
+def require_entity_authorization(
+    request_context: APIGatewayEventRequestContext, entity: dict
+) -> None:
+    """Raise ForbiddenError if user is not authorized to access the entity"""
+    if not check_entity_authorization(request_context, entity):
+        raise ForbiddenError("You do not have permission to access this resource")
+
+
+@tracer.capture_method(capture_response=False)
+def apply_auth_classes_filter(
+    request_context: APIGatewayEventRequestContext, tag_values: dict
+) -> dict:
+    """Apply auth_classes filtering to tag_values for list queries (admin bypass, None if no access)"""
+    # Admin bypass - no filtering needed
+    if is_admin(request_context):
+        return tag_values
+
+    user_classes = get_auth_classes(request_context)
+
+    if "auth_classes" in tag_values:
+        user_requested = set(tag_values["auth_classes"].split(","))
+        allowed_classes = user_requested & user_classes
+    else:
+        allowed_classes = user_classes
+
+    if allowed_classes:
+        tag_values["auth_classes"] = ",".join(allowed_classes)
+    else:
+        # Set value to "sentinel" value of None so that we can detect that the query should not be executed by the caller
+        tag_values["auth_classes"] = None
+
+    return tag_values
+
+
+@tracer.capture_method(capture_response=False)
+def require_auth_classes_tag_update_permission(
+    request_context: APIGatewayEventRequestContext,
+    existing_entity: dict,
+    new_auth_classes: list[str] | str,
+) -> None:
+    """Raise ForbiddenError if user lacks permission to update auth_classes tag"""
+    if is_admin(request_context):
+        return
+
+    if isinstance(new_auth_classes, str):
+        new_auth_classes = [new_auth_classes]
+
+    user_classes = get_auth_classes(request_context)
+    existing_auth_classes = existing_entity.get("tags", {}).get("auth_classes")
+
+    if existing_auth_classes:
+        if isinstance(existing_auth_classes, str):
+            existing_auth_classes = [existing_auth_classes]
+        # Check if there is at least one common auth_class
+        if not user_classes & set(existing_auth_classes):
+            raise ForbiddenError(
+                "You must have access to existing auth_classes to modify this tag"
+            )
+
+    # If setting auth_classes check if there is at least one common auth_class
+    if new_auth_classes and not user_classes & set(new_auth_classes):
+        raise ForbiddenError(
+            "You must have access to at least one of the new auth_classes"
+        )
 
 
 @tracer.capture_method(capture_response=False)
