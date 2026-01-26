@@ -30,7 +30,7 @@ from dynamodb import (
     storage_table,
 )
 from neptune import query_object_flows
-from schema import Object, Objectsinstancespost
+from schema import Object, Objectsinstancespost, Uuid
 from segment_get_urls import populate_get_urls
 from typing_extensions import Annotated
 from utils import (
@@ -140,15 +140,13 @@ def get_objects_by_id(
     # Filter referenced_by_flows by tag parameters if provided
     if param_tag_values or param_tag_exists:
         tagged_flows = query_object_flows(
-            schema_item.referenced_by_flows,
+            [flow_id.root for flow_id in schema_item.referenced_by_flows],
             {
                 "tag_values": param_tag_values,
                 "tag_exists": param_tag_exists,
             },
         )
-        schema_item.referenced_by_flows = list(
-            set(schema_item.referenced_by_flows) & set(tagged_flows)
-        )
+        schema_item.referenced_by_flows = list(map(Uuid, tagged_flows))
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
