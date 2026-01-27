@@ -80,11 +80,9 @@ Conditions:
 
   CreateWaf: !Equals [!Ref DeployWaf, "Yes"]
 
-  CreateCognito: !Equals [!Ref JwtIssuerUrl, ""]
-
   CreateLambdaAuthorizer: !Equals [!Ref LambdaAuthorizerArn, ""]
 
-  CognitoAndLambdaAuthorizer: !And [!Condition CreateCognito, !Condition CreateLambdaAuthorizer]
+  CreateCognito: !And [!Equals [!Ref JwtIssuerUrl, ""], !Condition CreateLambdaAuthorizer]
 
 Transform: AWS::Serverless-2016-10-31
 
@@ -156,7 +154,7 @@ Resources:
               - cognito-idp:AdminGetUser
               - cognito-idp:DescribeUserPoolClient
             Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoStack.Outputs.UserPoolId}
-    Condition: CognitoAndLambdaAuthorizer
+    Condition: CreateCognito
 
   Api:
     Type: AWS::Serverless::Api
