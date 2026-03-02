@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import (
+    AwareDatetime,
     BaseModel,
     ConfigDict,
     Field,
@@ -110,7 +110,7 @@ class Contentformat(Enum):
     urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
 
 
-class Status(Enum):
+class Status(StrEnum):
     """
     Status of the delete request
     """
@@ -133,7 +133,7 @@ class Error(BaseModel):
     traceback: Optional[List[str]] = Field(
         None, description="Stack trace leading to error (as a list of strings)"
     )
-    time: datetime = Field(
+    time: AwareDatetime = Field(
         ..., description="Time at which the error ocurred, to aid in log correlation"
     )
 
@@ -156,7 +156,7 @@ class Eventstreamcommon(BaseModel):
     )
 
 
-class Format(Enum):
+class Format(StrEnum):
     """
     The primary content type URN for the Flow.
     """
@@ -174,7 +174,7 @@ class CodecParameters(BaseModel):
     )
 
 
-class UncType(Enum):
+class UncType(StrEnum):
     """
     The uncompressed audio multi-channel representation type. If codec is `audio/x-raw-int` or `audio/x-raw-float`, unc_type must be set.
     """
@@ -224,7 +224,7 @@ class SegmentDuration(BaseModel):
     denominator: Optional[PositiveInt] = Field(1, description="denominator")
 
 
-class Format1(Enum):
+class Format1(StrEnum):
     """
     The primary content type URN for the Flow.
     """
@@ -246,7 +246,7 @@ class EssenceParameters1(BaseModel):
     )
 
 
-class Format2(Enum):
+class Format2(StrEnum):
     """
     The primary content type URN for the Flow.
     """
@@ -283,7 +283,7 @@ class EssenceParameters2(BaseModel):
     )
 
 
-class Format3(Enum):
+class Format3(StrEnum):
     """
     The primary content type URN for the Flow.
     """
@@ -302,7 +302,7 @@ class GetUrl(BaseModel):
     )
 
 
-class Format4(Enum):
+class Format4(StrEnum):
     """
     The primary content type URN for the Flow.
     """
@@ -310,7 +310,7 @@ class Format4(Enum):
     urn_x_nmos_format_video = "urn:x-nmos:format:video"
 
 
-class InterlaceMode(Enum):
+class InterlaceMode(StrEnum):
     """
     Interlaced video mode for frames in this Flow
     """
@@ -321,7 +321,7 @@ class InterlaceMode(Enum):
     interlaced_psf = "interlaced_psf"
 
 
-class Colorspace(Enum):
+class Colorspace(StrEnum):
     """
     Colorspace used for the video
     """
@@ -332,7 +332,7 @@ class Colorspace(Enum):
     BT2100 = "BT2100"
 
 
-class TransferCharacteristic(Enum):
+class TransferCharacteristic(StrEnum):
     """
     Transfer characteristic
     """
@@ -351,7 +351,7 @@ class PixelAspectRatio(BaseModel):
     denominator: PositiveInt = Field(..., description="denominator")
 
 
-class ComponentType(Enum):
+class ComponentType(StrEnum):
     """
     Picture component representation.
     """
@@ -360,7 +360,7 @@ class ComponentType(Enum):
     RGB = "RGB"
 
 
-class UncType1(Enum):
+class UncType1(StrEnum):
     """
     Uncompressed picture packing type. If codec is `video/raw`, unc_type must be set.
     """
@@ -566,7 +566,7 @@ class Servicepost(BaseModel):
     )
 
 
-class StoreType(Enum):
+class StoreType(StrEnum):
     """
     The generic Storage Backend type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.
     """
@@ -596,12 +596,12 @@ class Storagebackend(BaseModel):
     store_product: Optional[str] = Field(None, description="The storage product name.")
 
 
-class Tags(RootModel[Optional[Dict[str, Union[str, List[str]]]]]):
+class Tags(RootModel[Dict[str, Union[str, List[str]]]]):
     """
     Key is a freeform string. Value is a freeform string, or an array of freeform strings.
     """
 
-    root: Optional[Dict[str, Union[str, List[str]]]] = None
+    root: Dict[str, Union[str, List[str]]]
 
 
 class Timerange(
@@ -676,7 +676,7 @@ class Uuidlist(
     )
 
 
-class Event(Enum):
+class Event(StrEnum):
     flows_created = "flows/created"
     flows_updated = "flows/updated"
     flows_deleted = "flows/deleted"
@@ -735,7 +735,7 @@ class Webhook(BaseModel):
     tags: Optional[Tags] = None
 
 
-class Status1(Enum):
+class Status1(StrEnum):
     """
     Status of the Webhook. `created` indicates the webhook has been successfully registered but is yet to begin sending events or, depending on the service implementation, the worker responsible for sending the events has yet to start. `started` indicates the webhook is active and sending events. `disabled` indicates the webhook has been disabled by a client and is not currently sending events. `error` indicates an error condition has been encountered and the webhook has been disabled by the service instance. More information about the error condition will be indicated by the service instance in the `error` parameter. Service implementations SHOULD implement appropriate retries and only enter the `error` state when absolutely necesary. A webhook in the `error` or `disabled` state may be re-enabled by a client by setting the status to `created`. A webhook in the `created` or `started` state may be disabled by a client by setting the status to `disabled`. Attempting to transition an `error` status to `disabled` SHOULD be rejected.
     """
@@ -746,7 +746,7 @@ class Status1(Enum):
     error = "error"
 
 
-class Status2(Enum):
+class Status2(StrEnum):
     """
     Status of the Webhook. `created` will register the webhook in the created state and the service instance will attempt to start sending events. `disabled` will register the webhook in a disabled state and will not send events. Assumed to be `created` if not set.
     """
@@ -769,7 +769,7 @@ class Webhookpost(Webhook):
     )
 
 
-class Status3(Enum):
+class Status3(StrEnum):
     """
     Status of the Webhook. `created` indicates the webhook has been successfully registered but is yet to begin sending events or, depending on the service implementation, the worker responsible for sending the events has yet to start. `started` indicates the webhook is active and sending events. `disabled` indicates the webhook has been disabled by a client and is not currently sending events. `error` indicates an error condition has been encountered and the webhook has been disabled by the service instance. More information about the error condition will be indicated by the service instance in the `error` parameter. Service implementations SHOULD implement appropriate retries and only enter the `error` state when absolutely necesary. A webhook in the `error` or `disabled` state may be re-enabled by a client by setting the status to `created`. A webhook in the `created` or `started` state may be disabled by a client by setting the status to `disabled`. Attempting to transition an `error` status to `disabled` SHOULD be rejected.
     """
@@ -822,17 +822,17 @@ class Deletionrequest(BaseModel):
         ...,
         description="Whether the Flow should be deleted once the timerange has been",
     )
-    created: Optional[datetime] = Field(
+    created: Optional[AwareDatetime] = Field(
         None, description="Date/Time when this deletion request was created"
     )
     created_by: Optional[str] = Field(
         None,
         description="A string identifier for the entity that created the deletion request. Service implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system.",
     )
-    updated: Optional[datetime] = Field(
+    updated: Optional[AwareDatetime] = Field(
         None, description="Date/Time when this deletion request was updated"
     )
-    expiry: Optional[datetime] = Field(
+    expiry: Optional[AwareDatetime] = Field(
         None, description="Date/Time when this deletion request will be deleted"
     )
     status: Status = Field(..., description="Status of the delete request")
@@ -896,15 +896,15 @@ class Flowcore(BaseModel):
         None,
         description='An indication of how many lossy encodings the Flow content has been through. This parameter provides a hint to clients as to which is the "highest qualty" Flow available to them. A Flow with a higher generation may contain less of the original information than a Flow with a lower generation. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where the originating device outputs multiple qualities of the Source, `generation` should represent the encoding processes each has been through as accurately as possible.',
     )
-    created: Optional[datetime] = Field(
+    created: Optional[AwareDatetime] = Field(
         None,
         description="The date-time the Flow was created in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
-    metadata_updated: Optional[datetime] = Field(
+    metadata_updated: Optional[AwareDatetime] = Field(
         None,
         description="The date-time the Flow metadata was updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
-    segments_updated: Optional[datetime] = Field(
+    segments_updated: Optional[AwareDatetime] = Field(
         None,
         description="The date-time the Flow Segments were updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
@@ -962,6 +962,7 @@ class Flowdata(Flowcore):
         description="Describes the parameters of the essence inside this data Flow",
         title="Data Flow Essence Parameters",
     )
+    codec: Mimetype
 
 
 class Flowimage(Flowcore):
@@ -977,6 +978,7 @@ class Flowimage(Flowcore):
         description="Describes the parameters of the essence inside this image Flow",
         title="Image Flow Essence Parameters",
     )
+    codec: Mimetype
 
 
 class Flowmulti(Flowcore):
@@ -1118,6 +1120,7 @@ class Flowvideo(Flowcore):
         description="Describes the parameters of the essence inside this video Flow",
         title="Video Flow Essence Parameters",
     )
+    codec: Mimetype
 
 
 class GetUrl1(Storagebackend):
@@ -1200,11 +1203,11 @@ class Source(BaseModel):
         None,
         description="A string identifier for the entity that updated the Source metadata most recently. Service implementations SHOULD set suitable default values for `updated_by` based on the principal accessing the system.",
     )
-    created: Optional[datetime] = Field(
+    created: Optional[AwareDatetime] = Field(
         None,
         description="The date-time the Source was created in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
-    updated: Optional[datetime] = Field(
+    updated: Optional[AwareDatetime] = Field(
         None,
         description="The date-time the Source metadata was last updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
@@ -1284,6 +1287,7 @@ class Flowaudio(Flowcore):
         description="Describes the parameters of the essence inside this audio Flow",
         title="Audio Flow Essence Parameters",
     )
+    codec: Mimetype
 
 
 class Flowsegment(Objectcore):
