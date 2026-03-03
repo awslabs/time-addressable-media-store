@@ -11,7 +11,7 @@ info:
     **Note**: the examples provided in this specification are for a system which uses a Storage Backend that provides HTTP URLs for uploading and downloading Media Objects in buckets.
     This could for example be implemented using an AWS S3 compatible store using presigned URLs or by a simple file system storage with an HTTP frontend.
     Clients should parse the [/service](#/operations/GET_service) endpoint and handle the Storage Backend type in use appropriately.
-  version: '7.0'
+  version: '8.0'
   contact:
     name: BBC R&D - Cloud-Fit Production Team
     email: cloudfit-opensource@rd.bbc.co.uk
@@ -27,7 +27,7 @@ servers:
   variables:
     version:
       description: API version
-      default: v7.0
+      default: v8.0
 security:
 - bearer_token_auth: []
 - url_token_auth: []
