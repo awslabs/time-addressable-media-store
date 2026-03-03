@@ -93,90 +93,18 @@ The **Lambda VPC endpoint** requirement has been removed from the deployment pre
 
 ### 1. Flexible Authentication Options
 
-You now have three authentication options when deploying TAMS:
+Version 6.0.0 introduces flexible authentication with three options:
 
-#### Option A: Use Deployed Cognito (Default)
+- **Use Deployed Cognito** (default) - Automatic Cognito deployment with Lambda Authorizer
+- **Use Your Own JWT Issuer** (OIDC) - Bring your own identity provider (Auth0, Okta, Azure AD, etc.)
+- **Use Your Own Lambda Authorizer** - Complete custom authorization logic
 
-- Leave both `JwtIssuerUrl` and `LambdaAuthorizerArn` blank during deployment
-- Cognito User Pool will be created automatically
-- A Lambda Authorizer will validate Cognito-issued JWT tokens
-- Best for getting started or if you don't have an existing identity provider
+**See the [Authorization section in the main README](../../README.md#authorization) for complete details on:**
 
-#### Option B: Use Your Own JWT Issuer (OIDC Provider)
-
-- Provide `JwtIssuerUrl` parameter during deployment (e.g., `https://your-identity-provider.com`)
-- Cognito will NOT be deployed
-- A Lambda Authorizer will validate JWT tokens from your issuer
-- Your JWT tokens must include specific claims (see New Parameters section below)
-- Best for organizations with existing identity providers (Auth0, Okta, Azure AD, etc.)
-
-#### Option C: Use Your Own Lambda Authorizer
-
-- Provide `LambdaAuthorizerArn` parameter during deployment
-- Cognito will NOT be deployed
-- No default Lambda Authorizer is deployed
-- You provide complete custom authorization logic
-- Best for advanced scenarios with custom authentication requirements
-
-**Note:** Only one of `JwtIssuerUrl` or `LambdaAuthorizerArn` can be provided.
-
-### 2. Fine-Grained Authorization Utilities
-
-New utility functions have been added to support fine-grained authorization checks within Lambda functions, making it easier to implement scope-based access control in custom logic.
-
-## 📋 New Template Parameters
-
-Two new optional parameters have been added:
-
-### `JwtIssuerUrl`
-
-- **Type:** String (URL)
-- **Default:** Empty
-- **Description:** The URL for the issuer of JWT tokens from your own identity provider
-- **Example:** `https://auth.example.com`
-- **When to use:** If you have an existing OIDC-compatible identity provider
-- **Effect:** When provided, Cognito will not be deployed
-
-**JWT Token Requirements:**
-Your JWT tokens must include these claims:
-
-- `iss` (required): Issuer URL, must match the `JwtIssuerUrl` parameter
-- `scope` (required): Space-separated OAuth scopes (e.g., "tams-api/read tams-api/write")
-- `sub` (required): Subject identifier (used as username fallback)
-- `username` (optional): Username for audit fields (created_by, updated_by). If not provided, `sub` is used.
-
-Example JWT payload:
-
-```json
-{
-  "iss": "https://your-identity-provider.com",
-  "sub": "user-12345",
-  "username": "john.doe@example.com",
-  "scope": "tams-api/read tams-api/write tams-api/delete",
-  "exp": 1234567890
-}
-```
-
-### `LambdaAuthorizerArn`
-
-- **Type:** String (ARN)
-- **Default:** Empty
-- **Description:** The ARN of an existing Lambda Authorizer function
-- **Example:** `arn:aws:lambda:us-east-1:123456789012:function:my-authorizer`
-- **When to use:** If you need completely custom authorization logic
-- **Effect:** When provided, Cognito and the default Lambda Authorizer will not be deployed
-
-**Custom Lambda Authorizer Requirements:**
-Your authorizer must return a context object with:
-
-```json
-{
-  "context": {
-    "scopes": "[\"tams-api/read\", \"tams-api/write\"]",
-    "username": "john.doe@example.com"
-  }
-}
-```
+- How to configure each authentication option
+- Required JWT token claims for custom issuers
+- Lambda Authorizer context requirements
+- OAuth scopes and how to use them
 
 ## 🔄 Upgrade Process
 
