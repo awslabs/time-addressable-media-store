@@ -2,8 +2,6 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Description: TAMS API Cognito Stack
 
-Transform: AWS::Serverless-2016-10-31
-
 Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
