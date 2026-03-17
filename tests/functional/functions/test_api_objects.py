@@ -2,6 +2,7 @@ import json
 import uuid
 from http import HTTPStatus
 
+# pylint: disable=no-name-in-module
 import constants
 import pytest
 from conftest import create_pagination_token
