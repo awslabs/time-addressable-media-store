@@ -22,6 +22,7 @@ from aws_lambda_powertools.event_handler.openapi.params import Body, Path, Query
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import list_storage_backends
+from mediatimestamp.immutable import Timestamp
 from neptune import (
     check_node_exists,
     delete_webhook,
@@ -86,6 +87,10 @@ def get_service():
         type="urn:x-tams:service.example",
         api_version=stage_variables["api_version"],
         service_version=stage_variables["service_version"],
+        min_object_timeout=str(Timestamp.from_float(constants.MIN_OBJECT_TIMEOUT_SECS)),
+        min_presigned_url_timeout=str(
+            Timestamp.from_float(constants.MIN_PRESIGNED_URL_TIMEOUT_SECS)
+        ),
         **get_item.get("Item", {}),
     )
     service.event_stream_mechanisms = [Eventstreamcommon(name="webhooks")]

@@ -88,6 +88,8 @@ def test_Service_Information_GET_200(api_client_cognito):
     assert "api_version" in response.json()
     assert "service_version" in response.json()
     assert "event_stream_mechanisms" in response.json()
+    assert "min_object_timeout" in response.json()
+    assert "min_presigned_url_timeout" in response.json()
 
 
 def test_Update_Service_Information_POST_200(api_client_cognito):

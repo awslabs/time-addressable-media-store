@@ -822,7 +822,7 @@ def post_flow_storage_by_id(
     )
     expire_at = int(
         (
-            datetime.now() + timedelta(seconds=constants.PRESIGNED_URL_EXPIRES_IN)
+            datetime.now() + timedelta(seconds=constants.MIN_OBJECT_TIMEOUT_SECS)
         ).timestamp()
     )
     for media_object in flow_storage.media_objects:

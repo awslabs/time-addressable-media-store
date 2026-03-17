@@ -19,7 +19,8 @@ RETURN_LITERAL = {
     "delete_request": "delete_request {.*, error: CASE WHEN e.type IS NULL THEN NULL ELSE e {.*} END}",
     "webhook": "webhook {.*, tags: t {.*}}",
 }
-PRESIGNED_URL_EXPIRES_IN = 3600
+MIN_OBJECT_TIMEOUT_SECS = 3600
+MIN_PRESIGNED_URL_TIMEOUT_SECS = 3600
 SERVICE_INFO_ID = "1"
 DDB_MAX_RETRIES = 3
 ADMIN_SCOPE = "tams-api/admin"
