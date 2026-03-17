@@ -268,7 +268,7 @@ class TestUtils:
 
         assert mock_s3.generate_presigned_url.call_count == 1
         assert result == expected
-        assert kw_args["ExpiresIn"] == utils.constants.PRESIGNED_URL_EXPIRES_IN
+        assert kw_args["ExpiresIn"] == utils.constants.MIN_PRESIGNED_URL_TIMEOUT_SECS
 
     @pytest.mark.parametrize(
         "auth_classes_json,expected",

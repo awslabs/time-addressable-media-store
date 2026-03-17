@@ -480,7 +480,10 @@ class Httprequest(BaseModel):
     model_config = ConfigDict(
         extra="allow",
     )
-    url: str = Field(..., description="The URL to make the request to")
+    url: str = Field(
+        ...,
+        description="The URL to make the request to. Where this URL is pre-signed, it SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).",
+    )
     body: Optional[str] = Field(
         None,
         description="The text of the body which needs to be included in the request",
@@ -521,37 +524,6 @@ class Objectsinstancespost2(BaseModel):
     label: str = Field(
         ...,
         description="Label identifying this Media Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends.",
-    )
-
-
-class Service(BaseModel):
-    """
-    Provides information about the service instance
-    """
-
-    name: Optional[str] = Field(
-        None,
-        description="The service instance name. This should be a very short, human-readable name that may be displayed in listings of Service instances.",
-    )
-    description: Optional[str] = Field(
-        None,
-        description="The service instance description. This should be a human-readable description that may be showed in detailed views of Service instances. The description should be longer and more detailed than `name`.",
-    )
-    type: str = Field(
-        ...,
-        description="The type identifier for the service instance. The value must start with 'urn:x-tams:service'",
-    )
-    api_version: constr(pattern=r"^(0|[1-9]\d*)\.(0|[1-9]\d*)$") = Field(
-        ...,
-        description="The version of the TAMS API specification this service instance implements",
-    )
-    service_version: Optional[str] = Field(
-        None,
-        description="The version of software providing this service. Note: Different implementations and software houses may use different conventions for their version identification. As such, this field is intentionally permissive and intended to be informative only. Client implementations should avoid using this field to determine compatibility.",
-    )
-    event_stream_mechanisms: Optional[List[Eventstreamcommon]] = Field(
-        None,
-        description="List the types of event stream that this service implementation supports",
     )
 
 
@@ -615,7 +587,7 @@ class Timerange(
         pattern=r"^(\[|\()?(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?(_(-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}))?)?(\]|\))?$"
     ) = Field(
         ...,
-        description="A timerange of timestamps. It is represented using one or two timestamps with inclusivity and exclusivity markers.\n\nE.g.\n* `[0:0_10:0)` represents 10 seconds of media starting at timestamp `0:0` and ending before `10:0`.\n* `(5:0_` represents a timerange starting after `5:0` and to eternity.\n* `[1694429247:0_1694429248:0)` is a 1 second TAI timerange starting at 2023-09-11T10:46:50.0Z UTC.\n* `[1694429247:0]` is an instantaneous TAI timerange at 2023-09-11T10:46:50.0Z UTC.\n  This is equivalent to `[1694429247:0_1694429247:0]`.\n  The short syntax is preferred due to ease of identification as instantaneous.\n  Instantaneous TimeRanges cannot use exclusive markers (i.e. `(` or `)`).\n* A `[` or `]` indicates that bound is inclusive, and a `(` or `)` indicates that bound is exclusive.\n\nDetails of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.\n",
+        description='A timerange of timestamps. It is represented using one or two timestamps with inclusivity and exclusivity markers.\n\nE.g.\n* `[0:0_10:0)` represents 10 seconds of media starting at timestamp `0:0` and ending before `10:0`.\n* `(5:0_` represents a timerange starting after `5:0` and to eternity.\n* `_` without timestamps or inclusivity markers represents "eternity" (i.e. the entire timeline).\n* `()` without timestamps represents "never" (i.e. a range of zero length in no particular position).\n* `[1694429247:0_1694429248:0)` is a 1 second TAI timerange starting at 2023-09-11T10:46:50.0Z UTC.\n* `[1694429247:0]` is an instantaneous TAI timerange at 2023-09-11T10:46:50.0Z UTC.\n  This is equivalent to `[1694429247:0_1694429247:0]`.\n  The short syntax is preferred due to ease of identification as instantaneous.\n  Instantaneous TimeRanges cannot use exclusive markers (i.e. `(` or `)`).\n* A `[` or `]` indicates that bound is inclusive, and a `(` or `)` indicates that bound is exclusive.\n\nDetails of the format can be found in the [Timestamps in TAMS](https://github.com/bbc/tams/blob/main/docs/appnotes/0008-timestamps-in-TAMS.md) application note.\n',
         title="TimeRange",
     )
 
@@ -918,7 +890,7 @@ class Flowcore(BaseModel):
     )
     container: Optional[Mimetype] = Field(
         None,
-        description="The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+        description="The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence Flows that do reference Media Objects), this property MUST NOT be set.",
     )
     avg_bit_rate: Optional[conint(ge=0)] = Field(
         None,
@@ -1131,7 +1103,7 @@ class GetUrl1(Storagebackend):
     )
     presigned: Optional[bool] = Field(
         None,
-        description="If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed.",
+        description="If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed. The presigned URL SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).",
     )
     label: Optional[str] = Field(
         None,
@@ -1173,6 +1145,45 @@ class Objectsinstancespost(
         ...,
         description="Register a Media Object instance in the store.",
         title="Media object registration",
+    )
+
+
+class Service(BaseModel):
+    """
+    Provides information about the service instance
+    """
+
+    name: Optional[str] = Field(
+        None,
+        description="The service instance name. This should be a very short, human-readable name that may be displayed in listings of Service instances.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="The service instance description. This should be a human-readable description that may be showed in detailed views of Service instances. The description should be longer and more detailed than `name`.",
+    )
+    type: str = Field(
+        ...,
+        description="The type identifier for the service instance. The value must start with 'urn:x-tams:service'",
+    )
+    api_version: constr(pattern=r"^(0|[1-9]\d*)\.(0|[1-9]\d*)$") = Field(
+        ...,
+        description="The version of the TAMS API specification this service instance implements",
+    )
+    service_version: Optional[str] = Field(
+        None,
+        description="The version of software providing this service. Note: Different implementations and software houses may use different conventions for their version identification. As such, this field is intentionally permissive and intended to be informative only. Client implementations should avoid using this field to determine compatibility.",
+    )
+    event_stream_mechanisms: Optional[List[Eventstreamcommon]] = Field(
+        None,
+        description="List the types of event stream that this service implementation supports",
+    )
+    min_object_timeout: Timestamp = Field(
+        ...,
+        description="The minimum timeframe within which a Media Object created by this service must be registered against a Flow segment before it is garbage collected. Services SHOULD allow a small grace period beyond the advertised value to account for latency in assigning the Objects and returning them to the Client. This timeout MUST be `300:0` (i.e. 5 minutes) or greater. Clients MUST be capable of reaching this minimum performance level. Clients SHOULD adapt to this value by balancing how many object URLs to request per page against how fast they will be used. Services MAY allow this value to be configured at deploy-time. Format as described by the [Timestamp](#/schemas/timestamp) type. For more infomation, see the documentation of the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage) endpoint.",
+    )
+    min_presigned_url_timeout: Optional[Timestamp] = Field(
+        None,
+        description="The minimum timeframe within which pre-signed URLs generated by this Service are valid for (both for writing and reading content). This attribute MUST be set on implementations that support pre-signed URLs. Services SHOULD allow a small grace period beyond the advertised value to account for latency in generating pre-signed URLs and returning them to the Client. This timeout MUST be `30:0` (i.e. 30 second) or greater. The value of this parameter MUST be equal or less than `min_object_timeout` to avoid Objects being garbage collected while their pre-signed PUT URLs are still valid. Clients MUST be capable of reaching this minimum performance level. Clients SHOULD adapt to this value, by taking care to request URLs that will be used in a timely manner. Services MAY allow this value to be configured at deploy-time. Format as described by the [Timestamp](#/schemas/timestamp) type.",
     )
 
 
@@ -1252,7 +1263,7 @@ class Webhookget(Webhookwithid):
 
     error: Optional[Error] = Field(
         None,
-        description="Provides more information for the error status, as described by the [Error](../schemas/error#top) type",
+        description="Provides more information for the error status, as described by the [Error](#/schemas/error) type",
     )
     status: Status1 = Field(
         ...,
@@ -1300,15 +1311,15 @@ class Flowsegment(Objectcore):
     )
     ts_offset: Optional[Timestamp] = Field(
         None,
-        description="The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](../schemas/timestamp#top) type",
+        description="The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](#/schemas/timestamp) type",
     )
     timerange: Timerange = Field(
         ...,
-        description="The timerange for the samples contained in the Segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.",
+        description="The timerange for the samples contained in the Segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](#/schemas/timerange) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.",
     )
     last_duration: Optional[Timestamp] = Field(
         None,
-        description="The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative",
+        description="The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](#/schemas/timestamp) type, but cannot be negative",
     )
     object_timerange: Optional[Timerange] = Field(
         None,

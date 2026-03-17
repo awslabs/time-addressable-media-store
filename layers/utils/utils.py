@@ -406,7 +406,7 @@ def generate_presigned_url(
             "Key": key,
             **kwargs,
         },
-        ExpiresIn=constants.PRESIGNED_URL_EXPIRES_IN,
+        ExpiresIn=constants.MIN_PRESIGNED_URL_TIMEOUT_SECS,
     )
     return url
 

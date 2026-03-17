@@ -985,13 +985,13 @@ paths:
       parameters:
       - name: include_timerange
         in: query
-        description: Include the available Segment timerange in the response.
+        description: Include `timerange` in the response.
         schema:
           default: false
           type: boolean
       - name: timerange
         in: query
-        description: Limit the returned available Segment timerange to this timerange.
+        description: Limit `timerange` of the response to the time range over which Segments partially or wholly overlap with the provided timerange.
         schema:
           default: _
           $ref: '#/components/schemas/timerange'
@@ -1011,13 +1011,13 @@ paths:
       parameters:
       - name: include_timerange
         in: query
-        description: Include the available Segment timerange in the response.
+        description: Include `timerange` in the response.
         schema:
           default: false
           type: boolean
       - name: timerange
         in: query
-        description: Limit the returned available Segment timerange to this timerange.
+        description: Limit `timerange` of the response to the time range over which Segments partially or wholly overlap with the provided timerange.
         schema:
           default: _
           $ref: '#/components/schemas/timerange'
@@ -1728,7 +1728,7 @@ paths:
           type: string
       - name: timerange
         in: query
-        description: Return only the results in the timerange specified.
+        description: Return only the results that partially or wholly overlap the timerange specified.
         schema:
           $ref: '#/components/schemas/timerange'
       - name: reverse_order
@@ -1855,7 +1855,7 @@ paths:
           type: string
       - name: timerange
         in: query
-        description: Return only the results in the timerange specified.
+        description: Return only the results that partially or wholly overlap the timerange specified.
         schema:
           $ref: '#/components/schemas/timerange'
       - name: reverse_order
@@ -2097,7 +2097,14 @@ paths:
 
         The response will include a PUT URL that a client uses to upload the Media Object.
         The client is expected to register the Flow Segment using the [/flows/{flowId}/segments](#/operations/POST_flows-flowId-segments) endpoint once the upload is complete.
-        Service implementations need to handle situations where Objects were uploaded but no Flow Segment was registered successfully.
+
+        Clients MAY request Objects in batches to reduce the number of HTTP requests made to the Service.
+        Clients are not expected to use all of the Objects they requested.
+        Objects will likely go unused in cases such as shutdown of ingesting clients, the end of ingested live streams, and unexpected network congestion.
+        Clients SHOULD, however, adapt the number of Objects they request such that they may reasonably expect to use them before the timeout advertised in [`min_object_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).
+
+        Service implementations need to handle situations where Objects are not used, and where content is were uploaded but no Flow Segment was registered successfully.
+        In these circumstances, Services should garbage collect Objects after the timeout advertised in [`min_object_timeout` at the `/service`](#/operations/GET_service) endpoint.
 
         When making requests to the provided `put_url`, clients should include credentials if the provided URL is on the same origin as the API itself, akin to the `same-origin` mode in the [WhatWG Fetch Standard](https://fetch.spec.whatwg.org/#concept-request-credentials-mode).
       operationId: POST_flows-flowId-storage
@@ -2225,7 +2232,7 @@ paths:
         '400':
           $ref: '#/components/responses/trait_resource_info_head_400'
         '404':
-          description: The requested Media Object does not exist.
+          description: The requested Media Object does not exist. 404 MUST be returned if the ID has been assigned via the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage), but not yet registered against a Flow Segment.
     get:
       summary: Media Object Information
       description: |
@@ -2324,7 +2331,7 @@ paths:
         '400':
           description: Bad request. Invalid query options.
         '404':
-          description: The requested Media Object does not exist.
+          description: The requested Media Object does not exist. 404 MUST be returned if the ID has been assigned via the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage), but not yet registered against a Flow Segment.
   /objects/{objectId}/instances:
     post:
       summary: Register a Media Object instance
@@ -2375,7 +2382,7 @@ paths:
         '403':
           description: Forbidden. You do not have permission to modify this Media Object.
         '404':
-          description: The Media Object does not exist.
+          description: The Media Object does not exist. 404 MUST be returned if the ID has been assigned via the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage), but not yet registered against a Flow Segment.
     delete:
       summary: Delete a Media Object instance
       description: |
@@ -2414,7 +2421,7 @@ paths:
         '403':
           description: Forbidden. You do not have permission to modify this Media Object.
         '404':
-          description: The requested Object ID in the path is invalid.
+          description: The requested Object ID in the path is invalid. 404 MUST be returned if the ID has been assigned via the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage), but not yet registered against a Flow Segment.
   /flow-delete-requests:
     head:
       summary: List Flow Delete Requests
@@ -3102,7 +3109,8 @@ components:
           description: A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.
           $ref: '#/components/schemas/mimetype'
         container:
-          description: The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.
+          description: The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence
+            Flows that do reference Media Objects), this property MUST NOT be set.
           $ref: '#/components/schemas/mimetype'
         avg_bit_rate:
           description: The average bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
@@ -3245,13 +3253,13 @@ components:
             description: The object store identifier for the Media Object.
             type: string
           ts_offset:
-            description: The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](../schemas/timestamp#top) type
+            description: The timestamp offset between the sample timestamps stored in the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](#/schemas/timestamp) type
             $ref: '#/components/schemas/timestamp'
           timerange:
-            description: The timerange for the samples contained in the Segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](../schemas/timerange#top) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.
+            description: The timerange for the samples contained in the Segment. The timerange start is always inclusive. If samples have a duration then the timerange end is exclusive and covers at least the duration of the last sample. The exclusive timerange end will typically be set to the timestamp of the next sample. If the samples don't have a duration then the timerange end is inclusive. Format is described by the [TimeRange](#/schemas/timerange) type. Note that where temporal re-ordering is used, the timerange and samples refers to the presentation timeline.
             $ref: '#/components/schemas/timerange'
           last_duration:
-            description: The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](../schemas/timestamp#top) type, but cannot be negative
+            description: The difference between the exclusive end of the `timerange` and the last sample timestamp. Format as described by the [Timestamp](#/schemas/timestamp) type, but cannot be negative
             $ref: '#/components/schemas/timestamp'
           object_timerange:
             description: The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline.
@@ -3571,7 +3579,7 @@ components:
       - url
       properties:
         url:
-          description: The URL to make the request to
+          description: The URL to make the request to. Where this URL is pre-signed, it SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).
           type: string
         body:
           description: The text of the body which needs to be included in the request
@@ -3639,7 +3647,7 @@ components:
                   description: A URL to which a GET request can be made to directly retrieve the contents of the media object. Clients should include credentials if the provide URL is on the same origin as the API endpoint
                   type: string
                 presigned:
-                  description: If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed.
+                  description: If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed. The presigned URL SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).
                   type: boolean
                 label:
                   description: Label identifying this URL. If the URL is controlled by the service instance, this is the Storage Backend's label. If the URL is uncontrolled, this is the label provided when a client registered the URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.
@@ -3684,6 +3692,7 @@ components:
       required:
       - type
       - api_version
+      - min_object_timeout
       properties:
         name:
           description: The service instance name. This should be a very short, human-readable name that may be displayed in listings of Service instances.
@@ -3706,6 +3715,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/eventstreamcommon'
+        min_object_timeout:
+          description: The minimum timeframe within which a Media Object created by this service must be registered against a Flow segment before it is garbage collected. Services SHOULD allow a small grace period beyond the advertised value to account for latency in assigning the Objects and returning them to the Client. This timeout MUST be `300:0` (i.e. 5 minutes) or greater. Clients MUST be capable of reaching this minimum performance level. Clients SHOULD adapt to this value by balancing how many object URLs to request per page against how fast they will be used. Services MAY allow this value to be configured at deploy-time. Format as described by the [Timestamp](#/schemas/timestamp) type. For more infomation, see the documentation of the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage) endpoint.
+          $ref: '#/components/schemas/timestamp'
+        min_presigned_url_timeout:
+          description: The minimum timeframe within which pre-signed URLs generated by this Service are valid for (both for writing and reading content). This attribute MUST be set on implementations that support pre-signed URLs. Services SHOULD allow a small grace period beyond the advertised value to account for latency in generating pre-signed URLs and returning them to the Client. This timeout MUST be `30:0` (i.e. 30 second) or greater. The value of this parameter MUST be equal or less than `min_object_timeout` to avoid Objects being garbage collected while their pre-signed PUT URLs are still valid. Clients MUST be capable of reaching this minimum performance level. Clients SHOULD adapt to this value, by taking care to request URLs that will be used in a timely manner. Services MAY allow this value to be configured at deploy-time. Format as described by the [Timestamp](#/schemas/timestamp) type.
+          $ref: '#/components/schemas/timestamp'
     servicepost:
       title: Update Service Info
       description: Post update to the service info
@@ -3830,6 +3845,8 @@ components:
         E.g.
         * `[0:0_10:0)` represents 10 seconds of media starting at timestamp `0:0` and ending before `10:0`.
         * `(5:0_` represents a timerange starting after `5:0` and to eternity.
+        * `_` without timestamps or inclusivity markers represents "eternity" (i.e. the entire timeline).
+        * `()` without timestamps represents "never" (i.e. a range of zero length in no particular position).
         * `[1694429247:0_1694429248:0)` is a 1 second TAI timerange starting at 2023-09-11T10:46:50.0Z UTC.
         * `[1694429247:0]` is an instantaneous TAI timerange at 2023-09-11T10:46:50.0Z UTC.
           This is equivalent to `[1694429247:0_1694429247:0]`.
@@ -3950,7 +3967,7 @@ components:
         - status
         properties:
           error:
-            description: Provides more information for the error status, as described by the [Error](../schemas/error#top) type
+            description: Provides more information for the error status, as described by the [Error](#/schemas/error) type
             $ref: '#/components/schemas/error'
           status:
             description: Status of the Webhook. `created` indicates the webhook has been successfully registered but is yet to begin sending events or, depending on the service implementation, the worker responsible for sending the events has yet to start. `started` indicates the webhook is active and sending events. `disabled` indicates the webhook has been disabled by a client and is not currently sending events. `error` indicates an error condition has been encountered and the webhook has been disabled by the service instance. More information about the error condition will be indicated by the service instance in the `error` parameter. Service implementations SHOULD implement appropriate retries and only enter the `error` state when absolutely necesary. A webhook in the `error` or `disabled` state may be re-enabled by a client by setting the status to `created`. A webhook in the `created` or `started` state may be disabled by a client by setting the status to `disabled`. Attempting to
