@@ -161,7 +161,7 @@ def get_flows(
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump([Flow(**item) for item in items]),
+        body=model_dump([Flow(item) for item in items]),
         headers=custom_headers,
     )
 
@@ -192,7 +192,7 @@ def get_flow_by_id(
         )
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump(Flow(**item)), HTTPStatus.OK.value  # 200
+    return model_dump(Flow(item)), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>")
@@ -239,7 +239,7 @@ def put_flow_by_id(
         flow.root.created_by = username
     if not flow.root.updated_by and existing_item:
         flow.root.updated_by = username
-    item_dict = model_dump(Flow(**merge_source_flow(model_dump(flow), existing_item)))
+    item_dict = model_dump(Flow(merge_source_flow(model_dump(flow), existing_item)))
     publish_event(
         (f"{record_type}s/updated" if existing_item else f"{record_type}s/created"),
         {record_type: item_dict},
@@ -312,7 +312,7 @@ def get_flow_tags(flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATT
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
+    return model_dump(Tags(tags)), HTTPStatus.OK.value  # 200
 
 
 @app.head("/flows/<flowId>/tags/<name>")
@@ -551,9 +551,11 @@ def get_flow_flow_collection(
 @app.put("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
 def put_flow_flow_collection(
-    flow_collection: Annotated[Flowcollection, Body()],
+    flow_collection_list: Annotated[list[FlowcollectionItem], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
+    # Wrap list in Flowcollection model
+    flow_collection = Flowcollection(flow_collection_list)
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
@@ -805,7 +807,7 @@ def post_flow_storage_by_id(
         raise ForbiddenError(
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
-    flow: Flow = Flow(**item)
+    flow: Flow = Flow(item)
     if flow.root.container is None:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."

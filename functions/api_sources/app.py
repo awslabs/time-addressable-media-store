@@ -123,7 +123,7 @@ def get_source_tags(
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump(Tags(**tags)), HTTPStatus.OK.value  # 200
+    return model_dump(Tags(tags)), HTTPStatus.OK.value  # 200
 
 
 @app.head("/sources/<sourceId>/tags/<name>")
