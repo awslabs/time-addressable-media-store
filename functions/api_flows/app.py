@@ -551,11 +551,9 @@ def get_flow_flow_collection(
 @app.put("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
 def put_flow_flow_collection(
-    flow_collection_list: Annotated[list[FlowcollectionItem], Body()],
+    flow_collection: Annotated[Flowcollection, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
-    # Wrap list in Flowcollection model
-    flow_collection = Flowcollection(flow_collection_list)
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
