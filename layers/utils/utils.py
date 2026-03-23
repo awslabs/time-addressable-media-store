@@ -23,7 +23,7 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
 from botocore.config import Config
 from mediatimestamp.immutable import TimeRange, Timestamp
 from params import essence_params
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from schema import FailedSegment, Flowsegmentpost
 
 tracer = Tracer()
@@ -506,3 +506,37 @@ def calculate_object_timerange(segment: Flowsegmentpost) -> str:
             )
         )
     return segment.timerange.root
+
+
+@tracer.capture_method(capture_response=False)
+def validate_request_body(raw_body_str, type_annotation):
+    """Validate request body against a type annotation with proper error formatting for BadRequestError."""
+    # Parse JSON body
+    try:
+        body_value = json.loads(raw_body_str)
+    except json.JSONDecodeError as e:
+        # Invalid JSON - match Lambda Powertools error format
+        raise BadRequestError(
+            [
+                {
+                    "type": "json_invalid",
+                    "loc": ("body", e.pos),
+                    "msg": "JSON decode error",
+                    "input": {},
+                    "ctx": {"error": e.msg},
+                }
+            ]
+        ) from e
+
+    # Validate the parsed value
+    try:
+        adapter = TypeAdapter(type_annotation)
+        return adapter.validate_python(body_value)
+    except ValidationError as ex:
+        # Adjust error locations to match automatic validation format
+        errors = []
+        for err in ex.errors():
+            err_copy = err.copy()
+            err_copy["loc"] = ("body",) + tuple(err_copy["loc"])
+            errors.append(err_copy)
+        raise BadRequestError(errors) from ex

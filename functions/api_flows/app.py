@@ -75,6 +75,7 @@ from utils import (
     publish_event,
     put_message,
     validate_frame_rate,
+    validate_request_body,
 )
 
 tracer = Tracer()
@@ -336,10 +337,11 @@ def get_flow_tag_value(
 @app.put("/flows/<flowId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def put_flow_tag_value(
-    tag_value: Annotated[str | list[str], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
+    # Manual validation to work around PowerTools v3.25+ Body() list normalization bug
+    tag_value = validate_request_body(app.current_event.decoded_body, str | list[str])
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
@@ -551,9 +553,12 @@ def get_flow_flow_collection(
 @app.put("/flows/<flowId>/flow_collection")
 @tracer.capture_method(capture_response=False)
 def put_flow_flow_collection(
-    flow_collection: Annotated[Flowcollection, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
+    # Manual validation to work around PowerTools v3.25+ Body() list normalization bug
+    flow_collection = validate_request_body(
+        app.current_event.decoded_body, Flowcollection
+    )
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
