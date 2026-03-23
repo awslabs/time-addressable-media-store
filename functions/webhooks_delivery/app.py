@@ -52,7 +52,7 @@ def record_handler(record: SQSRecord) -> None:
     # Use associated model to clean the response data
     match event.detail_type:
         case "flows/created" | "flows/updated":
-            event.detail["flow"] = model_dump(Flow(**event.detail["flow"]))
+            event.detail["flow"] = model_dump(Flow(event.detail["flow"]))
         case "source/created" | "source/updated":
             event.detail["source"] = model_dump(Source(**event.detail["source"]))
         case "flows/segments_added":
