@@ -9,7 +9,7 @@ The following dependencies must be installed. Please refer to your operating sys
 > **Note:** For Windows, we recommend enabling Windows Subsystem for Linux (WSL) and installing a Linux distribution of your choice,
 > for example, here are the instructions on how to install [Ubuntu](https://ubuntu.com/tutorials/ubuntu-on-windows).
 
-- Python ~= 3.13.0 and pip
+- Python ~= 3.14.0 and pip
 - [poetry](https://python-poetry.org/) - Python dependency management
 - [pre-commit](https://pre-commit.com/#install) - Git hooks manager
 - [cfn-lint](https://github.com/aws-cloudformation/cfn-lint) - CloudFormation linting
