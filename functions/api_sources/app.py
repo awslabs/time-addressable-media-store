@@ -38,7 +38,6 @@ from utils import (
     opencypher_property_name,
     parse_tag_parameters,
     publish_event,
-    validate_request_body,
 )
 
 tracer = Tracer()
@@ -148,11 +147,10 @@ def get_source_tag_value(
 @app.put("/sources/<sourceId>/tags/<name>")
 @tracer.capture_method(capture_response=False)
 def put_source_tag_value(
+    tag_value: Annotated[str | list[str], Body()],
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
-    # Manual validation to work around PowerTools v3.25+ Body() list normalization bug
-    tag_value = validate_request_body(app.current_event.decoded_body, str | list[str])
     if not check_node_exists(record_type, source_id):
         raise NotFoundError(
             "The requested Source does not exist, or the tag name in the path is invalid."
