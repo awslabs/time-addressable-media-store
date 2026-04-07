@@ -87,7 +87,7 @@ Resources:
           NEW_STORAGE_TABLE: !Ref NewStorageTableName
           NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:30
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayerArn
       VpcConfig:
         SubnetIds: !Ref LambdaSubnetIds
