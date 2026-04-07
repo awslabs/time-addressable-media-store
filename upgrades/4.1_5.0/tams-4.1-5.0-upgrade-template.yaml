@@ -76,7 +76,7 @@ Resources:
       Timeout: 900
       MemorySize: 10240
       Handler: index.lambda_handler
-      Runtime: python3.13
+      Runtime: python3.14
       Architectures:
         - arm64
       Environment:
@@ -87,7 +87,7 @@ Resources:
           NEW_STORAGE_TABLE: !Ref NewStorageTableName
           NEPTUNE_ENDPOINT: !Ref NeptuneEndpoint
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayerArn
       VpcConfig:
         SubnetIds: !Ref LambdaSubnetIds

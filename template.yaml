@@ -73,7 +73,7 @@ Mappings:
   Solution:
     Constants:
       ApiVersion: "8.0"
-      ServiceVersion: 6.0.0
+      ServiceVersion: 6.1.0
 
 Conditions:
   CreateVpc: !Equals [!Ref VpcId, ""]
@@ -92,7 +92,7 @@ Globals:
     Timeout: 30
     MemorySize: 1024
     Handler: app.lambda_handler
-    Runtime: python3.13
+    Runtime: python3.14
     Architectures:
       - arm64
     VpcConfig:
@@ -130,7 +130,7 @@ Resources:
         ApplyOn: PublishedVersions
       CodeUri: functions/lambda_authorizer/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
       Environment:
         Variables:
           POWERTOOLS_LOG_LEVEL: INFO
@@ -447,13 +447,13 @@ Resources:
   UtilsLayer:
     Type: AWS::Serverless::LayerVersion
     Metadata:
-      BuildMethod: python3.13
+      BuildMethod: python3.14
       BuildArchitecture: arm64
     Properties:
       RetentionPolicy: Delete
       ContentUri: layers/utils/
       CompatibleRuntimes:
-        - python3.13
+        - python3.14
       CompatibleArchitectures:
         - arm64
 
@@ -491,7 +491,7 @@ Resources:
     Properties:
       CodeUri: functions/api_service/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -629,7 +629,7 @@ Resources:
     Properties:
       CodeUri: functions/api_sources/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -777,7 +777,7 @@ Resources:
     Properties:
       CodeUri: functions/api_flows/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1064,7 +1064,7 @@ Resources:
     Properties:
       CodeUri: functions/api_flow_segments/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1165,7 +1165,7 @@ Resources:
     Properties:
       CodeUri: functions/api_objects/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1254,7 +1254,7 @@ Resources:
     Properties:
       CodeUri: functions/api_flow_delete_requests/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1312,7 +1312,7 @@ Resources:
     Properties:
       CodeUri: functions/webhooks/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1373,7 +1373,7 @@ Resources:
       VpcConfig: !Ref AWS::NoValue
       CodeUri: functions/webhooks_delivery/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Timeout: 900
       Environment:
@@ -1412,7 +1412,7 @@ Resources:
     Properties:
       CodeUri: functions/webhooks_error/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Environment:
         Variables:
@@ -1510,7 +1510,7 @@ Resources:
     Properties:
       CodeUri: functions/sqs_delete_requests/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Timeout: 900
       Environment:
@@ -1574,7 +1574,7 @@ Resources:
     Properties:
       CodeUri: functions/sqs_object_cleanup/
       Layers:
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:31
         - !Ref UtilsLayer
       Timeout: 900
       Environment:

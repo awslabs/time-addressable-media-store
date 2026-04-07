@@ -1,7 +1,7 @@
 import json
 import os
 from http import HTTPStatus
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -179,7 +179,7 @@ def get_flow_segments_by_id(
 @app.post("/flows/<flowId>/segments")
 @tracer.capture_method(capture_response=False)
 def post_flow_segments_by_id(
-    flow_segment: Annotated[Union[Flowsegmentpost, List[Flowsegmentpost]], Body()],
+    flow_segment: Annotated[Union[Flowsegmentpost, list[Flowsegmentpost]], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -192,7 +192,7 @@ def post_flow_segments_by_id(
         )  # 403
     if not item.get("container"):
         raise BadRequestError("Bad request. The flow 'container' is not set.")  # 400
-    if isinstance(flow_segment, List):
+    if isinstance(flow_segment, list):
         failed_segments = []
         for segment in flow_segment:
             segment_result = process_single_segment(item, segment)

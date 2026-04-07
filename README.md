@@ -138,9 +138,9 @@ The guide below assumes you are using **Client credentials** [OAuth 2.0 grant](h
 
 To request an access token, you will require 4 pieces of information:
 
-- **Client Id**: This can be retrieved from the Outputs of the Cloudformation Stack created during deployment or by browsing to the Cognito User Pool console and locating the App Client named `server-to-server`.
+- **Client Id**: This can be retrieved from the Outputs of the Cloudformation Stack created during deployment or by browsing to the Cognito User Pool console and locating the App Client named `{STACK_NAME}-CognitoStack-{XXX}-all-scopes`.
 
-- **Client Secret**: This can be retrieved from the Cognito User Pool console and locating the App Client named `server-to-server`. Click on this App Client to view its details and you will see an option to copy the Client secret.
+- **Client Secret**: This can be retrieved from the Cognito User Pool console and locating the App Client named `{STACK_NAME}-CognitoStack-{XXX}-all-scopes`. Click on this App Client to view its details and you will see an option to copy the Client secret.
 **NOTE: This Client secret is confidential, and care should be taken to store this value securely so that 3rd parties are not able to access it.**
 
 - **Token URL**: This can be retrieved from the Outputs of the Cloudformation Stack created during deployment.

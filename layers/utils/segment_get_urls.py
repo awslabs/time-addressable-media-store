@@ -1,5 +1,5 @@
 import concurrent.futures
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 from urllib.parse import urlparse
 
 from aws_lambda_powertools import Tracer
@@ -10,7 +10,7 @@ tracer = Tracer()
 
 
 @tracer.capture_method(capture_response=False)
-def create_presigned_get_url(s3_url: str) -> Tuple[str, str]:
+def create_presigned_get_url(s3_url: str) -> tuple[str, str]:
     """Generate a presigned URL for S3 object access.
 
     Args:
@@ -28,8 +28,8 @@ def create_presigned_get_url(s3_url: str) -> Tuple[str, str]:
 
 @tracer.capture_method(capture_response=False)
 def create_direct_s3_get_url(
-    object_id: str, storage_backend: Dict[str, str], include_storage_id: bool
-) -> Dict[str, str]:
+    object_id: str, storage_backend: dict[str, str], include_storage_id: bool
+) -> dict[str, str]:
     """Generate a non-signed S3 URL for object access.
 
     Args:
@@ -49,7 +49,7 @@ def create_direct_s3_get_url(
 
 
 @tracer.capture_method(capture_response=False)
-def create_presigned_urls_parallel(url_set: Set[str]) -> Dict[str, str]:
+def create_presigned_urls_parallel(url_set: set[str]) -> dict[str, str]:
     """Generate presigned URLs in parallel using ThreadPoolExecutor.
 
     Args:
@@ -74,7 +74,7 @@ def create_presigned_urls_parallel(url_set: Set[str]) -> Dict[str, str]:
 @tracer.capture_method(capture_response=False)
 def get_storage_backends(
     accept_storage_ids: Optional[str],
-) -> Dict[str, Dict]:
+) -> dict[str, dict]:
     """Get storage backend configurations for accepted storage ids.
 
     Args:
@@ -95,12 +95,12 @@ def get_storage_backends(
 
 @tracer.capture_method(capture_response=False)
 def create_segment_access_urls(
-    segment: Dict,
-    storage_backend: Dict,
+    segment: dict,
+    storage_backend: dict,
     generate_presigned_urls: bool,
     verbose_storage: bool,
     include_storage_id: bool,
-) -> List[Dict]:
+) -> list[dict]:
     """Generate controlled access URLs for a segment.
 
     Args:
@@ -110,7 +110,7 @@ def create_segment_access_urls(
         verbose_storage: Whether to include verbose storage info
 
     Returns:
-        List of URL dictionaries with labels and URLs
+        list of URL dictionaries with labels and URLs
     """
     direct_url = create_direct_s3_get_url(
         segment["object_id"], storage_backend, include_storage_id
@@ -134,7 +134,7 @@ def create_segment_access_urls(
 
 @tracer.capture_method(capture_response=False)
 def populate_get_urls(
-    segments: List[Dict],
+    segments: list[dict],
     accept_get_urls: Optional[str] = None,
     verbose_storage: Optional[bool] = None,
     accept_storage_ids: Optional[str] = None,
@@ -144,7 +144,7 @@ def populate_get_urls(
     """Populate the object get_urls based on the supplied parameters.
 
     Args:
-        segments: List of segment dictionaries to populate URLs for
+        segments: list of segment dictionaries to populate URLs for
         accept_get_urls: Comma-separated list of URL labels to accept
         verbose_storage: Whether to include verbose storage information
         accept_storage_ids: Comma-separated storage IDs to filter by

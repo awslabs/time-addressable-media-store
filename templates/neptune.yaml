@@ -68,7 +68,7 @@ Resources:
     Properties:
       AvailabilityZones: !Ref VpcAZs
       DBSubnetGroupName: !Ref DBSubnetGroup
-      EngineVersion: 1.4.5.1
+      EngineVersion: 1.4.6.3
       IamAuthEnabled: True
       StorageEncrypted: True
       VpcSecurityGroupIds:
