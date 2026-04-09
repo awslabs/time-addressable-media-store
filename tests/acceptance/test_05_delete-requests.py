@@ -32,7 +32,7 @@ def test_auth_401(verb, path, api_endpoint):
 
 
 def test_Delete_Flow_Segment_DELETE_202(
-    api_client_cognito, delete_requests, api_endpoint, stub_multi_flow
+    api_client_cognito, delete_requests, api_endpoint, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -61,6 +61,7 @@ def test_Delete_Flow_Segment_DELETE_202(
     assert "created_by" in response.json()
     assert "updated" in response.json()
     assert "status" in response.json()
+    expect_webhooks("flows/updated", *["flows/segments_deleted"] * 5)
 
 
 @pytest.mark.skip("Delete requests always returned unless object_id used")
@@ -92,7 +93,7 @@ def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito, stub_video
 
 
 def test_Delete_Flow_Segment_DELETE_202_timerange(
-    api_client_cognito, delete_requests, api_endpoint, stub_video_flow
+    api_client_cognito, delete_requests, api_endpoint, stub_video_flow, expect_webhooks
 ):
     """Delete segments with timerange query specified"""
     # Arrange
@@ -123,6 +124,7 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
     assert "created_by" in response.json()
     assert "updated" in response.json()
     assert "status" in response.json()
+    expect_webhooks("flows/updated", *["flows/segments_deleted"] * 2)
 
 
 @pytest.mark.skip("Delete requests always returned unless object_id used")
@@ -279,7 +281,7 @@ def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito, id_404):
 
 
 def test_Delete_Flow_DELETE_202_VIDEO(
-    api_client_cognito, delete_requests, api_endpoint, stub_video_flow
+    api_client_cognito, delete_requests, api_endpoint, stub_video_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}'
@@ -308,6 +310,11 @@ def test_Delete_Flow_DELETE_202_VIDEO(
     assert "created_by" in response.json()
     assert "updated" in response.json()
     assert "status" in response.json()
+    expect_webhooks(
+        "flows/deleted",
+        "sources/deleted",
+        *["flows/segments_deleted"] * 103,
+    )
 
 
 def test_Delete_Flow_DELETE_403(api_client_cognito, stub_audio_flow):
@@ -345,7 +352,9 @@ def test_Delete_Flow_DELETE_404(api_client_cognito, id_404):
     assert "The requested Flow ID in the path is invalid." == response.json()["message"]
 
 
-def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito, stub_audio_flow):
+def test_Delete_Flow_DELETE_204_AUDIO(
+    api_client_cognito, stub_audio_flow, expect_webhooks
+):
     """204 returned as stub_audio_flow has no segments"""
     # Need to set read_only to false prior to delete request
     api_client_cognito.request(
@@ -366,9 +375,13 @@ def test_Delete_Flow_DELETE_204_AUDIO(api_client_cognito, stub_audio_flow):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")  # Flip read_only flag to allow deletion
+    expect_webhooks("flows/deleted", "sources/deleted")
 
 
-def test_Delete_Flow_DELETE_204_DATA(api_client_cognito, stub_data_flow):
+def test_Delete_Flow_DELETE_204_DATA(
+    api_client_cognito, stub_data_flow, expect_webhooks
+):
     """204 returned as stub_data_flow has no segments"""
     # Arrange
     path = f'/flows/{stub_data_flow["id"]}'
@@ -383,9 +396,12 @@ def test_Delete_Flow_DELETE_204_DATA(api_client_cognito, stub_data_flow):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/deleted", "sources/deleted")
 
 
-def test_Delete_Flow_DELETE_204_IMAGE(api_client_cognito, stub_image_flow):
+def test_Delete_Flow_DELETE_204_IMAGE(
+    api_client_cognito, stub_image_flow, expect_webhooks
+):
     """204 returned as stub_image_flow has no segments"""
     # Arrange
     path = f'/flows/{stub_image_flow["id"]}'
@@ -400,10 +416,11 @@ def test_Delete_Flow_DELETE_204_IMAGE(api_client_cognito, stub_image_flow):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/deleted", "sources/deleted")
 
 
 def test_Delete_Flow_DELETE_204_MULTI(
-    api_client_cognito, delete_requests, stub_multi_flow
+    api_client_cognito, delete_requests, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}'
@@ -419,6 +436,7 @@ def test_Delete_Flow_DELETE_204_MULTI(
     assert response.status_code in [202, 204]
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
+    expect_webhooks("flows/deleted", "sources/deleted")
 
 
 def test_Flow_Delete_Request_Details_GET_200(api_client_cognito, delete_requests):

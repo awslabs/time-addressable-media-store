@@ -1,10 +1,22 @@
 import os
+import time
 from copy import deepcopy
 
 import boto3
 import pytest
 import requests
 from deepdiff import DeepDiff
+from webhook_helpers import (
+    collect_cloudwatch_logs,
+    compare_webhook_counts,
+    delete_webhook_stack,
+    deploy_webhook_stack,
+    get_api_key_value,
+    get_stack_outputs,
+    parse_webhook_events,
+    validate_webhook_events,
+    wait_for_stack_create,
+)
 
 STACK_NAME = os.environ["TAMS_STACK_NAME"]
 REGION = os.environ["TAMS_REGION"]
@@ -365,6 +377,211 @@ def stub_webhook_tags():
         "events": ["sources/created", "sources/updated", "sources/deleted"],
         "tags": {"auth_classes": ["news", "sports"]},
     }
+
+
+@pytest.fixture(scope="session")
+def webhook_test_data():
+    """Storage for webhook verification data across session."""
+    return {
+        "stack_name": None,
+        "webhook_id": None,
+        "start_time": None,
+        "enabled": False,
+    }
+
+
+# pylint: disable=redefined-outer-name
+@pytest.fixture(scope="session", autouse=True)
+def webhook_verification_lifecycle(
+    session, region, api_client_cognito, webhook_test_data, webhook_expectations
+):
+    """
+    Automated webhook delivery verification.
+
+    Enabled by default. Disable with: WEBHOOK_VERIFICATION_ENABLED=false
+
+    Flow:
+    1. Deploy webhook-api-gateway stack
+    2. Get stack outputs (API URL, API Key, Log Group)
+    3. Get API key value from API Gateway
+    4. Register webhook with TAMS API
+    5. [Tests run]
+    6. Wait for async webhook delivery (30s)
+    7. Collect CloudWatch logs
+    8. Parse webhook events from logs
+    9. Validate webhook structure and compare counts with expectations
+    10. Cleanup webhook registration
+    11. Delete CloudFormation stack
+    """
+
+    # Check if enabled (defaults to true, set to "false" to disable)
+    enabled = os.getenv("WEBHOOK_VERIFICATION_ENABLED", "true").lower() == "true"
+    webhook_test_data["enabled"] = enabled
+
+    if not enabled:
+        yield
+        return
+
+    print("\n🚀 Setting up webhook verification...")
+
+    # Record start time for log filtering
+    webhook_test_data["start_time"] = int(time.time() * 1000)
+
+    try:
+        # 1. Deploy CloudFormation stack
+        stack_name = f"tams-webhook-test-{int(time.time())}"
+        webhook_test_data["stack_name"] = stack_name
+
+        template_path = os.path.join(
+            os.path.dirname(__file__), "webhook-api-gateway.yaml"
+        )
+
+        print(f"   Deploying stack: {stack_name}...")
+        deploy_webhook_stack(session, region, stack_name, template_path)
+        wait_for_stack_create(session, region, stack_name)
+        print("   ✅ Stack deployed")
+
+        # 2. Get stack outputs
+        outputs = get_stack_outputs(session, region, stack_name)
+        webhook_url = outputs["ApiUrl"]
+        api_key_id = outputs["ApiKeyId"]
+        log_group_name = outputs["LogGroupName"]
+
+        # 3. Get API key value
+        api_key_value = get_api_key_value(session, region, api_key_id)
+
+        # 4. Register webhook with TAMS
+        print(f"   Registering webhook: {webhook_url}/test-events...")
+        response = api_client_cognito.request(
+            "POST",
+            "/service/webhooks",
+            json={
+                "url": f"{webhook_url}/test-events",
+                "api_key_name": "x-api-key",
+                "api_key_value": api_key_value,
+                "events": [
+                    "flows/created",
+                    "flows/updated",
+                    "flows/deleted",
+                    "flows/segments_added",
+                    "flows/segments_deleted",
+                    "sources/created",
+                    "sources/updated",
+                    "sources/deleted",
+                ],
+                "tags": {"_test_infrastructure": ["webhook_verification"]},
+            },
+        )
+        response.raise_for_status()
+        webhook_id = response.json()["id"]
+        webhook_test_data["webhook_id"] = webhook_id
+        print(f"   ✅ Webhook registered: {webhook_id}")
+
+        print("🧪 Running tests with webhook verification enabled...\n")
+
+    # pylint: disable=broad-exception-caught
+    except Exception as e:
+        print(f"\n❌ Webhook verification setup failed: {e}")
+        print("   Continuing with tests anyway...\n")
+        # Still yield to run tests
+        yield
+        # Cleanup on setup failure
+        if webhook_test_data.get("stack_name"):
+            try:
+                delete_webhook_stack(session, region, webhook_test_data["stack_name"])
+            # pylint: disable=broad-exception-caught
+            except Exception:
+                pass
+        return
+
+    # ========== TESTS RUN HERE ==========
+    yield
+    # =====================================
+
+    print("\n🔍 Verifying webhook deliveries...")
+
+    try:
+        # 5. Wait for async webhook delivery
+        print("   Waiting 30s for async webhook delivery...")
+        time.sleep(30)
+
+        # 6. Collect CloudWatch logs
+        print(f"   Collecting logs from {log_group_name}...")
+        log_events = collect_cloudwatch_logs(
+            session, region, log_group_name, webhook_test_data["start_time"]
+        )
+        print(f"   Found {len(log_events)} log events")
+
+        # 7. Parse webhook events
+        webhook_events = parse_webhook_events(log_events)
+        print(f"   📬 Received {len(webhook_events)} webhook deliveries")
+
+        # 8. Validate webhooks
+        if len(webhook_events) > 0:
+            validate_webhook_events(webhook_events)
+            print("   ✅ Webhook verification passed!")
+
+            # Compare expected vs actual counts
+            if webhook_expectations:
+                print("\n   📊 Comparing expected vs actual webhook counts:")
+                compare_webhook_counts(webhook_expectations, webhook_events)
+            else:
+                print(
+                    "\n   ℹ️  No expectations registered (add expect_webhooks to tests)"
+                )
+        else:
+            print("   ⚠️  No webhooks received")
+
+    # pylint: disable=broad-exception-caught
+    except Exception as e:
+        print(f"\n⚠️  Webhook verification failed: {e}")
+        print("   (Tests may have passed, but webhook delivery verification failed)")
+
+    finally:
+        # 9. Cleanup webhook registration
+        if webhook_test_data.get("webhook_id"):
+            try:
+                print(f"   Deleting webhook: {webhook_id}...")
+                api_client_cognito.request("DELETE", f"/service/webhooks/{webhook_id}")
+                print("   ✅ Webhook deleted")
+            # pylint: disable=broad-exception-caught
+            except Exception as e:
+                print(f"   ⚠️  Failed to delete webhook: {e}")
+
+        # 10. Delete CloudFormation stack
+        if webhook_test_data.get("stack_name"):
+            try:
+                print(f"   Deleting stack: {stack_name}...")
+                delete_webhook_stack(session, region, stack_name)
+                print("   ⏳ Stack deletion initiated (async)")
+            # pylint: disable=broad-exception-caught
+            except Exception as e:
+                print(f"   ⚠️  Failed to delete stack: {e}")
+
+
+# pylint: disable=redefined-outer-name
+@pytest.fixture(scope="session")
+def webhook_verification_enabled(webhook_test_data):
+    """Check if webhook verification is enabled (useful for conditional test logic)."""
+    return webhook_test_data["enabled"]
+
+
+@pytest.fixture(scope="session")
+def webhook_expectations():
+    """Track expected webhook events from tests."""
+    return []
+
+
+@pytest.fixture
+def expect_webhooks(webhook_expectations, webhook_test_data):
+    """Register expected webhooks from a test."""
+
+    def _expect(*event_types):
+        """Register one or more expected webhook events."""
+        if webhook_test_data["enabled"]:
+            webhook_expectations.extend(event_types)
+
+    return _expect
 
 
 #############

@@ -369,7 +369,11 @@ def test_List_Webhook_URLs_HEAD_200_page(api_client_cognito):
 
 
 def test_List_Webhook_URLs_GET_200(
-    api_client_cognito, webhook_ids, stub_webhook_basic, stub_webhook_tags
+    api_client_cognito,
+    webhook_ids,
+    stub_webhook_basic,
+    stub_webhook_tags,
+    webhook_verification_enabled,
 ):
     # Arrange
     path = "/service/webhooks"
@@ -380,11 +384,12 @@ def test_List_Webhook_URLs_GET_200(
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
+    expected_count = len(webhook_ids) + (1 if webhook_verification_enabled else 0)
     # Assert
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert len(webhook_ids) == len(response_json)
+    assert expected_count == len(response_json)
     assert {
         **stub_webhook_basic,
         "id": webhook_ids[0],
@@ -476,7 +481,10 @@ def test_List_Webhook_URLs_GET_200_tag_exists_name_true(
 
 
 def test_List_Webhook_URLs_GET_200_tag_exists_name_false(
-    api_client_cognito, webhook_ids, stub_webhook_basic
+    api_client_cognito,
+    webhook_ids,
+    stub_webhook_basic,
+    webhook_verification_enabled,
 ):
     # Arrange
     path = "/service/webhooks"
@@ -490,7 +498,7 @@ def test_List_Webhook_URLs_GET_200_tag_exists_name_false(
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 2 == len(response_json)
+    assert (3 if webhook_verification_enabled else 2) == len(response_json)
     assert {
         **stub_webhook_basic,
         "id": webhook_ids[0],
@@ -549,7 +557,9 @@ def test_List_Webhook_URLs_GET_400_limit_bad(api_client_cognito):
     assert response_json["message"][0]["type"] == "int_parsing"
 
 
-def test_List_Webhook_URLs_GET_200_page(api_client_cognito):
+def test_List_Webhook_URLs_GET_200_page(
+    api_client_cognito, webhook_verification_enabled
+):
     # Arrange
     path = "/service/webhooks"
     # Act
@@ -560,7 +570,7 @@ def test_List_Webhook_URLs_GET_200_page(api_client_cognito):
     assert 200 == response.status_code
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    assert 2 == len(response_json)
+    assert (3 if webhook_verification_enabled else 2) == len(response_json)
 
 
 def test_Webhook_Details_HEAD_200(api_client_cognito, webhook_ids):

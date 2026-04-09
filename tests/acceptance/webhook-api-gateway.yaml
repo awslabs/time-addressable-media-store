@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+
+  TamsWebhookApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: tams
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+
+  LoggingFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: Vpc note required
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      Runtime: python3.14
+      Handler: index.lambda_handler
+      InlineCode: |
+        def lambda_handler(event, context):
+            print(event.get("body", "{}"))
+            return {
+                "statusCode": 200,
+                "body": "OK"
+            }
+      Events:
+        PostIdentifier:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TamsWebhookApi
+            Path: /{identifier}
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${TamsWebhookApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${TamsWebhookApi.Stage}
+
+  ApiKeyId:
+    Description: API Gateway API Key ID
+    Value: !Ref TamsWebhookApi.ApiKey
+
+  LogGroupName:
+    Description: CloudWatch Log Group for Lambda function
+    Value: !Sub /aws/lambda/${LoggingFunction}

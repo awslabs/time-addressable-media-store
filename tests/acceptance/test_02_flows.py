@@ -66,7 +66,9 @@ def test_auth_401(verb, path, api_endpoint):
     assert 401 == response.status_code
 
 
-def test_Create_or_Replace_Flow_PUT_201_VIDEO(api_client_cognito, stub_video_flow):
+def test_Create_or_Replace_Flow_PUT_201_VIDEO(
+    api_client_cognito, stub_video_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}'
     # Act
@@ -85,9 +87,12 @@ def test_Create_or_Replace_Flow_PUT_201_VIDEO(api_client_cognito, stub_video_flo
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_video_flow, response_json)
+    expect_webhooks("sources/created", "flows/created")
 
 
-def test_Create_or_Replace_Flow_PUT_201_AUDIO(api_client_cognito, stub_audio_flow):
+def test_Create_or_Replace_Flow_PUT_201_AUDIO(
+    api_client_cognito, stub_audio_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}'
     # Act
@@ -106,9 +111,12 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(api_client_cognito, stub_audio_flo
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_audio_flow, response_json)
+    expect_webhooks("sources/created", "flows/created")
 
 
-def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito, stub_data_flow):
+def test_Create_or_Replace_Flow_PUT_201_DATA(
+    api_client_cognito, stub_data_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_data_flow["id"]}'
     # Act
@@ -127,9 +135,12 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(api_client_cognito, stub_data_flow)
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_data_flow, response_json)
+    expect_webhooks("sources/created", "flows/created")
 
 
-def test_Create_or_Replace_Flow_PUT_201_IMAGE(api_client_cognito, stub_image_flow):
+def test_Create_or_Replace_Flow_PUT_201_IMAGE(
+    api_client_cognito, stub_image_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_image_flow["id"]}'
     # Act
@@ -148,9 +159,12 @@ def test_Create_or_Replace_Flow_PUT_201_IMAGE(api_client_cognito, stub_image_flo
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_image_flow, response_json)
+    expect_webhooks("sources/created", "flows/created")
 
 
-def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito, stub_multi_flow):
+def test_Create_or_Replace_Flow_PUT_201_MULTI(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}'
     # Act
@@ -169,9 +183,12 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(api_client_cognito, stub_multi_flo
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_multi_flow, response_json)
+    expect_webhooks("sources/created", "flows/created")
 
 
-def test_Create_or_Replace_Flow_PUT_204(api_client_cognito, stub_multi_flow):
+def test_Create_or_Replace_Flow_PUT_204(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}'
     # Act
@@ -182,6 +199,7 @@ def test_Create_or_Replace_Flow_PUT_204(api_client_cognito, stub_multi_flow):
     )  # Assert
     assert 204 == response.status_code
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
@@ -1479,7 +1497,9 @@ def test_Flow_Tag_Value_GET_404_bad_flow_id(api_client_cognito, id_404):
     assert "The requested flow or tag does not exist." == response.json()["message"]
 
 
-def test_Create_or_Update_Flow_Tag_PUT_204_create(api_client_cognito, stub_multi_flow):
+def test_Create_or_Update_Flow_Tag_PUT_204_create(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
     # Act
@@ -1494,9 +1514,12 @@ def test_Create_or_Update_Flow_Tag_PUT_204_create(api_client_cognito, stub_multi
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
-def test_Create_or_Update_Flow_Tag_PUT_204_update(api_client_cognito, stub_multi_flow):
+def test_Create_or_Update_Flow_Tag_PUT_204_update(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/tags/test'
     # Act
@@ -1511,6 +1534,7 @@ def test_Create_or_Update_Flow_Tag_PUT_204_update(api_client_cognito, stub_multi
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
@@ -1568,7 +1592,9 @@ def test_Create_or_Update_Flow_Tag_PUT_404(api_client_cognito, id_404):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Tag_DELETE_204(api_client_cognito, stub_multi_flow):
+def test_Delete_Flow_Tag_DELETE_204(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
     # Act
@@ -1582,6 +1608,7 @@ def test_Delete_Flow_Tag_DELETE_204(api_client_cognito, stub_multi_flow):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Delete_Flow_Tag_DELETE_403(api_client_cognito, stub_data_flow):
@@ -1684,7 +1711,7 @@ def test_Flow_Description_GET_404(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Flow_Description_PUT_204_create(
-    api_client_cognito, stub_audio_flow
+    api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/description'
@@ -1700,10 +1727,11 @@ def test_Create_or_Update_Flow_Description_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Description_PUT_204_update(
-    api_client_cognito, stub_video_flow
+    api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/description'
@@ -1719,6 +1747,7 @@ def test_Create_or_Update_Flow_Description_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito, stub_video_flow):
@@ -1776,7 +1805,9 @@ def test_Create_or_Update_Flow_Description_PUT_404(api_client_cognito, id_404):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Description_DELETE_204(api_client_cognito, stub_audio_flow):
+def test_Delete_Flow_Description_DELETE_204(
+    api_client_cognito, stub_audio_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/description'
     # Act
@@ -1790,6 +1821,7 @@ def test_Delete_Flow_Description_DELETE_204(api_client_cognito, stub_audio_flow)
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Delete_Flow_Description_DELETE_403(api_client_cognito, stub_data_flow):
@@ -1895,7 +1927,7 @@ def test_Flow_Label_GET_404(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Flow_Label_PUT_204_create(
-    api_client_cognito, stub_audio_flow
+    api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/label'
@@ -1911,10 +1943,11 @@ def test_Create_or_Update_Flow_Label_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Label_PUT_204_update(
-    api_client_cognito, stub_video_flow
+    api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/label'
@@ -1930,6 +1963,7 @@ def test_Create_or_Update_Flow_Label_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito, stub_video_flow):
@@ -1967,7 +2001,9 @@ def test_Create_or_Update_Flow_Label_PUT_404(api_client_cognito, id_404):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Label_DELETE_204(api_client_cognito, stub_audio_flow):
+def test_Delete_Flow_Label_DELETE_204(
+    api_client_cognito, stub_audio_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/label'
     # Act
@@ -1981,6 +2017,7 @@ def test_Delete_Flow_Label_DELETE_204(api_client_cognito, stub_audio_flow):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Delete_Flow_Label_DELETE_404(api_client_cognito, id_404):
@@ -2065,7 +2102,9 @@ def test_Flow_Flow_Collection_GET_404(api_client_cognito, id_404):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Flow_Collection_DELETE_204(api_client_cognito, stub_multi_flow):
+def test_Delete_Flow_Flow_Collection_DELETE_204(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
     # Act
@@ -2079,6 +2118,7 @@ def test_Delete_Flow_Flow_Collection_DELETE_204(api_client_cognito, stub_multi_f
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito, id_404):
@@ -2098,7 +2138,7 @@ def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(
-    api_client_cognito, stub_multi_flow
+    api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
@@ -2114,10 +2154,11 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
-    api_client_cognito, stub_multi_flow
+    api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
@@ -2133,6 +2174,7 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_400(
@@ -2237,7 +2279,7 @@ def test_Flow_Max_Bit_Rate_GET_404(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(
-    api_client_cognito, stub_audio_flow
+    api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/max_bit_rate'
@@ -2253,10 +2295,11 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(
-    api_client_cognito, stub_video_flow
+    api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
@@ -2272,6 +2315,7 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(
@@ -2311,7 +2355,9 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito, id_404):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Max_Bit_Rate_DELETE_204(api_client_cognito, stub_audio_flow):
+def test_Delete_Flow_Max_Bit_Rate_DELETE_204(
+    api_client_cognito, stub_audio_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/max_bit_rate'
     # Act
@@ -2325,6 +2371,7 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_204(api_client_cognito, stub_audio_flow
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito, id_404):
@@ -2408,7 +2455,7 @@ def test_Flow_Avg_Bit_Rate_GET_404(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(
-    api_client_cognito, stub_audio_flow
+    api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/avg_bit_rate'
@@ -2424,10 +2471,11 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(
-    api_client_cognito, stub_video_flow
+    api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
@@ -2443,6 +2491,7 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(
@@ -2482,7 +2531,9 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito, id_404):
     assert "The requested Flow does not exist." == response.json()["message"]
 
 
-def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(api_client_cognito, stub_audio_flow):
+def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(
+    api_client_cognito, stub_audio_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/avg_bit_rate'
     # Act
@@ -2496,6 +2547,7 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(api_client_cognito, stub_audio_flow
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito, id_404):
@@ -2578,7 +2630,9 @@ def test_Flow_Read_Only_GET_404(api_client_cognito, id_404):
     assert "The requested flow does not exist." == response.json()["message"]
 
 
-def test_Set_Flow_Read_Only_PUT_204_DATA(api_client_cognito, stub_data_flow):
+def test_Set_Flow_Read_Only_PUT_204_DATA(
+    api_client_cognito, stub_data_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_data_flow["id"]}/read_only'
     # Act
@@ -2593,9 +2647,12 @@ def test_Set_Flow_Read_Only_PUT_204_DATA(api_client_cognito, stub_data_flow):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
-def test_Set_Flow_Read_Only_PUT_204_AUDIO(api_client_cognito, stub_audio_flow):
+def test_Set_Flow_Read_Only_PUT_204_AUDIO(
+    api_client_cognito, stub_audio_flow, expect_webhooks
+):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}/read_only'
     # Act
@@ -2610,6 +2667,7 @@ def test_Set_Flow_Read_Only_PUT_204_AUDIO(api_client_cognito, stub_audio_flow):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("flows/updated")
 
 
 def test_Set_Flow_Read_Only_PUT_400(api_client_cognito, stub_multi_flow):
