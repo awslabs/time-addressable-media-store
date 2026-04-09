@@ -386,12 +386,19 @@ def publish_event(detail_type: str, details: dict, resources) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def put_message(queue: str, item: dict) -> None:
+def put_message(queue: str, item: dict, message_group_id: str = None) -> None:
     """Publishs a message to SQS"""
-    sqs.send_message(
-        QueueUrl=queue,
-        MessageBody=json.dumps(item),
-    )
+    params = {
+        "QueueUrl": queue,
+        "MessageBody": json.dumps(item),
+    }
+
+    # Add FIFO-specific parameters if message_group_id is provided
+    if message_group_id:
+        params["MessageGroupId"] = message_group_id
+        # MessageDeduplicationId not needed if ContentBasedDeduplication is enabled
+
+    sqs.send_message(**params)
 
 
 @tracer.capture_method(capture_response=False)
@@ -506,3 +513,22 @@ def calculate_object_timerange(segment: Flowsegmentpost) -> str:
             )
         )
     return segment.timerange.root
+
+
+@tracer.capture_method(capture_response=False)
+def get_resource_id_from_event(event) -> str:
+    """Extract the primary resource ID from event.resources field for FIFO message grouping"""
+    # Flow events have tams:flow:xxx
+    for resource in event.resources:
+        if resource.startswith("tams:flow:"):
+            return resource[len("tams:flow:") :]
+
+    # Source events have tams:source:xxx
+    for resource in event.resources:
+        if resource.startswith("tams:source:"):
+            return resource[len("tams:source:") :]
+
+    # Fallback: shouldn't happen if all events are properly tagged
+    raise ValueError(
+        f"No tams:flow: or tams:source: found in resources: {event.resources}"
+    )

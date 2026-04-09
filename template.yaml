@@ -384,6 +384,9 @@ Resources:
   WebhooksDeliveryQueue:
     Type: AWS::SQS::Queue
     Properties:
+      QueueName: !Sub ${AWS::StackName}-WebhooksDelivery.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
       KmsMasterKeyId: alias/aws/sqs
       VisibilityTimeout: 900
       MessageRetentionPeriod: 86400
@@ -394,6 +397,8 @@ Resources:
   WebhooksDeliveryQueueDLQ:
     Type: AWS::SQS::Queue
     Properties:
+      QueueName: !Sub ${AWS::StackName}-WebhooksDeliveryDLQ.fifo
+      FifoQueue: true
       KmsMasterKeyId: alias/aws/sqs
       VisibilityTimeout: 900
       MessageRetentionPeriod: 86400

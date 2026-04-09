@@ -8,7 +8,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import get_default_storage_backend, get_storage_backend, get_store_name
 from neptune import get_matching_webhooks, set_node_property_base
 from segment_get_urls import populate_get_urls
-from utils import model_dump, put_message
+from utils import get_resource_id_from_event, model_dump, put_message
 
 tracer = Tracer()
 logger = Logger()
@@ -20,9 +20,15 @@ store_name = get_store_name()
 
 @tracer.capture_method(capture_response=False)
 def post_event(event, item, get_urls=None):
+    # Extract resource ID from event for FIFO message grouping
+    resource_id = get_resource_id_from_event(event)
+    # Composite MessageGroupId: webhook_id:resource_id
+    message_group_id = f"{item.id.root}:{resource_id}"
+
     put_message(
         webhooks_queue,
         {"event": event.raw_event, "item": model_dump(item), "get_urls": get_urls},
+        message_group_id=message_group_id,
     )
 
 
