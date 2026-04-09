@@ -54,6 +54,11 @@ def alternative_storage_id():
     yield str(uuid.uuid4())
 
 
+@pytest.fixture(scope="session")
+def id_404():
+    return "00000000-0000-1000-8000-00000000000a"
+
+
 @pytest.fixture(scope="module", autouse=True)
 def mock_neptune_client():
     """
@@ -103,6 +108,7 @@ def api_event_factory():
                 "service_version": "aws.1.0",
             },
             "requestContext": {
+                "requestId": str(uuid.uuid4()),
                 "httpMethod": http_method,
                 "domainName": "test.com",
                 "path": path,

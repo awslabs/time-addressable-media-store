@@ -65,7 +65,6 @@ SAMPLE_LABELS = [
     "aws.eu-west-1:s3.presigned:Example TAMS",
 ]
 INVALID_STORAGE_ID = str(uuid.uuid4())
-DUMMY_ID = str(uuid.uuid4())
 
 
 @pytest.mark.parametrize(
@@ -73,7 +72,6 @@ DUMMY_ID = str(uuid.uuid4())
     [
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -88,7 +86,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -104,7 +101,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -120,7 +116,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -136,7 +131,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -152,7 +146,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -168,7 +161,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -184,7 +176,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -200,7 +191,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -216,7 +206,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -232,7 +221,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -248,7 +236,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -264,7 +251,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -281,7 +267,6 @@ DUMMY_ID = str(uuid.uuid4())
         pytest.param(
             None,
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "event_type": "flows/segments_added",
                 "conditions": {"flow_ids": SAMPLE_FLOW_ID},
@@ -292,7 +277,6 @@ DUMMY_ID = str(uuid.uuid4())
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -320,6 +304,10 @@ def test_segments_added_using_controlled_storage(
     expected_count,
 ):
     # Arrange
+    # Generate unique webhook ID to avoid deduplication in FIFO queue
+    if webhook_item:
+        webhook_item = {**webhook_item, "id": str(uuid.uuid4())}
+
     detail = {
         "flow_id": SAMPLE_FLOW_ID,
         "segments": [
@@ -422,7 +410,6 @@ def test_segments_added_using_controlled_storage(
     [
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -437,7 +424,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -453,7 +439,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -469,7 +454,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -485,7 +469,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -501,7 +484,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -517,7 +499,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -533,7 +514,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -549,7 +529,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -565,7 +544,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -581,7 +559,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -597,7 +574,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -613,7 +589,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -639,7 +614,6 @@ def test_segments_added_using_controlled_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -666,6 +640,10 @@ def test_segments_added_using_legacy_storage(
     expected_count,
 ):
     # Arrange
+    # Generate unique webhook ID to avoid deduplication in FIFO queue
+    if webhook_item:
+        webhook_item = {**webhook_item, "id": str(uuid.uuid4())}
+
     detail = {
         "flow_id": SAMPLE_FLOW_ID,
         "segments": [
@@ -767,7 +745,6 @@ def test_segments_added_using_legacy_storage(
     [
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -782,7 +759,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -798,7 +774,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -814,7 +789,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -830,7 +804,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -846,7 +819,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -862,7 +834,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -878,7 +849,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -894,7 +864,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -910,7 +879,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -926,7 +894,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -952,7 +919,6 @@ def test_segments_added_using_legacy_storage(
         ),
         pytest.param(
             {
-                "id": DUMMY_ID,
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
@@ -979,6 +945,10 @@ def test_segments_added_using_external_storage(
     expected_count,
 ):
     # Arrange
+    # Generate unique webhook ID to avoid deduplication in FIFO queue
+    if webhook_item:
+        webhook_item = {**webhook_item, "id": str(uuid.uuid4())}
+
     detail = {
         "flow_id": SAMPLE_FLOW_ID,
         "segments": [
