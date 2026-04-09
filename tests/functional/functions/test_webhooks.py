@@ -25,7 +25,7 @@ def webhooks():
     Import webhooks Lambda handler after moto is active.
 
     Returns:
-        module: The api_objects Lambda handler module
+        module: The webhooks Lambda handler module
     """
     # pylint: disable=import-outside-toplevel
     from webhooks import app

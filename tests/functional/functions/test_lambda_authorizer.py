@@ -20,7 +20,7 @@ def lambda_authorizer():
     Import lambda_authorizer Lambda handler after moto is active.
 
     Returns:
-        module: The api_objects Lambda handler module
+        module: The lambda_authorizer Lambda handler module
     """
     # pylint: disable=import-outside-toplevel
     from lambda_authorizer import app
