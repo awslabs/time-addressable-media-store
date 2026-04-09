@@ -195,7 +195,7 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
 
 
 def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
-    api_client_cognito, media_objects, stub_video_flow
+    api_client_cognito, media_objects, stub_video_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -208,10 +208,14 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
         )
         # Assert
         assert 201 == response.status_code
+    expect_count = len(media_objects[:-2])
+    expect_webhooks(
+        *["flows/updated"] * expect_count, *["flows/segments_added"] * expect_count
+    )
 
 
 def test_Create_Flow_Segment_POST_201_MULTI(
-    api_client_cognito, media_objects, stub_multi_flow
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -226,10 +230,11 @@ def test_Create_Flow_Segment_POST_201_MULTI(
     )
     # Assert
     assert 201 == response.status_code
+    expect_webhooks("flows/updated", "flows/segments_added")
 
 
 def test_Create_Flow_Segment_POST_201_negative(
-    api_client_cognito, media_objects, stub_multi_flow
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -244,10 +249,11 @@ def test_Create_Flow_Segment_POST_201_negative(
     )
     # Assert
     assert 201 == response.status_code
+    expect_webhooks("flows/updated", "flows/segments_added")
 
 
 def test_Create_Flow_Segment_POST_201_list_ok(
-    api_client_cognito, media_objects, stub_multi_flow
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -268,10 +274,11 @@ def test_Create_Flow_Segment_POST_201_list_ok(
     )
     # Assert
     assert 201 == response.status_code
+    expect_webhooks(*["flows/updated"] * 2, *["flows/segments_added"] * 2)
 
 
 def test_Create_Flow_Segment_POST_200_list_partial(
-    api_client_cognito, media_objects, stub_multi_flow
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -295,6 +302,7 @@ def test_Create_Flow_Segment_POST_200_list_partial(
     assert 1 == len(response_json)
     assert "BadRequestError" == response_json[0]["error"]["type"]
     assert 200 == response.status_code
+    expect_webhooks("flows/updated", "flows/segments_added")
 
 
 def test_Create_Flow_Segment_POST_200_list_failed(
@@ -324,7 +332,7 @@ def test_Create_Flow_Segment_POST_200_list_failed(
 
 
 def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
-    api_client_cognito, region, stack, stub_multi_flow
+    api_client_cognito, region, stack, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -347,10 +355,11 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
     )
     # Assert
     assert 201 == response.status_code
+    expect_webhooks("flows/updated", "flows/segments_added")
 
 
 def test_Create_Flow_Segment_POST_201_with_get_urls_external(
-    api_client_cognito, stub_multi_flow
+    api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -372,6 +381,7 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
     )
     # Assert
     assert 201 == response.status_code
+    expect_webhooks("flows/updated", "flows/segments_added")
 
 
 def test_List_Flow_Segments_GET_200_with_get_urls_same_store(
@@ -419,7 +429,7 @@ def test_List_Flow_Segments_GET_200_with_get_urls_external(
 
 
 def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
-    api_client_cognito, stub_multi_flow
+    api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -433,10 +443,11 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
     )
     # Assert
     assert 204 == response.status_code
+    expect_webhooks("flows/updated", "flows/segments_deleted")
 
 
 def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
-    api_client_cognito, stub_multi_flow
+    api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -450,6 +461,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
     )
     # Assert
     assert 204 == response.status_code
+    expect_webhooks("flows/updated", "flows/segments_deleted")
 
 
 def test_List_Flow_Segments_HEAD_200(api_client_cognito, stub_video_flow):

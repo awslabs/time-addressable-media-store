@@ -813,7 +813,7 @@ def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Source_Tag_PUT_204_create(
-    api_client_cognito, stub_multi_source
+    api_client_cognito, stub_multi_source, expect_webhooks
 ):
     # Arrange
     path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
@@ -829,10 +829,11 @@ def test_Create_or_Update_Source_Tag_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Create_or_Update_Source_Tag_PUT_204_update(
-    api_client_cognito, stub_multi_source
+    api_client_cognito, stub_multi_source, expect_webhooks
 ):
     # Arrange
     path = f'/sources/{stub_multi_source["id"]}/tags/test'
@@ -848,6 +849,7 @@ def test_Create_or_Update_Source_Tag_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito, stub_multi_source):
@@ -888,7 +890,9 @@ def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito, id_404):
     )
 
 
-def test_Delete_Source_Tag_DELETE_204(api_client_cognito, stub_multi_source):
+def test_Delete_Source_Tag_DELETE_204(
+    api_client_cognito, stub_multi_source, expect_webhooks
+):
     # Arrange
     path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
     # Act
@@ -902,6 +906,7 @@ def test_Delete_Source_Tag_DELETE_204(api_client_cognito, stub_multi_source):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Delete_Source_Tag_DELETE_404(api_client_cognito, id_404):
@@ -988,7 +993,7 @@ def test_Source_Description_GET_404(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Source_Description_PUT_204_create(
-    api_client_cognito, stub_audio_source
+    api_client_cognito, stub_audio_source, expect_webhooks
 ):
     # Arrange
     path = f'/sources/{stub_audio_source["id"]}/description'
@@ -1004,10 +1009,11 @@ def test_Create_or_Update_Source_Description_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Create_or_Update_Source_Description_PUT_204_update(
-    api_client_cognito, stub_video_source
+    api_client_cognito, stub_video_source, expect_webhooks
 ):
     # Arrange
     path = f'/sources/{stub_video_source["id"]}/description'
@@ -1023,6 +1029,7 @@ def test_Create_or_Update_Source_Description_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Create_or_Update_Source_Description_PUT_400(
@@ -1062,7 +1069,9 @@ def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito, id_404)
     assert "The requested Source does not exist." == response.json()["message"]
 
 
-def test_Delete_Source_Description_DELETE_204(api_client_cognito, stub_audio_source):
+def test_Delete_Source_Description_DELETE_204(
+    api_client_cognito, stub_audio_source, expect_webhooks
+):
     # Arrange
     path = f'/sources/{stub_audio_source["id"]}/description'
     # Act
@@ -1076,6 +1085,7 @@ def test_Delete_Source_Description_DELETE_204(api_client_cognito, stub_audio_sou
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Delete_Source_Description_DELETE_404(api_client_cognito, id_404):
@@ -1162,7 +1172,7 @@ def test_Source_Label_GET_404(api_client_cognito, id_404):
 
 
 def test_Create_or_Update_Source_Label_PUT_204_create(
-    api_client_cognito, stub_audio_source
+    api_client_cognito, stub_audio_source, expect_webhooks
 ):
     # Arrange
     path = f'/sources/{stub_audio_source["id"]}/label'
@@ -1178,10 +1188,11 @@ def test_Create_or_Update_Source_Label_PUT_204_create(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Create_or_Update_Source_Label_PUT_204_update(
-    api_client_cognito, stub_video_source
+    api_client_cognito, stub_video_source, expect_webhooks
 ):
     # Arrange
     path = f'/sources/{stub_video_source["id"]}/label'
@@ -1197,6 +1208,7 @@ def test_Create_or_Update_Source_Label_PUT_204_update(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito, stub_video_source):
@@ -1234,7 +1246,9 @@ def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito, id_404):
     assert "The requested Source does not exist." == response.json()["message"]
 
 
-def test_Delete_Source_Label_DELETE_204(api_client_cognito, stub_audio_source):
+def test_Delete_Source_Label_DELETE_204(
+    api_client_cognito, stub_audio_source, expect_webhooks
+):
     # Arrange
     path = f'/sources/{stub_audio_source["id"]}/label'
     # Act
@@ -1248,6 +1262,7 @@ def test_Delete_Source_Label_DELETE_204(api_client_cognito, stub_audio_source):
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     assert "" == response.content.decode("utf-8")
+    expect_webhooks("sources/updated")
 
 
 def test_Delete_Source_Label_DELETE_404(api_client_cognito, id_404):
