@@ -61,7 +61,7 @@ def test_Delete_Flow_Segment_DELETE_202(
     assert "created_by" in response.json()
     assert "updated" in response.json()
     assert "status" in response.json()
-    expect_webhooks("flows/updated", *["flows/segments_deleted"] * 5)
+    expect_webhooks(*["flows/segments_deleted"] * 5, "flows/updated")
 
 
 @pytest.mark.skip("Delete requests always returned unless object_id used")
@@ -124,7 +124,7 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
     assert "created_by" in response.json()
     assert "updated" in response.json()
     assert "status" in response.json()
-    expect_webhooks("flows/updated", *["flows/segments_deleted"] * 2)
+    expect_webhooks(*["flows/segments_deleted"] * 2, "flows/updated")
 
 
 @pytest.mark.skip("Delete requests always returned unless object_id used")

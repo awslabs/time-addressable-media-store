@@ -208,9 +208,8 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
         )
         # Assert
         assert 201 == response.status_code
-    expect_count = len(media_objects[:-2])
     expect_webhooks(
-        *["flows/updated"] * expect_count, *["flows/segments_added"] * expect_count
+        *["flows/updated", "flows/segments_added"] * len(media_objects[:-2])
     )
 
 
@@ -274,7 +273,7 @@ def test_Create_Flow_Segment_POST_201_list_ok(
     )
     # Assert
     assert 201 == response.status_code
-    expect_webhooks(*["flows/updated"] * 2, *["flows/segments_added"] * 2)
+    expect_webhooks(*["flows/updated", "flows/segments_added"] * 2)
 
 
 def test_Create_Flow_Segment_POST_200_list_partial(
@@ -443,7 +442,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
     )
     # Assert
     assert 204 == response.status_code
-    expect_webhooks("flows/updated", "flows/segments_deleted")
+    expect_webhooks("flows/segments_deleted", "flows/updated")
 
 
 def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
@@ -461,7 +460,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
     )
     # Assert
     assert 204 == response.status_code
-    expect_webhooks("flows/updated", "flows/segments_deleted")
+    expect_webhooks("flows/segments_deleted", "flows/updated")
 
 
 def test_List_Flow_Segments_HEAD_200(api_client_cognito, stub_video_flow):
