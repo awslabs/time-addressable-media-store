@@ -124,10 +124,11 @@ def parse_webhook_events(log_events: list[dict[str, any]]) -> list[dict[str, any
         if message.startswith(("START", "END", "REPORT")):
             continue
 
-        # Lambda function does: print(event.get("body", "{}"))
-        # So the message is the webhook body directly
+        # Lambda function does: print(json.dumps(event))
+        # So the message is the full event object, and body is nested inside
         try:
-            body = json.loads(message)
+            api_event = json.loads(message)
+            body = json.loads(api_event.get("body", "{}"))
         except json.JSONDecodeError:
             # Skip malformed JSON
             continue
@@ -139,6 +140,9 @@ def parse_webhook_events(log_events: list[dict[str, any]]) -> list[dict[str, any
         webhooks.append(
             {
                 "timestamp": event.get("timestamp"),
+                "identifier": api_event.get("pathParameters", {}).get(
+                    "identifier", "not-found"
+                ),
                 "body": body,
                 "event_type": body.get(
                     "event_type", "unknown"
@@ -157,6 +161,7 @@ def validate_webhook_events(webhook_events: list[dict[str, any]]) -> None:
     for i, webhook in enumerate(webhook_events):
         # Check structure
         assert "body" in webhook, f"Webhook {i}: missing 'body'"
+        assert "identifier" in webhook, f"Webhook {i}: missing 'identifier'"
         assert "timestamp" in webhook, f"Webhook {i}: missing 'timestamp'"
         assert "event_type" in webhook, f"Webhook {i}: missing 'event_type'"
 

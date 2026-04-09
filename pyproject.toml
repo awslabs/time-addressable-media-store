@@ -21,6 +21,7 @@ moto = "^5.1.22"
 datamodel-code-generator = "^0.55.0"
 pytest-lazy-fixtures = "^1.4.0"
 pyjwt = "^2.12.1"
+responses = "^0.26.0"
 
 [project]
 name = "time-addressable-media-store"

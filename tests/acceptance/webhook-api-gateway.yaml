@@ -26,8 +26,10 @@ Resources:
       Runtime: python3.14
       Handler: index.lambda_handler
       InlineCode: |
+        import json
+
         def lambda_handler(event, context):
-            print(event.get("body", "{}"))
+            print(json.dumps(event))
             return {
                 "statusCode": 200,
                 "body": "OK"

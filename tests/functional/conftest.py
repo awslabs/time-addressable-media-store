@@ -344,17 +344,30 @@ def webhooks_queue():
     """
     Create and manage a test SQS Queue for webhooks.
 
-    Creates a webhooks SQS Queue before tests run and cleans it up afterward.
+    Creates a webhooks FIFO SQS Queue before tests run and cleans it up afterward.
 
     Returns:
         Table: A DynamoDB table resource for test use
     """
-    # Create SQS Queue
+    # Create FIFO SQS Queue with ContentBasedDeduplication
     client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
-    response = client.create_queue(QueueName="webhooks-queue")
+    response = client.create_queue(
+        QueueName="webhooks-queue.fifo",
+        Attributes={
+            "FifoQueue": "true",
+            "ContentBasedDeduplication": "true",
+        },
+    )
     os.environ["WEBHOOKS_QUEUE_URL"] = response["QueueUrl"]
+
+    # Create error queue for webhook delivery errors
+    error_response = client.create_queue(QueueName="webhooks-error-queue")
+    os.environ["ERROR_QUEUE_URL"] = error_response["QueueUrl"]
+
     yield
+
     client.delete_queue(QueueUrl=response["QueueUrl"])
+    client.delete_queue(QueueUrl=error_response["QueueUrl"])
 
 
 @pytest.fixture(autouse=True)
