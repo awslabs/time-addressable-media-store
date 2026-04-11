@@ -1,3 +1,4 @@
+import inspect
 import os
 import time
 from copy import deepcopy
@@ -14,6 +15,7 @@ from webhook_helpers import (
     get_api_key_value,
     get_stack_outputs,
     parse_webhook_events,
+    validate_webhook_bodies,
     validate_webhook_events,
     wait_for_stack_create,
 )
@@ -406,7 +408,7 @@ def webhook_verification_lifecycle(
     3. Get API key value from API Gateway
     4. Register webhook with TAMS API
     5. [Tests run]
-    6. Wait for async webhook delivery (30s)
+    6. Wait for async webhook delivery
     7. Collect CloudWatch logs
     8. Parse webhook events from logs
     9. Validate webhook structure and compare counts with expectations
@@ -501,22 +503,22 @@ def webhook_verification_lifecycle(
     print("\n🔍 Verifying webhook deliveries...")
 
     try:
-        # 5. Wait for async webhook delivery
-        print("   Waiting 30s for async webhook delivery...")
-        time.sleep(30)
+        # 6. Wait for async webhook delivery
+        print("   Waiting 10s for async webhook delivery...")
+        time.sleep(10)
 
-        # 6. Collect CloudWatch logs
+        # 7. Collect CloudWatch logs
         print(f"   Collecting logs from {log_group_name}...")
         log_events = collect_cloudwatch_logs(
             session, region, log_group_name, webhook_test_data["start_time"]
         )
         print(f"   Found {len(log_events)} log events")
 
-        # 7. Parse webhook events
+        # 8. Parse webhook events
         webhook_events = parse_webhook_events(log_events)
         print(f"   📬 Received {len(webhook_events)} webhook deliveries")
 
-        # 8. Validate webhooks
+        # 9. Validate webhooks
         if len(webhook_events) > 0:
             validate_webhook_events(webhook_events)
             print("   ✅ Webhook verification passed!")
@@ -525,6 +527,7 @@ def webhook_verification_lifecycle(
             if webhook_expectations:
                 print("\n   📊 Comparing expected vs actual webhook counts:")
                 compare_webhook_counts(webhook_expectations, webhook_events)
+                validate_webhook_bodies(webhook_expectations, webhook_events)
             else:
                 print(
                     "\n   ℹ️  No expectations registered (add expect_webhooks to tests)"
@@ -538,7 +541,7 @@ def webhook_verification_lifecycle(
         print("   (Tests may have passed, but webhook delivery verification failed)")
 
     finally:
-        # 9. Cleanup webhook registration
+        # 10. Cleanup webhook registration
         if webhook_test_data.get("webhook_id"):
             try:
                 print(f"   Deleting webhook: {webhook_id}...")
@@ -548,7 +551,7 @@ def webhook_verification_lifecycle(
             except Exception as e:
                 print(f"   ⚠️  Failed to delete webhook: {e}")
 
-        # 10. Delete CloudFormation stack
+        # 11. Delete CloudFormation stack
         if webhook_test_data.get("stack_name"):
             try:
                 print(f"   Deleting stack: {stack_name}...")
@@ -579,7 +582,25 @@ def expect_webhooks(webhook_expectations, webhook_test_data):
     def _expect(*event_types):
         """Register one or more expected webhook events."""
         if webhook_test_data["enabled"]:
-            webhook_expectations.extend(event_types)
+            # Automatically capture the calling test function name
+            frame = inspect.currentframe().f_back
+            test_name = frame.f_code.co_name
+
+            # Store expectations with test name for body validations
+            for item in event_types:
+                if (
+                    isinstance(item, tuple)
+                    and len(item) >= 1
+                    and isinstance(item[0], dict)
+                ):
+                    # Body validation - deep copy to prevent mutations affecting stored expectations
+                    body_dict = item[0]
+                    exclude_list = item[1] if len(item) > 1 else []
+                    body_copy = deepcopy(body_dict)
+                    webhook_expectations.append(((body_copy, exclude_list), test_name))
+                else:
+                    # Count only - no test name needed
+                    webhook_expectations.append(item)
 
     return _expect
 
@@ -603,3 +624,13 @@ def assert_equal_unordered(obj1, obj2):
     diff = DeepDiff(obj1, obj2, ignore_order=True)
     if diff:
         raise AssertionError(f"Objects are not equal:\n{diff}")
+
+
+def assert_json_response(response, status_code, empty_body=False):
+    """Assert that response has expected status code and JSON content-type."""
+    assert status_code == response.status_code
+    headers = {k.lower(): v for k, v in response.headers.items()}
+    assert "content-type" in headers
+    assert "application/json" == headers["content-type"]
+    if empty_body:
+        assert "" == response.content.decode("utf-8")

@@ -1,7 +1,7 @@
 # pylint: disable=too-many-lines
 import pytest
 import requests
-from conftest import assert_equal_unordered
+from conftest import assert_equal_unordered, assert_json_response
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -41,7 +41,7 @@ def test_auth_401(verb, path, api_endpoint):
         timeout=30,
     )
     # Assert
-    assert 401 == response.status_code
+    assert_json_response(response, 401)
 
 
 def test_List_Sources_HEAD_200(api_client_cognito):
@@ -52,12 +52,8 @@ def test_List_Sources_HEAD_200(api_client_cognito):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Sources_HEAD_200_label(api_client_cognito):
@@ -69,12 +65,8 @@ def test_List_Sources_HEAD_200_label(api_client_cognito):
         path,
         params={"label": "pytest"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Sources_HEAD_200_limit(api_client_cognito):
@@ -88,13 +80,10 @@ def test_List_Sources_HEAD_200_limit(api_client_cognito):
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 200, empty_body=True)
     assert "link" in response_headers_lower
     assert "x-paging-limit" in response_headers_lower
     assert "x-paging-nextkey" in response_headers_lower
-    assert "" == response.content.decode("utf-8")
 
 
 def test_List_Sources_HEAD_200_page(api_client_cognito):
@@ -106,12 +95,8 @@ def test_List_Sources_HEAD_200_page(api_client_cognito):
         path,
         params={"page": "1"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Sources_HEAD_200_tag_name(api_client_cognito):
@@ -123,12 +108,8 @@ def test_List_Sources_HEAD_200_tag_name(api_client_cognito):
         path,
         params={"tag.test": "this"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Sources_HEAD_200_tag_exists_name(api_client_cognito):
@@ -140,12 +121,8 @@ def test_List_Sources_HEAD_200_tag_exists_name(api_client_cognito):
         path,
         params={"tag_exists.test": "false"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Sources_HEAD_400(api_client_cognito):
@@ -157,12 +134,8 @@ def test_List_Sources_HEAD_400(api_client_cognito):
         path,
         params={"format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Sources_HEAD_400_label(api_client_cognito):
@@ -174,12 +147,8 @@ def test_List_Sources_HEAD_400_label(api_client_cognito):
         path,
         params={"label": "pytest", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Sources_HEAD_400_limit(api_client_cognito):
@@ -191,12 +160,8 @@ def test_List_Sources_HEAD_400_limit(api_client_cognito):
         path,
         params={"limit": "2", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Sources_HEAD_400_page(api_client_cognito):
@@ -208,12 +173,8 @@ def test_List_Sources_HEAD_400_page(api_client_cognito):
         path,
         params={"page": "1", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Sources_HEAD_400_tag_name(api_client_cognito):
@@ -225,12 +186,8 @@ def test_List_Sources_HEAD_400_tag_name(api_client_cognito):
         path,
         params={"tag.test": "this", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Sources_HEAD_400_tag_exists_name(api_client_cognito):
@@ -242,12 +199,8 @@ def test_List_Sources_HEAD_400_tag_exists_name(api_client_cognito):
         path,
         params={"tag_exists.test": "false", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Sources_GET_200(
@@ -266,18 +219,15 @@ def test_List_Sources_GET_200(
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert_json_response(response, 200)
     response_json = response.json()
     for record in response_json:
         if "source_collection" in record:
             record["source_collection"] = sorted(
                 record["source_collection"], key=lambda sc: sc["id"]
             )
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 5 == len(response.json())
+    assert 5 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -313,13 +263,10 @@ def test_List_Sources_GET_200_format(
         path,
         params={"format": "urn:x-nmos:format:data"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -341,7 +288,6 @@ def test_List_Sources_GET_200_label(
         path,
         params={"label": "pytest"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     response_json = response.json()
     for record in response_json:
         if "source_collection" in record:
@@ -349,10 +295,9 @@ def test_List_Sources_GET_200_label(
                 record["source_collection"], key=lambda sc: sc["id"]
             )
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -372,13 +317,12 @@ def test_List_Sources_GET_200_limit(api_client_cognito):
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 200)
+    response_json = response.json()
     assert "link" in response_headers_lower
     assert "x-paging-limit" in response_headers_lower
     assert "x-paging-nextkey" in response_headers_lower
-    assert 2 == len(response.json())
+    assert 2 == len(response_json)
 
 
 def test_List_Sources_GET_200_page(api_client_cognito):
@@ -391,12 +335,10 @@ def test_List_Sources_GET_200_page(api_client_cognito):
         path,
         params={"page": "1"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 4 == len(response_json)
 
 
 def test_List_Sources_GET_200_tag_name(
@@ -411,18 +353,15 @@ def test_List_Sources_GET_200_tag_name(
         path,
         params={"tag.test": "this"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert_json_response(response, 200)
     response_json = response.json()
     for record in response_json:
         if "source_collection" in record:
             record["source_collection"] = sorted(
                 record["source_collection"], key=lambda sc: sc["id"]
             )
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -440,12 +379,10 @@ def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
         path,
         params={"tag_exists.test": "false"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 4 == len(response_json)
 
 
 def test_List_Sources_GET_400(api_client_cognito):
@@ -457,13 +394,11 @@ def test_List_Sources_GET_400(api_client_cognito):
         path,
         params={"format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Sources_GET_400_format(api_client_cognito):
@@ -476,13 +411,11 @@ def test_List_Sources_GET_400_format(api_client_cognito):
         path,
         params={"format": "urn:x-nmos:format:data", "limit": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Sources_GET_400_label(api_client_cognito):
@@ -495,13 +428,11 @@ def test_List_Sources_GET_400_label(api_client_cognito):
         path,
         params={"label": "pytest", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Sources_GET_400_limit(api_client_cognito):
@@ -514,13 +445,11 @@ def test_List_Sources_GET_400_limit(api_client_cognito):
         path,
         params={"limit": "2", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Sources_GET_400_page(api_client_cognito):
@@ -533,13 +462,11 @@ def test_List_Sources_GET_400_page(api_client_cognito):
         path,
         params={"page": "1", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Sources_GET_400_tag_name(api_client_cognito):
@@ -552,13 +479,11 @@ def test_List_Sources_GET_400_tag_name(api_client_cognito):
         path,
         params={"tag.test": "this", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Sources_GET_400_tag_exists_name(api_client_cognito):
@@ -571,13 +496,11 @@ def test_List_Sources_GET_400_tag_exists_name(api_client_cognito):
         path,
         params={"tag_exists.test": "false", "format": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Source_Details_HEAD_200(api_client_cognito, stub_multi_source):
@@ -588,12 +511,8 @@ def test_Source_Details_HEAD_200(api_client_cognito, stub_multi_source):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Source_Details_HEAD_404(api_client_cognito, id_404):
@@ -604,12 +523,8 @@ def test_Source_Details_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Source_Details_GET_200(
@@ -622,12 +537,9 @@ def test_Source_Details_GET_200(
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 200)
+    response_json = response.json()
     for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
@@ -644,12 +556,10 @@ def test_Source_Details_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Source does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source does not exist." == response_json["message"]
 
 
 def test_List_Source_Tags_HEAD_200(api_client_cognito, stub_multi_source):
@@ -660,12 +570,8 @@ def test_List_Source_Tags_HEAD_200(api_client_cognito, stub_multi_source):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Source_Tags_HEAD_404(api_client_cognito, id_404):
@@ -676,12 +582,8 @@ def test_List_Source_Tags_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_List_Source_Tags_GET_200(api_client_cognito, stub_multi_source):
@@ -692,12 +594,10 @@ def test_List_Source_Tags_GET_200(api_client_cognito, stub_multi_source):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_source["tags"] == response.json()
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_source["tags"] == response_json
 
 
 def test_List_Source_Tags_GET_404(api_client_cognito, id_404):
@@ -708,12 +608,10 @@ def test_List_Source_Tags_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Source does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source does not exist." == response_json["message"]
 
 
 def test_Source_Tag_Value_HEAD_200(api_client_cognito, stub_multi_source):
@@ -724,12 +622,8 @@ def test_Source_Tag_Value_HEAD_200(api_client_cognito, stub_multi_source):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Source_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_source):
@@ -740,12 +634,8 @@ def test_Source_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_source
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito, id_404):
@@ -756,12 +646,8 @@ def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Source_Tag_Value_GET_200(api_client_cognito, stub_multi_source):
@@ -772,12 +658,10 @@ def test_Source_Tag_Value_GET_200(api_client_cognito, stub_multi_source):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_source["tags"]["flow_status"] == response.content.decode("utf-8")
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_source["tags"]["flow_status"] == response_json
 
 
 def test_Source_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_source):
@@ -788,12 +672,10 @@ def test_Source_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_source)
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Source or tag does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source or tag does not exist." == response_json["message"]
 
 
 def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito, id_404):
@@ -804,12 +686,10 @@ def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Source or tag does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source or tag does not exist." == response_json["message"]
 
 
 def test_Create_or_Update_Source_Tag_PUT_204_create(
@@ -823,12 +703,8 @@ def test_Create_or_Update_Source_Tag_PUT_204_create(
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -843,12 +719,8 @@ def test_Create_or_Update_Source_Tag_PUT_204_update(
         path,
         json="something else",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -861,13 +733,11 @@ def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito, stub_multi_sour
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito, id_404):
@@ -879,14 +749,12 @@ def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito, id_404):
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 404)
+    response_json = response.json()
     assert (
         "The requested Source does not exist, or the tag name in the path is invalid."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -900,12 +768,8 @@ def test_Delete_Source_Tag_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -917,14 +781,12 @@ def test_Delete_Source_Tag_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 404)
+    response_json = response.json()
     assert (
         "The requested Source ID or tag in the path is invalid."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -936,12 +798,8 @@ def test_Source_Description_HEAD_200(api_client_cognito, stub_multi_source):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Source_Description_HEAD_404(api_client_cognito, id_404):
@@ -952,12 +810,8 @@ def test_Source_Description_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Source_Description_GET_200(api_client_cognito, stub_multi_source):
@@ -968,12 +822,10 @@ def test_Source_Description_GET_200(api_client_cognito, stub_multi_source):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_source["description"] == response.content.decode("utf-8")
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_source["description"] == response_json
 
 
 def test_Source_Description_GET_404(api_client_cognito, id_404):
@@ -984,12 +836,10 @@ def test_Source_Description_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Source does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source does not exist." == response_json["message"]
 
 
 def test_Create_or_Update_Source_Description_PUT_204_create(
@@ -1003,12 +853,8 @@ def test_Create_or_Update_Source_Description_PUT_204_create(
         path,
         json="pytest - audio",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -1023,12 +869,8 @@ def test_Create_or_Update_Source_Description_PUT_204_update(
         path,
         json="pytest",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -1043,13 +885,11 @@ def test_Create_or_Update_Source_Description_PUT_400(
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito, id_404):
@@ -1061,12 +901,10 @@ def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito, id_404)
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Source does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source does not exist." == response_json["message"]
 
 
 def test_Delete_Source_Description_DELETE_204(
@@ -1079,12 +917,8 @@ def test_Delete_Source_Description_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -1096,12 +930,10 @@ def test_Delete_Source_Description_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The Source ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The Source ID in the path is invalid." == response_json["message"]
 
 
 def test_Source_Label_HEAD_200(api_client_cognito, stub_multi_source):
@@ -1112,12 +944,8 @@ def test_Source_Label_HEAD_200(api_client_cognito, stub_multi_source):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Source_Label_HEAD_404(api_client_cognito, id_404):
@@ -1128,12 +956,8 @@ def test_Source_Label_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Source_Label_GET_200(api_client_cognito, stub_multi_source):
@@ -1144,12 +968,10 @@ def test_Source_Label_GET_200(api_client_cognito, stub_multi_source):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_source["label"] == response.content.decode("utf-8")
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_source["label"] == response_json
 
 
 def test_Source_Label_GET_404(api_client_cognito, id_404):
@@ -1160,14 +982,12 @@ def test_Source_Label_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 404)
+    response_json = response.json()
     assert (
         "The requested Source does not exist, or does not have a label set."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -1182,12 +1002,8 @@ def test_Create_or_Update_Source_Label_PUT_204_create(
         path,
         json="pytest - audio",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -1202,12 +1018,8 @@ def test_Create_or_Update_Source_Label_PUT_204_update(
         path,
         json="pytest",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -1220,13 +1032,11 @@ def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito, stub_video_so
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito, id_404):
@@ -1238,12 +1048,10 @@ def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito, id_404):
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Source does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source does not exist." == response_json["message"]
 
 
 def test_Delete_Source_Label_DELETE_204(
@@ -1256,12 +1064,8 @@ def test_Delete_Source_Label_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("sources/updated")
 
 
@@ -1273,11 +1077,7 @@ def test_Delete_Source_Label_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert (
-        "The requested Source ID in the path is invalid." == response.json()["message"]
-    )
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Source ID in the path is invalid." == response_json["message"]

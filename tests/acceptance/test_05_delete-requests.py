@@ -3,6 +3,7 @@ from collections import deque
 
 import pytest
 import requests
+from conftest import assert_json_response
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -28,7 +29,7 @@ def test_auth_401(verb, path, api_endpoint):
         timeout=30,
     )
     # Assert
-    assert 401 == response.status_code
+    assert_json_response(response, 401)
 
 
 def test_Delete_Flow_Segment_DELETE_202(
@@ -42,26 +43,43 @@ def test_Delete_Flow_Segment_DELETE_202(
         path,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    delete_requests.append(response.json()["id"])
     # Assert
-    assert 202 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 202)
+    response_json = response.json()
+    delete_requests.append(response_json["id"])
     assert "location" in response_headers_lower
     assert (
-        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
+        f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
         == response_headers_lower["location"]
     )
-    assert "id" in response.json()
-    assert "flow_id" in response.json()
-    assert "timerange_to_delete" in response.json()
-    assert "timerange_remaining" in response.json()
-    assert "delete_flow" in response.json()
-    assert "created" in response.json()
-    assert "created_by" in response.json()
-    assert "updated" in response.json()
-    assert "status" in response.json()
-    expect_webhooks(*["flows/segments_deleted"] * 5, "flows/updated")
+    assert "id" in response_json
+    assert "flow_id" in response_json
+    assert "timerange_to_delete" in response_json
+    assert "timerange_remaining" in response_json
+    assert "delete_flow" in response_json
+    assert "created" in response_json
+    assert "created_by" in response_json
+    assert "updated" in response_json
+    assert "status" in response_json
+    expect_webhooks(
+        *[
+            (
+                {
+                    "event_type": "flows/segments_deleted",
+                    "event": {"flow_id": stub_multi_flow["id"], "timerange": timerange},
+                },
+                ["event_timestamp"],
+            )
+            for timerange in [
+                "[-60:0_-30:0)",
+                "[0:0_1:0)",
+                "[1:0_2:0)",
+                "[2:0_3:0)",
+                "[3:0_4:0)",
+            ]
+        ],
+        "flows/updated",
+    )
 
 
 @pytest.mark.skip("Delete requests always returned unless object_id used")
@@ -84,12 +102,8 @@ def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito, stub_video
         path,
         params={"object_id": "20000000-0000-1000-8000-000000000005"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
 
 
 def test_Delete_Flow_Segment_DELETE_202_timerange(
@@ -105,26 +119,40 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
         params={"timerange": "[3:5_4:5)"},
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    delete_requests.append(response.json()["id"])
     # Assert
-    assert 202 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 202)
+    response_json = response.json()
+    delete_requests.append(response_json["id"])
     assert "location" in response_headers_lower
     assert (
-        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
+        f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
         == response_headers_lower["location"]
     )
-    assert "id" in response.json()
-    assert "flow_id" in response.json()
-    assert "timerange_to_delete" in response.json()
-    assert "timerange_remaining" in response.json()
-    assert "delete_flow" in response.json()
-    assert "created" in response.json()
-    assert "created_by" in response.json()
-    assert "updated" in response.json()
-    assert "status" in response.json()
-    expect_webhooks(*["flows/segments_deleted"] * 2, "flows/updated")
+    assert "id" in response_json
+    assert "flow_id" in response_json
+    assert "timerange_to_delete" in response_json
+    assert "timerange_remaining" in response_json
+    assert "delete_flow" in response_json
+    assert "created" in response_json
+    assert "created_by" in response_json
+    assert "updated" in response_json
+    assert "status" in response_json
+    expect_webhooks(
+        *[
+            (
+                {
+                    "event_type": "flows/segments_deleted",
+                    "event": {"flow_id": stub_video_flow["id"], "timerange": timerange},
+                },
+                ["event_timestamp"],
+            )
+            for timerange in [
+                "[3:0_4:0)",
+                "[4:0_5:0)",
+            ]
+        ],
+        "flows/updated",
+    )
 
 
 @pytest.mark.skip("Delete requests always returned unless object_id used")
@@ -141,13 +169,11 @@ def test_Delete_Flow_Segment_DELETE_400(api_client_cognito, stub_multi_flow):
         path,
         params={"timerange": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito, stub_video_flow):
@@ -162,13 +188,11 @@ def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito, stub_video
             "timerange": "bad",
         },
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Delete_Flow_Segment_DELETE_403(api_client_cognito, stub_audio_flow):
@@ -179,14 +203,12 @@ def test_Delete_Flow_Segment_DELETE_403(api_client_cognito, stub_audio_flow):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -199,14 +221,12 @@ def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito, stub_audio
         path,
         params={"object_id": "20000000-0000-1000-8000-000000000005"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -219,14 +239,12 @@ def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito, stub_audio
         path,
         params={"timerange": "[3:5_4:5)"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -238,12 +256,10 @@ def test_Delete_Flow_Segment_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito, id_404):
@@ -255,12 +271,10 @@ def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito, id_404):
         path,
         params={"object_id": "20000000-0000-1000-8000-000000000005"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito, id_404):
@@ -272,16 +286,19 @@ def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito, id_404):
         path,
         params={"timerange": "[3:5_4:5)"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Delete_Flow_DELETE_202_VIDEO(
-    api_client_cognito, delete_requests, api_endpoint, stub_video_flow, expect_webhooks
+    api_client_cognito,
+    delete_requests,
+    api_endpoint,
+    stub_video_flow,
+    expect_webhooks,
+    media_objects,
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}'
@@ -291,29 +308,53 @@ def test_Delete_Flow_DELETE_202_VIDEO(
         path,
     )
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    delete_requests.append(response.json()["id"])
     # Assert
-    assert 202 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 202)
+    response_json = response.json()
+    delete_requests.append(response_json["id"])
     assert "location" in response_headers_lower
     assert (
-        f'{api_endpoint}/flow-delete-requests/{response.json()["id"]}'
+        f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
         == response_headers_lower["location"]
     )
-    assert "id" in response.json()
-    assert "flow_id" in response.json()
-    assert "timerange_to_delete" in response.json()
-    assert "timerange_remaining" in response.json()
-    assert "delete_flow" in response.json()
-    assert "created" in response.json()
-    assert "created_by" in response.json()
-    assert "updated" in response.json()
-    assert "status" in response.json()
+    assert "id" in response_json
+    assert "flow_id" in response_json
+    assert "timerange_to_delete" in response_json
+    assert "timerange_remaining" in response_json
+    assert "delete_flow" in response_json
+    assert "created" in response_json
+    assert "created_by" in response_json
+    assert "updated" in response_json
+    assert "status" in response_json
     expect_webhooks(
-        "flows/deleted",
-        "sources/deleted",
-        *["flows/segments_deleted"] * 103,
+        (
+            {
+                "event_type": "flows/deleted",
+                "event": {"flow_id": stub_video_flow["id"]},
+            },
+            ["event_timestamp"],
+        ),
+        (
+            {
+                "event_type": "sources/deleted",
+                "event": {"source_id": stub_video_flow["source_id"]},
+            },
+            ["event_timestamp"],
+        ),
+        *[
+            (
+                {
+                    "event_type": "flows/segments_deleted",
+                    "event": {
+                        "flow_id": stub_video_flow["id"],
+                        "timerange": f"[{n}:0_{n + 1}:0)",
+                    },
+                },
+                ["event_timestamp"],
+            )
+            for n in range(len(media_objects[:-2]))
+            if n not in (3, 4)
+        ],
     )
 
 
@@ -325,14 +366,12 @@ def test_Delete_Flow_DELETE_403(api_client_cognito, stub_audio_flow):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -344,12 +383,10 @@ def test_Delete_Flow_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Delete_Flow_DELETE_204_AUDIO(
@@ -369,14 +406,25 @@ def test_Delete_Flow_DELETE_204_AUDIO(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 204, empty_body=True)
     expect_webhooks("flows/updated")  # Flip read_only flag to allow deletion
-    expect_webhooks("flows/deleted", "sources/deleted")
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/deleted",
+                "event": {"flow_id": stub_audio_flow["id"]},
+            },
+            ["event_timestamp"],
+        ),
+        (
+            {
+                "event_type": "sources/deleted",
+                "event": {"source_id": stub_audio_flow["source_id"]},
+            },
+            ["event_timestamp"],
+        ),
+    )
 
 
 def test_Delete_Flow_DELETE_204_DATA(
@@ -390,13 +438,24 @@ def test_Delete_Flow_DELETE_204_DATA(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/deleted", "sources/deleted")
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/deleted",
+                "event": {"flow_id": stub_data_flow["id"]},
+            },
+            ["event_timestamp"],
+        ),
+        (
+            {
+                "event_type": "sources/deleted",
+                "event": {"source_id": stub_data_flow["source_id"]},
+            },
+            ["event_timestamp"],
+        ),
+    )
 
 
 def test_Delete_Flow_DELETE_204_IMAGE(
@@ -410,13 +469,24 @@ def test_Delete_Flow_DELETE_204_IMAGE(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/deleted", "sources/deleted")
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/deleted",
+                "event": {"flow_id": stub_image_flow["id"]},
+            },
+            ["event_timestamp"],
+        ),
+        (
+            {
+                "event_type": "sources/deleted",
+                "event": {"source_id": stub_image_flow["source_id"]},
+            },
+            ["event_timestamp"],
+        ),
+    )
 
 
 def test_Delete_Flow_DELETE_204_MULTI(
@@ -434,9 +504,26 @@ def test_Delete_Flow_DELETE_204_MULTI(
         delete_requests.append(response.json()["id"])
     # Assert
     assert response.status_code in [202, 204]
+    if response.status_code == 204:
+        assert "" == response.content.decode("utf-8")
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
-    expect_webhooks("flows/deleted", "sources/deleted")
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/deleted",
+                "event": {"flow_id": stub_multi_flow["id"]},
+            },
+            ["event_timestamp"],
+        ),
+        (
+            {
+                "event_type": "sources/deleted",
+                "event": {"source_id": stub_multi_flow["source_id"]},
+            },
+            ["event_timestamp"],
+        ),
+    )
 
 
 def test_Flow_Delete_Request_Details_GET_200(api_client_cognito, delete_requests):
@@ -451,20 +538,18 @@ def test_Flow_Delete_Request_Details_GET_200(api_client_cognito, delete_requests
             "GET",
             path,
         )
-        response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
         # Assert
-        assert 200 == response.status_code
-        assert "content-type" in response_headers_lower
-        assert "application/json" == response_headers_lower["content-type"]
-        assert "id" in response.json()
-        assert "flow_id" in response.json()
-        assert "timerange_to_delete" in response.json()
-        assert "delete_flow" in response.json()
-        assert "status" in response.json()
-        if response.json()["status"] not in ["done", "error"]:
+        assert_json_response(response, 200)
+        response_json = response.json()
+        assert "id" in response_json
+        assert "flow_id" in response_json
+        assert "timerange_to_delete" in response_json
+        assert "delete_flow" in response_json
+        assert "status" in response_json
+        if response_json["status"] not in ["done", "error"]:
             queue.append(request_id)
         else:
-            assert "done" == response.json()["status"]
+            assert "done" == response_json["status"]
 
 
 def test_List_Flow_Delete_Requests_HEAD_200(api_client_cognito):
@@ -475,12 +560,8 @@ def test_List_Flow_Delete_Requests_HEAD_200(api_client_cognito):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flow_Delete_Requests_GET_200(api_client_cognito):
@@ -491,13 +572,11 @@ def test_List_Flow_Delete_Requests_GET_200(api_client_cognito):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 0 < len(response.json())
-    for record in response.json():
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 0 < len(response_json)
+    for record in response_json:
         assert "id" in record
         assert "flow_id" in record
         assert "timerange_to_delete" in record
@@ -513,12 +592,8 @@ def test_Flow_Delete_Request_Details_HEAD_200(api_client_cognito, delete_request
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito, id_404):
@@ -529,12 +604,8 @@ def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Delete_Request_Details_GET_404(api_client_cognito, id_404):
@@ -545,14 +616,11 @@ def test_Flow_Delete_Request_Details_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 404)
+    response_json = response.json()
     assert (
-        "The requested flow delete request does not exist."
-        == response.json()["message"]
+        "The requested flow delete request does not exist." == response_json["message"]
     )
 
 
