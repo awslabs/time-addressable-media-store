@@ -1059,7 +1059,7 @@ def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito, stub_multi_
     path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
+        "HEAD", path, params={"include_timerange": "bad"}
     )
     # Assert
     assert_json_response(response, 400, empty_body=True)
@@ -1103,9 +1103,7 @@ def test_Flow_Details_HEAD_404_timerange(api_client_cognito, id_404):
     # Arrange
     path = f"/flows/{id_404}"
     # Act
-    response = api_client_cognito.request(
-        "HEAD", path, params={"include_timerange": "true"}
-    )
+    response = api_client_cognito.request("HEAD", path, params={"timerange": "()"})
     # Assert
     assert_json_response(response, 404, empty_body=True)
 
@@ -1148,7 +1146,7 @@ def test_Flow_Details_GET_400_include_timerange(api_client_cognito, stub_data_fl
     path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"include_timerange": "true", "timerange": "bad"}
+        "GET", path, params={"include_timerange": "bad"}
     )
     # Assert
     assert_json_response(response, 400)
@@ -1202,9 +1200,7 @@ def test_Flow_Details_GET_404_timerange(api_client_cognito, id_404):
     # Arrange
     path = f"/flows/{id_404}"
     # Act
-    response = api_client_cognito.request(
-        "GET", path, params={"include_timerange": "true"}
-    )
+    response = api_client_cognito.request("GET", path, params={"timerange": "()"})
     # Assert
     assert_json_response(response, 404)
     response_json = response.json()
