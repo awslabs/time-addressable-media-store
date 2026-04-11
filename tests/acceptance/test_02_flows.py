@@ -1,7 +1,7 @@
 # pylint: disable=too-many-lines
 import pytest
 import requests
-from conftest import assert_equal_unordered
+from conftest import assert_equal_unordered, assert_json_response
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -63,11 +63,14 @@ def test_auth_401(verb, path, api_endpoint):
         timeout=30,
     )
     # Assert
-    assert 401 == response.status_code
+    assert_json_response(response, 401)
 
 
 def test_Create_or_Replace_Flow_PUT_201_VIDEO(
-    api_client_cognito, stub_video_flow, expect_webhooks
+    api_client_cognito,
+    stub_video_flow,
+    expect_webhooks,
+    stub_video_source,
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}'
@@ -77,21 +80,36 @@ def test_Create_or_Replace_Flow_PUT_201_VIDEO(
         path,
         json=stub_video_flow,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 201 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 201)
+    response_json = response.json()
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_video_flow, response_json)
-    expect_webhooks("sources/created", "flows/created")
+    expect_webhooks(
+        (
+            {
+                "event_type": "sources/created",
+                "event": {"source": stub_video_source},
+            },
+            ["event_timestamp", "event.source.created_by", "event.source.created"],
+        ),
+        (
+            {
+                "event_type": "flows/created",
+                "event": {"flow": stub_video_flow},
+            },
+            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
+        ),
+    )
 
 
 def test_Create_or_Replace_Flow_PUT_201_AUDIO(
-    api_client_cognito, stub_audio_flow, expect_webhooks
+    api_client_cognito,
+    stub_audio_flow,
+    expect_webhooks,
+    stub_audio_source,
 ):
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}'
@@ -101,21 +119,36 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(
         path,
         json=stub_audio_flow,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 201 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 201)
+    response_json = response.json()
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_audio_flow, response_json)
-    expect_webhooks("sources/created", "flows/created")
+    expect_webhooks(
+        (
+            {
+                "event_type": "sources/created",
+                "event": {"source": stub_audio_source},
+            },
+            ["event_timestamp", "event.source.created_by", "event.source.created"],
+        ),
+        (
+            {
+                "event_type": "flows/created",
+                "event": {"flow": stub_audio_flow},
+            },
+            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
+        ),
+    )
 
 
 def test_Create_or_Replace_Flow_PUT_201_DATA(
-    api_client_cognito, stub_data_flow, expect_webhooks
+    api_client_cognito,
+    stub_data_flow,
+    expect_webhooks,
+    stub_data_source,
 ):
     # Arrange
     path = f'/flows/{stub_data_flow["id"]}'
@@ -125,21 +158,36 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(
         path,
         json=stub_data_flow,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 201 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 201)
+    response_json = response.json()
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_data_flow, response_json)
-    expect_webhooks("sources/created", "flows/created")
+    expect_webhooks(
+        (
+            {
+                "event_type": "sources/created",
+                "event": {"source": stub_data_source},
+            },
+            ["event_timestamp", "event.source.created_by", "event.source.created"],
+        ),
+        (
+            {
+                "event_type": "flows/created",
+                "event": {"flow": stub_data_flow},
+            },
+            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
+        ),
+    )
 
 
 def test_Create_or_Replace_Flow_PUT_201_IMAGE(
-    api_client_cognito, stub_image_flow, expect_webhooks
+    api_client_cognito,
+    stub_image_flow,
+    expect_webhooks,
+    stub_image_source,
 ):
     # Arrange
     path = f'/flows/{stub_image_flow["id"]}'
@@ -149,21 +197,44 @@ def test_Create_or_Replace_Flow_PUT_201_IMAGE(
         path,
         json=stub_image_flow,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 201 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 201)
+    response_json = response.json()
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_image_flow, response_json)
-    expect_webhooks("sources/created", "flows/created")
+    expect_webhooks(
+        (
+            {
+                "event_type": "sources/created",
+                "event": {"source": stub_image_source},
+            },
+            ["event_timestamp", "event.source.created_by", "event.source.created"],
+        ),
+        (
+            {
+                "event_type": "flows/created",
+                "event": {"flow": stub_image_flow},
+            },
+            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
+        ),
+    )
 
 
 def test_Create_or_Replace_Flow_PUT_201_MULTI(
-    api_client_cognito, stub_multi_flow, expect_webhooks
+    api_client_cognito,
+    stub_multi_flow,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_image_flow,
+    stub_multi_source,
+    stub_video_source,
+    stub_audio_source,
+    stub_data_source,
+    stub_image_source,
+    expect_webhooks,
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}'
@@ -173,17 +244,43 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(
         path,
         json=stub_multi_flow,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 201 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 201)
+    response_json = response.json()
     for prop in ["created_by", "created"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_multi_flow, response_json)
-    expect_webhooks("sources/created", "flows/created")
+    for flow in [
+        stub_video_flow,
+        stub_audio_flow,
+        stub_data_flow,
+        stub_image_flow,
+    ]:
+        flow["collected_by"] = [stub_multi_flow["id"]]
+    for source in [
+        stub_video_source,
+        stub_audio_source,
+        stub_data_source,
+        stub_image_source,
+    ]:
+        source["collected_by"] = [stub_multi_source["id"]]
+    expect_webhooks(
+        (
+            {
+                "event_type": "sources/created",
+                "event": {"source": stub_multi_source},
+            },
+            ["event_timestamp", "event.source.created_by", "event.source.created"],
+        ),
+        (
+            {
+                "event_type": "flows/created",
+                "event": {"flow": stub_multi_flow},
+            },
+            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
+        ),
+    )
 
 
 def test_Create_or_Replace_Flow_PUT_204(
@@ -196,10 +293,24 @@ def test_Create_or_Replace_Flow_PUT_204(
         "PUT",
         path,
         json=stub_multi_flow,
-    )  # Assert
-    assert 204 == response.status_code
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {"flow": stub_multi_flow},
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        ),
+    )
 
 
 def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
@@ -217,9 +328,10 @@ def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
         json=body,
     )
     # Assert
-    assert 400 == response.status_code
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Replace_Flow_PUT_403(api_client_cognito, stub_data_flow):
@@ -233,10 +345,11 @@ def test_Create_or_Replace_Flow_PUT_403(api_client_cognito, stub_data_flow):
         json=stub_data_flow,
     )
     # Assert
-    assert 403 == response.status_code
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -251,8 +364,9 @@ def test_Create_or_Replace_Flow_PUT_404(api_client_cognito, id_404, stub_multi_f
         json=stub_multi_flow,
     )
     # Assert
-    assert 404 == response.status_code
-    assert "The requested Flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow ID in the path is invalid." == response_json["message"]
 
 
 def test_List_Flows_HEAD_200(api_client_cognito):
@@ -263,12 +377,8 @@ def test_List_Flows_HEAD_200(api_client_cognito):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_codec(api_client_cognito):
@@ -276,12 +386,8 @@ def test_List_Flows_HEAD_200_codec(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"codec": "audio/aac"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_format(api_client_cognito):
@@ -291,12 +397,8 @@ def test_List_Flows_HEAD_200_format(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"format": "urn:x-nmos:format:data"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_frame_height(api_client_cognito):
@@ -304,12 +406,8 @@ def test_List_Flows_HEAD_200_frame_height(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"frame_height": "1080"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_frame_width(api_client_cognito):
@@ -317,12 +415,8 @@ def test_List_Flows_HEAD_200_frame_width(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"frame_width": "1920"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_label(api_client_cognito):
@@ -330,12 +424,8 @@ def test_List_Flows_HEAD_200_label(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"label": "pytest"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_limit(api_client_cognito):
@@ -345,13 +435,10 @@ def test_List_Flows_HEAD_200_limit(api_client_cognito):
     response = api_client_cognito.request("HEAD", path, params={"limit": "2"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 200, empty_body=True)
     assert "link" in response_headers_lower
     assert "x-paging-limit" in response_headers_lower
     assert "x-paging-nextkey" in response_headers_lower
-    assert "" == response.content.decode("utf-8")
 
 
 def test_List_Flows_HEAD_200_page(api_client_cognito):
@@ -359,12 +446,8 @@ def test_List_Flows_HEAD_200_page(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"page": "1"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_source_id(api_client_cognito, stub_data_flow):
@@ -374,12 +457,8 @@ def test_List_Flows_HEAD_200_source_id(api_client_cognito, stub_data_flow):
     response = api_client_cognito.request(
         "HEAD", path, params={"source_id": stub_data_flow["source_id"]}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_tag_name(api_client_cognito):
@@ -387,12 +466,8 @@ def test_List_Flows_HEAD_200_tag_name(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"tag.test": "this"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_tag_exists_name(api_client_cognito):
@@ -404,12 +479,8 @@ def test_List_Flows_HEAD_200_tag_exists_name(api_client_cognito):
         path,
         params={"tag_exists.test": "false"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_200_timerange(api_client_cognito):
@@ -417,12 +488,8 @@ def test_List_Flows_HEAD_200_timerange(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"timerange": "()"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flows_HEAD_400(api_client_cognito):
@@ -434,12 +501,8 @@ def test_List_Flows_HEAD_400(api_client_cognito):
         path,
         params={"timerange": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_codec(api_client_cognito):
@@ -449,12 +512,8 @@ def test_List_Flows_HEAD_400_codec(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"codec": "audio/aac", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_format(api_client_cognito):
@@ -464,12 +523,8 @@ def test_List_Flows_HEAD_400_format(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"format": "urn:x-nmos:format:data", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_frame_height(api_client_cognito):
@@ -479,12 +534,8 @@ def test_List_Flows_HEAD_400_frame_height(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"frame_height": "1080", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_frame_width(api_client_cognito):
@@ -494,12 +545,8 @@ def test_List_Flows_HEAD_400_frame_width(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"frame_width": "1920", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_label(api_client_cognito):
@@ -509,12 +556,8 @@ def test_List_Flows_HEAD_400_label(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"label": "pytest", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_limit(api_client_cognito):
@@ -524,12 +567,8 @@ def test_List_Flows_HEAD_400_limit(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"limit": "2", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_page(api_client_cognito):
@@ -539,12 +578,8 @@ def test_List_Flows_HEAD_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"page": "1", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_source_id(api_client_cognito, stub_data_flow):
@@ -556,12 +591,8 @@ def test_List_Flows_HEAD_400_source_id(api_client_cognito, stub_data_flow):
         path,
         params={"source_id": stub_data_flow["source_id"], "timerange": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_tag_name(api_client_cognito):
@@ -571,12 +602,8 @@ def test_List_Flows_HEAD_400_tag_name(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"tag.test": "this", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_tag_exists_name(api_client_cognito):
@@ -586,12 +613,8 @@ def test_List_Flows_HEAD_400_tag_exists_name(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"tag_exists.text": "false", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_HEAD_400_timerange(api_client_cognito):
@@ -601,12 +624,8 @@ def test_List_Flows_HEAD_400_timerange(api_client_cognito):
     response = api_client_cognito.request(
         "HEAD", path, params={"timerange": "()", "format": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_List_Flows_GET_200(
@@ -625,18 +644,15 @@ def test_List_Flows_GET_200(
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert_json_response(response, 200)
     response_json = response.json()
     for record in response_json:
         if "flow_collection" in record:
             record["flow_collection"] = sorted(
                 record["flow_collection"], key=lambda fc: fc["id"]
             )
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 5 == len(response.json())
+    assert 5 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -656,13 +672,10 @@ def test_List_Flows_GET_200_codec(
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"codec": "audio/aac"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -682,13 +695,10 @@ def test_List_Flows_GET_200_format(
     response = api_client_cognito.request(
         "GET", path, params={"format": "urn:x-nmos:format:data"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -706,13 +716,10 @@ def test_List_Flows_GET_200_frame_height(
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"frame_height": "1080"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -730,13 +737,10 @@ def test_List_Flows_GET_200_frame_width(
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"frame_width": "1920"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -752,18 +756,15 @@ def test_List_Flows_GET_200_label(api_client_cognito, dynamic_props, stub_multi_
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"label": "pytest"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert_json_response(response, 200)
     response_json = response.json()
     for record in response_json:
         if "flow_collection" in record:
             record["flow_collection"] = sorted(
                 record["flow_collection"], key=lambda fc: fc["id"]
             )
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -779,13 +780,12 @@ def test_List_Flows_GET_200_limit(api_client_cognito):
     response = api_client_cognito.request("GET", path, params={"limit": "2"})
     response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 200)
+    response_json = response.json()
     assert "link" in response_headers_lower
     assert "x-paging-limit" in response_headers_lower
     assert "x-paging-nextkey" in response_headers_lower
-    assert 2 == len(response.json())
+    assert 2 == len(response_json)
 
 
 def test_List_Flows_GET_200_page(api_client_cognito):
@@ -794,12 +794,10 @@ def test_List_Flows_GET_200_page(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"page": "1"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 4 == len(response_json)
 
 
 def test_List_Flows_GET_200_source_id(
@@ -812,13 +810,10 @@ def test_List_Flows_GET_200_source_id(
     response = api_client_cognito.request(
         "GET", path, params={"source_id": stub_data_flow["source_id"]}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -836,18 +831,15 @@ def test_List_Flows_GET_200_tag_name(
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"tag.test": "this"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    # Assert
+    assert_json_response(response, 200)
     response_json = response.json()
     for record in response_json:
         if "flow_collection" in record:
             record["flow_collection"] = sorted(
                 record["flow_collection"], key=lambda fc: fc["id"]
             )
-    # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 1 == len(response.json())
+    assert 1 == len(response_json)
     for prop in dynamic_props:
         for record in response_json:
             if prop in record:
@@ -863,12 +855,10 @@ def test_List_Flows_GET_200_tag_exists_name(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"tag_exists.test": "false"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 4 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 4 == len(response_json)
 
 
 def test_List_Flows_GET_200_timerange(api_client_cognito):
@@ -877,12 +867,10 @@ def test_List_Flows_GET_200_timerange(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"timerange": "()"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert 5 == len(response.json())
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 5 == len(response_json)
 
 
 def test_List_Flows_GET_400(api_client_cognito):
@@ -890,13 +878,11 @@ def test_List_Flows_GET_400(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"timerange": "bad"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_codec(api_client_cognito):
@@ -907,13 +893,11 @@ def test_List_Flows_GET_400_codec(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"codec": "audio/aac", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_format(api_client_cognito):
@@ -924,13 +908,11 @@ def test_List_Flows_GET_400_format(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"format": "urn:x-nmos:format:data", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_frame_height(api_client_cognito):
@@ -941,13 +923,11 @@ def test_List_Flows_GET_400_frame_height(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"frame_height": "1080", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_frame_width(api_client_cognito):
@@ -958,13 +938,11 @@ def test_List_Flows_GET_400_frame_width(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"frame_width": "1920", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_label(api_client_cognito):
@@ -975,13 +953,11 @@ def test_List_Flows_GET_400_label(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"label": "pytest", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_limit(api_client_cognito):
@@ -992,13 +968,11 @@ def test_List_Flows_GET_400_limit(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"limit": "2", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_page(api_client_cognito):
@@ -1009,13 +983,11 @@ def test_List_Flows_GET_400_page(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"page": "1", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_source_id(api_client_cognito, stub_data_flow):
@@ -1028,13 +1000,11 @@ def test_List_Flows_GET_400_source_id(api_client_cognito, stub_data_flow):
         path,
         params={"source_id": stub_data_flow["source_id"], "timerange": "bad"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_tag_name(api_client_cognito):
@@ -1045,13 +1015,11 @@ def test_List_Flows_GET_400_tag_name(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"tag.test": "this", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_tag_exists_name(api_client_cognito):
@@ -1062,13 +1030,11 @@ def test_List_Flows_GET_400_tag_exists_name(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"tag_exists.text": "false", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_List_Flows_GET_400_timerange(api_client_cognito):
@@ -1079,13 +1045,11 @@ def test_List_Flows_GET_400_timerange(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"timerange": "()", "format": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Flow_Details_HEAD_200(api_client_cognito, stub_multi_flow):
@@ -1096,12 +1060,8 @@ def test_Flow_Details_HEAD_200(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Details_HEAD_200_include_timerange(api_client_cognito, stub_multi_flow):
@@ -1111,12 +1071,8 @@ def test_Flow_Details_HEAD_200_include_timerange(api_client_cognito, stub_multi_
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Details_HEAD_200_timerange(api_client_cognito, stub_multi_flow):
@@ -1124,12 +1080,8 @@ def test_Flow_Details_HEAD_200_timerange(api_client_cognito, stub_multi_flow):
     path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request("HEAD", path, params={"timerange": "()"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Details_HEAD_400(api_client_cognito, stub_multi_flow):
@@ -1137,12 +1089,8 @@ def test_Flow_Details_HEAD_400(api_client_cognito, stub_multi_flow):
     path = f'/flows/{stub_multi_flow["id"]}'
     # Act
     response = api_client_cognito.request("HEAD", path, params={"timerange": "bad"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito, stub_multi_flow):
@@ -1152,12 +1100,8 @@ def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito, stub_multi_
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_Flow_Details_HEAD_400_timerange(api_client_cognito, stub_multi_flow):
@@ -1167,12 +1111,8 @@ def test_Flow_Details_HEAD_400_timerange(api_client_cognito, stub_multi_flow):
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 400, empty_body=True)
 
 
 def test_Flow_Details_HEAD_404(api_client_cognito, id_404):
@@ -1183,12 +1123,8 @@ def test_Flow_Details_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Details_HEAD_404_include_timerange(api_client_cognito, id_404):
@@ -1198,12 +1134,8 @@ def test_Flow_Details_HEAD_404_include_timerange(api_client_cognito, id_404):
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Details_HEAD_404_timerange(api_client_cognito, id_404):
@@ -1213,12 +1145,8 @@ def test_Flow_Details_HEAD_404_timerange(api_client_cognito, id_404):
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Details_GET_200(
@@ -1231,12 +1159,9 @@ def test_Flow_Details_GET_200(
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 200)
+    response_json = response.json()
     for prop in dynamic_props:
         if prop in response_json:
             del response_json[prop]
@@ -1250,13 +1175,11 @@ def test_Flow_Details_GET_400(api_client_cognito, stub_data_flow):
     path = f'/flows/{stub_data_flow["id"]}'
     # Act
     response = api_client_cognito.request("GET", path, params={"timerange": "bad"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Flow_Details_GET_400_include_timerange(api_client_cognito, stub_data_flow):
@@ -1266,13 +1189,11 @@ def test_Flow_Details_GET_400_include_timerange(api_client_cognito, stub_data_fl
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Flow_Details_GET_400_timerange(api_client_cognito, stub_data_flow):
@@ -1282,13 +1203,11 @@ def test_Flow_Details_GET_400_timerange(api_client_cognito, stub_data_flow):
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true", "timerange": "bad"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Flow_Details_GET_404(api_client_cognito, id_404):
@@ -1299,12 +1218,10 @@ def test_Flow_Details_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_Flow_Details_GET_404_include_timerange(api_client_cognito, id_404):
@@ -1314,12 +1231,10 @@ def test_Flow_Details_GET_404_include_timerange(api_client_cognito, id_404):
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_Flow_Details_GET_404_timerange(api_client_cognito, id_404):
@@ -1329,12 +1244,10 @@ def test_Flow_Details_GET_404_timerange(api_client_cognito, id_404):
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true"}
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_List_Flow_Tags_HEAD_200(api_client_cognito, stub_multi_flow):
@@ -1345,12 +1258,8 @@ def test_List_Flow_Tags_HEAD_200(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_List_Flow_Tags_HEAD_404(api_client_cognito, id_404):
@@ -1361,12 +1270,8 @@ def test_List_Flow_Tags_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_List_Flow_Tags_GET_200(api_client_cognito, stub_multi_flow):
@@ -1377,12 +1282,10 @@ def test_List_Flow_Tags_GET_200(api_client_cognito, stub_multi_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_flow["tags"] == response.json()
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_flow["tags"] == response_json
 
 
 def test_List_Flow_Tags_GET_404(api_client_cognito, id_404):
@@ -1393,12 +1296,10 @@ def test_List_Flow_Tags_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_Flow_Tag_Value_HEAD_200(api_client_cognito, stub_multi_flow):
@@ -1409,12 +1310,8 @@ def test_Flow_Tag_Value_HEAD_200(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_flow):
@@ -1425,12 +1322,8 @@ def test_Flow_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Tag_Value_HEAD_404_bad_flow_id(api_client_cognito, id_404):
@@ -1441,12 +1334,8 @@ def test_Flow_Tag_Value_HEAD_404_bad_flow_id(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Tag_Value_GET_200(api_client_cognito, stub_multi_flow):
@@ -1457,12 +1346,10 @@ def test_Flow_Tag_Value_GET_200(api_client_cognito, stub_multi_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_flow["tags"]["flow_status"] == response.content.decode("utf-8")
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_flow["tags"]["flow_status"] == response_json
 
 
 def test_Flow_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_flow):
@@ -1473,12 +1360,10 @@ def test_Flow_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow or tag does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow or tag does not exist." == response_json["message"]
 
 
 def test_Flow_Tag_Value_GET_404_bad_flow_id(api_client_cognito, id_404):
@@ -1489,52 +1374,78 @@ def test_Flow_Tag_Value_GET_404_bad_flow_id(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow or tag does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow or tag does not exist." == response_json["message"]
 
 
 def test_Create_or_Update_Flow_Tag_PUT_204_create(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
+    tag_name = "pytest"
+    tag_value = "test"
+    path = f'/flows/{stub_multi_flow["id"]}/tags/{tag_name}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="test",
+        json=tag_value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_multi_flow["tags"][tag_name] = tag_value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {"flow": stub_multi_flow},
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Tag_PUT_204_update(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/test'
+    tag_name = "test"
+    tag_value = "something else"
+    path = f'/flows/{stub_multi_flow["id"]}/tags/{tag_name}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="something else",
+        json=tag_value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_multi_flow["tags"][tag_name] = tag_value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
@@ -1546,13 +1457,11 @@ def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
         path,
         data="test this",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Flow_Tag_PUT_403(api_client_cognito, stub_data_flow):
@@ -1564,14 +1473,12 @@ def test_Create_or_Update_Flow_Tag_PUT_403(api_client_cognito, stub_data_flow):
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -1584,31 +1491,43 @@ def test_Create_or_Update_Flow_Tag_PUT_404(api_client_cognito, id_404):
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_Delete_Flow_Tag_DELETE_204(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
+    tag_name = "pytest"
+    path = f'/flows/{stub_multi_flow["id"]}/tags/{tag_name}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    del stub_multi_flow["tags"][tag_name]
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Delete_Flow_Tag_DELETE_403(api_client_cognito, stub_data_flow):
@@ -1619,14 +1538,12 @@ def test_Delete_Flow_Tag_DELETE_403(api_client_cognito, stub_data_flow):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -1638,12 +1555,10 @@ def test_Delete_Flow_Tag_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Flow_Description_HEAD_200(api_client_cognito, stub_multi_flow):
@@ -1654,12 +1569,8 @@ def test_Flow_Description_HEAD_200(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Description_HEAD_404(api_client_cognito, id_404):
@@ -1670,12 +1581,8 @@ def test_Flow_Description_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Description_GET_200(api_client_cognito, stub_multi_flow):
@@ -1686,12 +1593,10 @@ def test_Flow_Description_GET_200(api_client_cognito, stub_multi_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_flow["description"] == response.content.decode("utf-8")
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_flow["description"] == response_json
 
 
 def test_Flow_Description_GET_404(api_client_cognito, id_404):
@@ -1702,38 +1607,51 @@ def test_Flow_Description_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_Create_or_Update_Flow_Description_PUT_204_create(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
+    value = "pytest - audio"
     path = f'/flows/{stub_audio_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="pytest - audio",
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_audio_flow["description"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Description_PUT_204_update(
     api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
+    value = "pytest"
     path = f'/flows/{stub_video_flow["id"]}/description'
     # Act
     response = api_client_cognito.request(
@@ -1741,13 +1659,26 @@ def test_Create_or_Update_Flow_Description_PUT_204_update(
         path,
         json="pytest",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_video_flow["description"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_video_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito, stub_video_flow):
@@ -1759,13 +1690,11 @@ def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito, stub_vide
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Flow_Description_PUT_403(api_client_cognito, stub_data_flow):
@@ -1777,14 +1706,12 @@ def test_Create_or_Update_Flow_Description_PUT_403(api_client_cognito, stub_data
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -1797,12 +1724,10 @@ def test_Create_or_Update_Flow_Description_PUT_404(api_client_cognito, id_404):
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_Delete_Flow_Description_DELETE_204(
@@ -1815,13 +1740,26 @@ def test_Delete_Flow_Description_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    del stub_audio_flow["description"]
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Delete_Flow_Description_DELETE_403(api_client_cognito, stub_data_flow):
@@ -1832,14 +1770,12 @@ def test_Delete_Flow_Description_DELETE_403(api_client_cognito, stub_data_flow):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 403 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 403)
+    response_json = response.json()
     assert (
         "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -1851,12 +1787,10 @@ def test_Delete_Flow_Description_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Flow_Label_HEAD_200(api_client_cognito, stub_multi_flow):
@@ -1867,12 +1801,8 @@ def test_Flow_Label_HEAD_200(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Label_HEAD_404(api_client_cognito, id_404):
@@ -1883,12 +1813,8 @@ def test_Flow_Label_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Label_GET_200(api_client_cognito, stub_multi_flow):
@@ -1899,12 +1825,10 @@ def test_Flow_Label_GET_200(api_client_cognito, stub_multi_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_multi_flow["label"] == response.content.decode("utf-8")
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_multi_flow["label"] == response_json
 
 
 def test_Flow_Label_GET_404(api_client_cognito, id_404):
@@ -1915,14 +1839,12 @@ def test_Flow_Label_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 404)
+    response_json = response.json()
     assert (
         "The requested Flow does not exist, or does not have a label set."
-        == response.json()["message"]
+        == response_json["message"]
     )
 
 
@@ -1930,40 +1852,68 @@ def test_Create_or_Update_Flow_Label_PUT_204_create(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
+    value = "pytest - audio"
     path = f'/flows/{stub_audio_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="pytest - audio",
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_audio_flow["label"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Label_PUT_204_update(
     api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
+    value = "pytest"
     path = f'/flows/{stub_video_flow["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="pytest",
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_video_flow["label"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_video_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito, stub_video_flow):
@@ -1975,13 +1925,11 @@ def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito, stub_video_flow
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Flow_Label_PUT_404(api_client_cognito, id_404):
@@ -1993,12 +1941,10 @@ def test_Create_or_Update_Flow_Label_PUT_404(api_client_cognito, id_404):
         path,
         json="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
 
 
 def test_Delete_Flow_Label_DELETE_204(
@@ -2011,13 +1957,26 @@ def test_Delete_Flow_Label_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    del stub_audio_flow["label"]
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Delete_Flow_Label_DELETE_404(api_client_cognito, id_404):
@@ -2028,12 +1987,10 @@ def test_Delete_Flow_Label_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Flow_Flow_Collection_HEAD_200(api_client_cognito, stub_multi_flow):
@@ -2044,12 +2001,8 @@ def test_Flow_Flow_Collection_HEAD_200(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Flow_Collection_HEAD_404(api_client_cognito, id_404):
@@ -2060,12 +2013,8 @@ def test_Flow_Flow_Collection_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Flow_Collection_GET_200(api_client_cognito, stub_multi_flow):
@@ -2076,13 +2025,9 @@ def test_Flow_Flow_Collection_GET_200(api_client_cognito, stub_multi_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
-    response_json = response.json()
-    response_json = sorted(response_json, key=lambda fc: fc["id"])
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
+    assert_json_response(response, 200)
+    response_json = response.json()
     assert_equal_unordered(stub_multi_flow["flow_collection"], response_json)
 
 
@@ -2094,12 +2039,10 @@ def test_Flow_Flow_Collection_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
 
 
 def test_Delete_Flow_Flow_Collection_DELETE_204(
@@ -2112,13 +2055,29 @@ def test_Delete_Flow_Flow_Collection_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": {
+                        k: v
+                        for k, v in stub_multi_flow.items()
+                        if k != "flow_collection"
+                    }
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito, id_404):
@@ -2129,12 +2088,10 @@ def test_Delete_Flow_Flow_Collection_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(
@@ -2148,13 +2105,28 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(
         path,
         json=stub_multi_flow["flow_collection"][0:1],
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": {
+                        **stub_multi_flow,
+                        "flow_collection": stub_multi_flow["flow_collection"][0:1],
+                    },
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
@@ -2168,13 +2140,23 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
         path,
         json=stub_multi_flow["flow_collection"],
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {"flow": stub_multi_flow},
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_400(
@@ -2188,13 +2170,11 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_400(
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito, id_404):
@@ -2206,12 +2186,10 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito, id_40
         path,
         json=[],
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
 
 
 def test_Flow_Max_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
@@ -2222,12 +2200,8 @@ def test_Flow_Max_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Max_Bit_Rate_HEAD_404(api_client_cognito, id_404):
@@ -2238,12 +2212,8 @@ def test_Flow_Max_Bit_Rate_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Max_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
@@ -2254,12 +2224,10 @@ def test_Flow_Max_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_video_flow["max_bit_rate"] == int(response.content.decode("utf-8"))
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_video_flow["max_bit_rate"] == int(response_json)
 
 
 def test_Flow_Max_Bit_Rate_GET_404(api_client_cognito, id_404):
@@ -2270,52 +2238,78 @@ def test_Flow_Max_Bit_Rate_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
+    value = 6000000
     path = f'/flows/{stub_audio_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=6000000,
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_audio_flow["max_bit_rate"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(
     api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
+    value = 6000000
     path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=6000000,
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_video_flow["max_bit_rate"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_video_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(
@@ -2329,13 +2323,11 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito, id_404):
@@ -2347,12 +2339,10 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_404(api_client_cognito, id_404):
         path,
         json=6000000,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
 
 
 def test_Delete_Flow_Max_Bit_Rate_DELETE_204(
@@ -2365,13 +2355,26 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    del stub_audio_flow["max_bit_rate"]
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito, id_404):
@@ -2382,12 +2385,10 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Flow_Avg_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
@@ -2398,12 +2399,8 @@ def test_Flow_Avg_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Avg_Bit_Rate_HEAD_404(api_client_cognito, id_404):
@@ -2414,12 +2411,8 @@ def test_Flow_Avg_Bit_Rate_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Avg_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
@@ -2430,12 +2423,10 @@ def test_Flow_Avg_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert stub_video_flow["avg_bit_rate"] == int(response.content.decode("utf-8"))
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_video_flow["avg_bit_rate"] == int(response_json)
 
 
 def test_Flow_Avg_Bit_Rate_GET_404(api_client_cognito, id_404):
@@ -2446,52 +2437,78 @@ def test_Flow_Avg_Bit_Rate_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
+    value = 6000000
     path = f'/flows/{stub_audio_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=6000000,
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_audio_flow["avg_bit_rate"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(
     api_client_cognito, stub_video_flow, expect_webhooks
 ):
     # Arrange
+    value = 6000000
     path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=6000000,
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_video_flow["avg_bit_rate"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_video_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(
@@ -2505,13 +2522,11 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(
         path,
         data="test",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito, id_404):
@@ -2523,12 +2538,10 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_404(api_client_cognito, id_404):
         path,
         json=6000000,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested Flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
 
 
 def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(
@@ -2541,13 +2554,26 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    del stub_audio_flow["avg_bit_rate"]
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito, id_404):
@@ -2558,12 +2584,10 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito, id_404):
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow ID in the path is invalid." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 def test_Flow_Read_Only_HEAD_200(api_client_cognito, stub_multi_flow):
@@ -2574,12 +2598,8 @@ def test_Flow_Read_Only_HEAD_200(api_client_cognito, stub_multi_flow):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 200, empty_body=True)
 
 
 def test_Flow_Read_Only_HEAD_404(api_client_cognito, id_404):
@@ -2590,12 +2610,8 @@ def test_Flow_Read_Only_HEAD_404(api_client_cognito, id_404):
         "HEAD",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Flow_Read_Only_GET_200(api_client_cognito, stub_multi_flow):
@@ -2606,12 +2622,10 @@ def test_Flow_Read_Only_GET_200(api_client_cognito, stub_multi_flow):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 200 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert str(False).lower() == response.content.decode("utf-8")
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert not response_json
 
 
 def test_Flow_Read_Only_GET_404(api_client_cognito, id_404):
@@ -2622,52 +2636,78 @@ def test_Flow_Read_Only_GET_404(api_client_cognito, id_404):
         "GET",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
 
 
 def test_Set_Flow_Read_Only_PUT_204_DATA(
     api_client_cognito, stub_data_flow, expect_webhooks
 ):
     # Arrange
+    value = False
     path = f'/flows/{stub_data_flow["id"]}/read_only'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=False,
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_data_flow["read_only"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_data_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Set_Flow_Read_Only_PUT_204_AUDIO(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
+    value = True
     path = f'/flows/{stub_audio_flow["id"]}/read_only'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json=True,
+        json=value,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 204 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "" == response.content.decode("utf-8")
-    expect_webhooks("flows/updated")
+    assert_json_response(response, 204, empty_body=True)
+    stub_audio_flow["read_only"] = value
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_audio_flow,
+                },
+            },
+            [
+                "event_timestamp",
+                "event.flow.created_by",
+                "event.flow.created",
+                "event.flow.updated_by",
+                "event.flow.metadata_updated",
+            ],
+        )
+    )
 
 
 def test_Set_Flow_Read_Only_PUT_400(api_client_cognito, stub_multi_flow):
@@ -2679,13 +2719,11 @@ def test_Set_Flow_Read_Only_PUT_400(api_client_cognito, stub_multi_flow):
         path,
         data="invalid",
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 400 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert isinstance(response.json()["message"], list)
-    assert 0 < len(response.json()["message"])
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
 
 
 def test_Set_Flow_Read_Only_PUT_404(api_client_cognito, id_404):
@@ -2697,9 +2735,7 @@ def test_Set_Flow_Read_Only_PUT_404(api_client_cognito, id_404):
         path,
         json=False,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
-    assert 404 == response.status_code
-    assert "content-type" in response_headers_lower
-    assert "application/json" == response_headers_lower["content-type"]
-    assert "The requested flow does not exist." == response.json()["message"]
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow does not exist." == response_json["message"]
