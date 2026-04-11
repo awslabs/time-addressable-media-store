@@ -141,7 +141,7 @@ def get_source_tag_value(
         raise NotFoundError("The requested Source or tag does not exist.")  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return tags[tag_name], HTTPStatus.OK.value  # 200
+    return json.dumps(tags[tag_name]), HTTPStatus.OK.value  # 200
 
 
 @app.put("/sources/<sourceId>/tags/<name>")
@@ -213,7 +213,7 @@ def get_source_description(
         raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return description, HTTPStatus.OK.value  # 200
+    return json.dumps(description), HTTPStatus.OK.value  # 200
 
 
 @app.put("/sources/<sourceId>/description")
@@ -269,7 +269,7 @@ def get_source_label(
         ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return label, HTTPStatus.OK.value  # 200
+    return json.dumps(label), HTTPStatus.OK.value  # 200
 
 
 @app.put("/sources/<sourceId>/label")
