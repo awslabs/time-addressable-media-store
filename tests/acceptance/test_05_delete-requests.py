@@ -63,13 +63,10 @@ def test_Delete_Flow_Segment_DELETE_202(
     assert "status" in response_json
     expect_webhooks(
         *[
-            (
-                {
-                    "event_type": "flows/segments_deleted",
-                    "event": {"flow_id": stub_multi_flow["id"], "timerange": timerange},
-                },
-                ["event_timestamp"],
-            )
+            {
+                "event_type": "flows/segments_deleted",
+                "event": {"flow_id": stub_multi_flow["id"], "timerange": timerange},
+            }
             for timerange in [
                 "[-60:0_-30:0)",
                 "[0:0_1:0)",
@@ -139,13 +136,10 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
     assert "status" in response_json
     expect_webhooks(
         *[
-            (
-                {
-                    "event_type": "flows/segments_deleted",
-                    "event": {"flow_id": stub_video_flow["id"], "timerange": timerange},
-                },
-                ["event_timestamp"],
-            )
+            {
+                "event_type": "flows/segments_deleted",
+                "event": {"flow_id": stub_video_flow["id"], "timerange": timerange},
+            }
             for timerange in [
                 "[3:0_4:0)",
                 "[4:0_5:0)",
@@ -327,31 +321,22 @@ def test_Delete_Flow_DELETE_202_VIDEO(
     assert "updated" in response_json
     assert "status" in response_json
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/deleted",
-                "event": {"flow_id": stub_video_flow["id"]},
-            },
-            ["event_timestamp"],
-        ),
-        (
-            {
-                "event_type": "sources/deleted",
-                "event": {"source_id": stub_video_flow["source_id"]},
-            },
-            ["event_timestamp"],
-        ),
+        {
+            "event_type": "flows/deleted",
+            "event": {"flow_id": stub_video_flow["id"]},
+        },
+        {
+            "event_type": "sources/deleted",
+            "event": {"source_id": stub_video_flow["source_id"]},
+        },
         *[
-            (
-                {
-                    "event_type": "flows/segments_deleted",
-                    "event": {
-                        "flow_id": stub_video_flow["id"],
-                        "timerange": f"[{n}:0_{n + 1}:0)",
-                    },
+            {
+                "event_type": "flows/segments_deleted",
+                "event": {
+                    "flow_id": stub_video_flow["id"],
+                    "timerange": f"[{n}:0_{n + 1}:0)",
                 },
-                ["event_timestamp"],
-            )
+            }
             for n in range(len(media_objects[:-2]))
             if n not in (3, 4)
         ],
@@ -410,20 +395,14 @@ def test_Delete_Flow_DELETE_204_AUDIO(
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks("flows/updated")  # Flip read_only flag to allow deletion
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/deleted",
-                "event": {"flow_id": stub_audio_flow["id"]},
-            },
-            ["event_timestamp"],
-        ),
-        (
-            {
-                "event_type": "sources/deleted",
-                "event": {"source_id": stub_audio_flow["source_id"]},
-            },
-            ["event_timestamp"],
-        ),
+        {
+            "event_type": "flows/deleted",
+            "event": {"flow_id": stub_audio_flow["id"]},
+        },
+        {
+            "event_type": "sources/deleted",
+            "event": {"source_id": stub_audio_flow["source_id"]},
+        },
     )
 
 
@@ -441,20 +420,14 @@ def test_Delete_Flow_DELETE_204_DATA(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/deleted",
-                "event": {"flow_id": stub_data_flow["id"]},
-            },
-            ["event_timestamp"],
-        ),
-        (
-            {
-                "event_type": "sources/deleted",
-                "event": {"source_id": stub_data_flow["source_id"]},
-            },
-            ["event_timestamp"],
-        ),
+        {
+            "event_type": "flows/deleted",
+            "event": {"flow_id": stub_data_flow["id"]},
+        },
+        {
+            "event_type": "sources/deleted",
+            "event": {"source_id": stub_data_flow["source_id"]},
+        },
     )
 
 
@@ -472,20 +445,14 @@ def test_Delete_Flow_DELETE_204_IMAGE(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/deleted",
-                "event": {"flow_id": stub_image_flow["id"]},
-            },
-            ["event_timestamp"],
-        ),
-        (
-            {
-                "event_type": "sources/deleted",
-                "event": {"source_id": stub_image_flow["source_id"]},
-            },
-            ["event_timestamp"],
-        ),
+        {
+            "event_type": "flows/deleted",
+            "event": {"flow_id": stub_image_flow["id"]},
+        },
+        {
+            "event_type": "sources/deleted",
+            "event": {"source_id": stub_image_flow["source_id"]},
+        },
     )
 
 
@@ -509,20 +476,14 @@ def test_Delete_Flow_DELETE_204_MULTI(
     assert "content-type" in response_headers_lower
     assert "application/json" == response_headers_lower["content-type"]
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/deleted",
-                "event": {"flow_id": stub_multi_flow["id"]},
-            },
-            ["event_timestamp"],
-        ),
-        (
-            {
-                "event_type": "sources/deleted",
-                "event": {"source_id": stub_multi_flow["source_id"]},
-            },
-            ["event_timestamp"],
-        ),
+        {
+            "event_type": "flows/deleted",
+            "event": {"flow_id": stub_multi_flow["id"]},
+        },
+        {
+            "event_type": "sources/deleted",
+            "event": {"source_id": stub_multi_flow["source_id"]},
+        },
     )
 
 

@@ -588,18 +588,13 @@ def expect_webhooks(webhook_expectations, webhook_test_data):
 
             # Store expectations with test name for body validations
             for item in event_types:
-                if (
-                    isinstance(item, tuple)
-                    and len(item) >= 1
-                    and isinstance(item[0], dict)
-                ):
+                if isinstance(item, dict):
                     # Body validation - deep copy to prevent mutations affecting stored expectations
-                    body_dict = item[0]
-                    exclude_list = item[1] if len(item) > 1 else []
-                    body_copy = deepcopy(body_dict)
-                    webhook_expectations.append(((body_copy, exclude_list), test_name))
+                    # Exclude fields are automatically determined by webhook_helpers based on event_type
+                    body_copy = deepcopy(item)
+                    webhook_expectations.append((body_copy, test_name))
                 else:
-                    # Count only - no test name needed
+                    # Count only - string event type
                     webhook_expectations.append(item)
 
     return _expect

@@ -88,20 +88,14 @@ def test_Create_or_Replace_Flow_PUT_201_VIDEO(
         del response_json[prop]
     assert_equal_unordered(stub_video_flow, response_json)
     expect_webhooks(
-        (
-            {
-                "event_type": "sources/created",
-                "event": {"source": stub_video_source},
-            },
-            ["event_timestamp", "event.source.created_by", "event.source.created"],
-        ),
-        (
-            {
-                "event_type": "flows/created",
-                "event": {"flow": stub_video_flow},
-            },
-            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
-        ),
+        {
+            "event_type": "sources/created",
+            "event": {"source": stub_video_source},
+        },
+        {
+            "event_type": "flows/created",
+            "event": {"flow": stub_video_flow},
+        },
     )
 
 
@@ -127,20 +121,14 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(
         del response_json[prop]
     assert_equal_unordered(stub_audio_flow, response_json)
     expect_webhooks(
-        (
-            {
-                "event_type": "sources/created",
-                "event": {"source": stub_audio_source},
-            },
-            ["event_timestamp", "event.source.created_by", "event.source.created"],
-        ),
-        (
-            {
-                "event_type": "flows/created",
-                "event": {"flow": stub_audio_flow},
-            },
-            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
-        ),
+        {
+            "event_type": "sources/created",
+            "event": {"source": stub_audio_source},
+        },
+        {
+            "event_type": "flows/created",
+            "event": {"flow": stub_audio_flow},
+        },
     )
 
 
@@ -166,20 +154,14 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(
         del response_json[prop]
     assert_equal_unordered(stub_data_flow, response_json)
     expect_webhooks(
-        (
-            {
-                "event_type": "sources/created",
-                "event": {"source": stub_data_source},
-            },
-            ["event_timestamp", "event.source.created_by", "event.source.created"],
-        ),
-        (
-            {
-                "event_type": "flows/created",
-                "event": {"flow": stub_data_flow},
-            },
-            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
-        ),
+        {
+            "event_type": "sources/created",
+            "event": {"source": stub_data_source},
+        },
+        {
+            "event_type": "flows/created",
+            "event": {"flow": stub_data_flow},
+        },
     )
 
 
@@ -205,20 +187,14 @@ def test_Create_or_Replace_Flow_PUT_201_IMAGE(
         del response_json[prop]
     assert_equal_unordered(stub_image_flow, response_json)
     expect_webhooks(
-        (
-            {
-                "event_type": "sources/created",
-                "event": {"source": stub_image_source},
-            },
-            ["event_timestamp", "event.source.created_by", "event.source.created"],
-        ),
-        (
-            {
-                "event_type": "flows/created",
-                "event": {"flow": stub_image_flow},
-            },
-            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
-        ),
+        {
+            "event_type": "sources/created",
+            "event": {"source": stub_image_source},
+        },
+        {
+            "event_type": "flows/created",
+            "event": {"flow": stub_image_flow},
+        },
     )
 
 
@@ -266,20 +242,14 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(
     ]:
         source["collected_by"] = [stub_multi_source["id"]]
     expect_webhooks(
-        (
-            {
-                "event_type": "sources/created",
-                "event": {"source": stub_multi_source},
-            },
-            ["event_timestamp", "event.source.created_by", "event.source.created"],
-        ),
-        (
-            {
-                "event_type": "flows/created",
-                "event": {"flow": stub_multi_flow},
-            },
-            ["event_timestamp", "event.flow.created_by", "event.flow.created"],
-        ),
+        {
+            "event_type": "sources/created",
+            "event": {"source": stub_multi_source},
+        },
+        {
+            "event_type": "flows/created",
+            "event": {"flow": stub_multi_flow},
+        },
     )
 
 
@@ -297,19 +267,10 @@ def test_Create_or_Replace_Flow_PUT_204(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {"flow": stub_multi_flow},
-            },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        ),
+        {
+            "event_type": "flows/updated",
+            "event": {"flow": stub_multi_flow},
+        },
     )
 
 
@@ -1397,19 +1358,10 @@ def test_Create_or_Update_Flow_Tag_PUT_204_create(
     assert_json_response(response, 204, empty_body=True)
     stub_multi_flow["tags"][tag_name] = tag_value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {"flow": stub_multi_flow},
-            },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        {
+            "event_type": "flows/updated",
+            "event": {"flow": stub_multi_flow},
+        },
     )
 
 
@@ -1430,21 +1382,12 @@ def test_Create_or_Update_Flow_Tag_PUT_204_update(
     assert_json_response(response, 204, empty_body=True)
     stub_multi_flow["tags"][tag_name] = tag_value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_multi_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_multi_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -1512,21 +1455,12 @@ def test_Delete_Flow_Tag_DELETE_204(
     assert_json_response(response, 204, empty_body=True)
     del stub_multi_flow["tags"][tag_name]
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_multi_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_multi_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -1629,21 +1563,12 @@ def test_Create_or_Update_Flow_Description_PUT_204_create(
     assert_json_response(response, 204, empty_body=True)
     stub_audio_flow["description"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -1663,21 +1588,12 @@ def test_Create_or_Update_Flow_Description_PUT_204_update(
     assert_json_response(response, 204, empty_body=True)
     stub_video_flow["description"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_video_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_video_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -1744,21 +1660,12 @@ def test_Delete_Flow_Description_DELETE_204(
     assert_json_response(response, 204, empty_body=True)
     del stub_audio_flow["description"]
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -1864,21 +1771,12 @@ def test_Create_or_Update_Flow_Label_PUT_204_create(
     assert_json_response(response, 204, empty_body=True)
     stub_audio_flow["label"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -1898,21 +1796,12 @@ def test_Create_or_Update_Flow_Label_PUT_204_update(
     assert_json_response(response, 204, empty_body=True)
     stub_video_flow["label"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_video_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_video_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -1961,21 +1850,12 @@ def test_Delete_Flow_Label_DELETE_204(
     assert_json_response(response, 204, empty_body=True)
     del stub_audio_flow["label"]
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2058,25 +1938,14 @@ def test_Delete_Flow_Flow_Collection_DELETE_204(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": {
-                        k: v
-                        for k, v in stub_multi_flow.items()
-                        if k != "flow_collection"
-                    }
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": {
+                    k: v for k, v in stub_multi_flow.items() if k != "flow_collection"
+                }
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2108,24 +1977,15 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": {
-                        **stub_multi_flow,
-                        "flow_collection": stub_multi_flow["flow_collection"][0:1],
-                    },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": {
+                    **stub_multi_flow,
+                    "flow_collection": stub_multi_flow["flow_collection"][0:1],
                 },
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2143,19 +2003,10 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {"flow": stub_multi_flow},
-            },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        {
+            "event_type": "flows/updated",
+            "event": {"flow": stub_multi_flow},
+        },
     )
 
 
@@ -2260,21 +2111,12 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(
     assert_json_response(response, 204, empty_body=True)
     stub_audio_flow["max_bit_rate"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2294,21 +2136,12 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(
     assert_json_response(response, 204, empty_body=True)
     stub_video_flow["max_bit_rate"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_video_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_video_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2359,21 +2192,12 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_204(
     assert_json_response(response, 204, empty_body=True)
     del stub_audio_flow["max_bit_rate"]
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2459,21 +2283,12 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(
     assert_json_response(response, 204, empty_body=True)
     stub_audio_flow["avg_bit_rate"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2493,21 +2308,12 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(
     assert_json_response(response, 204, empty_body=True)
     stub_video_flow["avg_bit_rate"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_video_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_video_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2558,21 +2364,12 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(
     assert_json_response(response, 204, empty_body=True)
     del stub_audio_flow["avg_bit_rate"]
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2658,21 +2455,12 @@ def test_Set_Flow_Read_Only_PUT_204_DATA(
     assert_json_response(response, 204, empty_body=True)
     stub_data_flow["read_only"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_data_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_data_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 
@@ -2692,21 +2480,12 @@ def test_Set_Flow_Read_Only_PUT_204_AUDIO(
     assert_json_response(response, 204, empty_body=True)
     stub_audio_flow["read_only"] = value
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/updated",
-                "event": {
-                    "flow": stub_audio_flow,
-                },
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
             },
-            [
-                "event_timestamp",
-                "event.flow.created_by",
-                "event.flow.created",
-                "event.flow.updated_by",
-                "event.flow.metadata_updated",
-            ],
-        )
+        },
     )
 
 

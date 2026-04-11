@@ -13,6 +13,39 @@ import json
 
 from deepdiff import DeepDiff
 
+# Standard exclude fields for each webhook event type
+# event_timestamp is always excluded as it's dynamically generated
+WEBHOOK_EXCLUDE_FIELDS = {
+    "flows/created": [
+        "event_timestamp",
+        "event.flow.created_by",
+        "event.flow.created",
+    ],
+    "flows/updated": [
+        "event_timestamp",
+        "event.flow.created_by",
+        "event.flow.created",
+        "event.flow.updated_by",
+        "event.flow.metadata_updated",
+    ],
+    "flows/deleted": ["event_timestamp"],
+    "flows/segments_added": ["event_timestamp", "event.segments.get_urls.url"],
+    "flows/segments_deleted": ["event_timestamp"],
+    "sources/created": [
+        "event_timestamp",
+        "event.source.created_by",
+        "event.source.created",
+    ],
+    "sources/updated": [
+        "event_timestamp",
+        "event.source.created_by",
+        "event.source.created",
+        "event.source.updated_by",
+        "event.source.updated",
+    ],
+    "sources/deleted": ["event_timestamp"],
+}
+
 
 def deploy_webhook_stack(
     session, region: str, stack_name: str, template_path: str
@@ -256,18 +289,12 @@ def compare_webhook_counts(expected_events: list, actual_webhooks: list[dict]) -
 def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) -> None:
     """Validate webhook body content using matching algorithm."""
     # Extract expectations with body validation
-    # Format: ((body_dict, exclude_list), test_name) or old format (body_dict, exclude_list)
+    # Format: (body_dict, test_name)
     body_expectations = []
     for item in expected_events:
-        if isinstance(item, tuple) and len(item) >= 1:
-            # Check if this is body validation
-            first_elem = item[0]
-            if isinstance(first_elem, dict):
-                # Old format: (body_dict, exclude_list)
-                body_expectations.append((item, "unknown"))
-            elif isinstance(first_elem, tuple) and isinstance(first_elem[0], dict):
-                # New format: ((body_dict, exclude_list), test_name)
-                body_expectations.append(item)
+        if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[0], dict):
+            # Body validation: (body_dict, test_name)
+            body_expectations.append(item)
 
     if not body_expectations:
         print("\n      ℹ️  No body validations requested")
@@ -280,16 +307,9 @@ def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) 
     validation_errors = []
 
     for expectation in body_expectations:
-        # Extract body tuple and test name
-        if isinstance(expectation[0], tuple):
-            body_tuple = expectation[0]
-            test_name = expectation[1] if len(expectation) > 1 else "unknown"
-        else:
-            body_tuple = expectation
-            test_name = "unknown"
-
-        expected_body = body_tuple[0]
-        exclude_fields = body_tuple[1] if len(body_tuple) > 1 else []
+        # Extract body dict and test name
+        expected_body = expectation[0]
+        test_name = expectation[1] if len(expectation) > 1 else "unknown"
 
         # Extract event_type from the body
         event_type = expected_body.get("event_type")
@@ -299,6 +319,9 @@ def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) 
             print(f"      ❌ {error}")
             validation_errors.append(error)
             continue
+
+        # Get exclude fields from dictionary based on event type
+        exclude_fields = WEBHOOK_EXCLUDE_FIELDS.get(event_type, [])
 
         # Find all unmatched webhooks of this type
         candidates = [

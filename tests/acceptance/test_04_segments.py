@@ -425,13 +425,10 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/segments_deleted",
-                "event": {"flow_id": stub_multi_flow["id"], "timerange": "[4:0_5:0)"},
-            },
-            ["event_timestamp"],
-        ),
+        {
+            "event_type": "flows/segments_deleted",
+            "event": {"flow_id": stub_multi_flow["id"], "timerange": "[4:0_5:0)"},
+        },
         "flows/updated",
     )
 
@@ -452,13 +449,10 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     expect_webhooks(
-        (
-            {
-                "event_type": "flows/segments_deleted",
-                "event": {"flow_id": stub_multi_flow["id"], "timerange": "[5:0_6:0)"},
-            },
-            ["event_timestamp"],
-        ),
+        {
+            "event_type": "flows/segments_deleted",
+            "event": {"flow_id": stub_multi_flow["id"], "timerange": "[5:0_6:0)"},
+        },
         "flows/updated",
     )
 
