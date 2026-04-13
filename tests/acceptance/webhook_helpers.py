@@ -10,6 +10,7 @@ These functions handle:
 
 import copy
 import json
+from datetime import datetime, timezone
 
 from deepdiff import DeepDiff
 
@@ -45,6 +46,34 @@ WEBHOOK_EXCLUDE_FIELDS = {
     ],
     "sources/deleted": ["event_timestamp"],
 }
+
+# Resource ID path mapping for each event type
+# Maps event type to tuple of keys for extracting resource ID from webhook body
+EVENT_TYPE_TO_ID_PATH = {
+    "flows/created": ("event", "flow", "id"),
+    "flows/updated": ("event", "flow", "id"),
+    "flows/deleted": ("event", "flow_id"),
+    "flows/segments_added": ("event", "flow_id"),
+    "flows/segments_deleted": ("event", "flow_id"),
+    "sources/created": ("event", "source", "id"),
+    "sources/updated": ("event", "source", "id"),
+    "sources/deleted": ("event", "source_id"),
+}
+
+
+def get_resource_id(body: dict, event_type: str) -> str | None:
+    """Extract resource ID from webhook body based on event type."""
+    path = EVENT_TYPE_TO_ID_PATH.get(event_type)
+    if not path:
+        return None
+
+    current = body
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            return None
+        current = current[key]
+
+    return current
 
 
 def deploy_webhook_stack(
@@ -327,12 +356,24 @@ def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) 
         # Merge with any extra excludes from the test
         exclude_fields = list(set(exclude_fields + extra_excludes))
 
-        # Find all unmatched webhooks of this type
-        candidates = [
-            (idx, webhook)
-            for idx, webhook in enumerate(actual_webhooks)
-            if webhook["event_type"] == event_type and idx not in matched_indices
-        ]
+        # Extract resource ID from expected body for filtering
+        expected_resource_id = get_resource_id(expected_body, event_type)
+
+        # Find all unmatched webhooks of this type with matching resource ID, sorted by timestamp
+        candidates = sorted(
+            [
+                (idx, webhook)
+                for idx, webhook in enumerate(actual_webhooks)
+                if webhook["event_type"] == event_type
+                and idx not in matched_indices
+                and (
+                    expected_resource_id is None
+                    or get_resource_id(webhook["body"], event_type)
+                    == expected_resource_id
+                )
+            ],
+            key=lambda x: x[1]["timestamp"],
+        )
 
         if not candidates:
             error = f"No unmatched webhook found for {event_type} [{test_name}]"
@@ -381,8 +422,13 @@ def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) 
             print(f"         Tried {len(candidates)} candidate(s):")
 
             # Show ALL candidates with their issues
-            for i, (idx, webhook) in enumerate(candidates):
-                print(f"\n         Candidate #{i + 1} (webhook #{idx}):")
+            for _, webhook in candidates:
+                timestamp = (
+                    datetime.fromtimestamp(webhook["timestamp"] / 1000, tz=timezone.utc)
+                    .isoformat(timespec="milliseconds")
+                    .replace("+00:00", "Z")
+                )
+                print(f"\n         Webhook at {timestamp}:")
                 actual_body = webhook["body"]
                 expected_copy = copy.deepcopy(expected_body)
                 actual_copy = copy.deepcopy(actual_body)

@@ -73,7 +73,15 @@ def test_Delete_Flow_Segment_DELETE_202(
                 "[3:0_4:0)",
             ]
         ],
-        "flows/updated",
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
     )
 
 
@@ -141,7 +149,15 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
                 "[4:0_5:0)",
             ]
         ],
-        "flows/updated",
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_video_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
     )
 
 
@@ -378,6 +394,7 @@ def test_Delete_Flow_DELETE_204_AUDIO(
         f'/flows/{stub_audio_flow["id"]}/read_only',
         json=False,
     )
+    stub_audio_flow["read_only"] = False
     # Arrange
     path = f'/flows/{stub_audio_flow["id"]}'
     # Act
@@ -387,8 +404,13 @@ def test_Delete_Flow_DELETE_204_AUDIO(
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("flows/updated")  # Flip read_only flag to allow deletion
     expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_audio_flow,
+            },
+        },
         {
             "event_type": "flows/deleted",
             "event": {"flow_id": stub_audio_flow["id"]},

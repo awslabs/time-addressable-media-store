@@ -201,7 +201,19 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
         # Assert
         assert_json_response(response, 201)
     expect_webhooks(
-        *["flows/updated", "flows/segments_added"] * len(media_objects[:-2])
+        *[
+            (
+                {
+                    "event_type": "flows/updated",
+                    "event": {
+                        "flow": stub_video_flow,
+                    },
+                },
+                ["event.flow.segments_updated"],
+            ),
+        ]
+        * len(media_objects[:-2]),
+        *["flows/segments_added"] * len(media_objects[:-2]),
     )
 
 
@@ -221,7 +233,18 @@ def test_Create_Flow_Segment_POST_201_MULTI(
     )
     # Assert
     assert_json_response(response, 201)
-    expect_webhooks("flows/updated", "flows/segments_added")
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
+        "flows/segments_added",
+    )
 
 
 def test_Create_Flow_Segment_POST_201_negative(
@@ -240,7 +263,18 @@ def test_Create_Flow_Segment_POST_201_negative(
     )
     # Assert
     assert_json_response(response, 201)
-    expect_webhooks("flows/updated", "flows/segments_added")
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
+        "flows/segments_added",
+    )
 
 
 def test_Create_Flow_Segment_POST_201_list_ok(
@@ -265,7 +299,21 @@ def test_Create_Flow_Segment_POST_201_list_ok(
     )
     # Assert
     assert_json_response(response, 201)
-    expect_webhooks(*["flows/updated", "flows/segments_added"] * 2)
+    expect_webhooks(
+        *[
+            (
+                {
+                    "event_type": "flows/updated",
+                    "event": {
+                        "flow": stub_multi_flow,
+                    },
+                },
+                ["event.flow.segments_updated"],
+            ),
+            "flows/segments_added",
+        ]
+        * 2
+    )
 
 
 def test_Create_Flow_Segment_POST_200_list_partial(
@@ -293,7 +341,18 @@ def test_Create_Flow_Segment_POST_200_list_partial(
     response_json = response.json()
     assert 1 == len(response_json)
     assert "BadRequestError" == response_json[0]["error"]["type"]
-    expect_webhooks("flows/updated", "flows/segments_added")
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
+        "flows/segments_added",
+    )
 
 
 def test_Create_Flow_Segment_POST_200_list_failed(
@@ -346,7 +405,18 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
     )
     # Assert
     assert_json_response(response, 201)
-    expect_webhooks("flows/updated", "flows/segments_added")
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
+        "flows/segments_added",
+    )
 
 
 def test_Create_Flow_Segment_POST_201_with_get_urls_external(
@@ -372,7 +442,18 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
     )
     # Assert
     assert_json_response(response, 201)
-    expect_webhooks("flows/updated", "flows/segments_added")
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
+        "flows/segments_added",
+    )
 
 
 def test_List_Flow_Segments_GET_200_with_get_urls_same_store(
@@ -435,7 +516,15 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
             "event_type": "flows/segments_deleted",
             "event": {"flow_id": stub_multi_flow["id"], "timerange": "[4:0_5:0)"},
         },
-        "flows/updated",
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
     )
 
 
@@ -459,7 +548,15 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
             "event_type": "flows/segments_deleted",
             "event": {"flow_id": stub_multi_flow["id"], "timerange": "[5:0_6:0)"},
         },
-        "flows/updated",
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_multi_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+        ),
     )
 
 

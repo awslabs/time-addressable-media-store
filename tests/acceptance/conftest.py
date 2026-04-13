@@ -8,6 +8,7 @@ import pytest
 import requests
 from deepdiff import DeepDiff
 from webhook_helpers import (
+    EVENT_TYPE_TO_ID_PATH,
     collect_cloudwatch_logs,
     compare_webhook_counts,
     delete_webhook_stack,
@@ -466,16 +467,7 @@ def webhook_verification_lifecycle(
                 "url": f"{webhook_url}/test-events",
                 "api_key_name": "x-api-key",
                 "api_key_value": api_key_value,
-                "events": [
-                    "flows/created",
-                    "flows/updated",
-                    "flows/deleted",
-                    "flows/segments_added",
-                    "flows/segments_deleted",
-                    "sources/created",
-                    "sources/updated",
-                    "sources/deleted",
-                ],
+                "events": list(EVENT_TYPE_TO_ID_PATH.keys()),
                 "tags": {"_test_infrastructure": ["webhook_verification"]},
             },
         )
@@ -593,11 +585,19 @@ def expect_webhooks(webhook_expectations, webhook_test_data):
 
             # Store expectations with test name for body validations
             for item in event_types:
-                if isinstance(item, dict):
-                    # Body validation - deep copy to prevent mutations affecting stored expectations
-                    # Exclude fields are automatically determined by webhook_helpers based on event_type
+                if (
+                    isinstance(item, tuple)
+                    and len(item) == 2
+                    and isinstance(item[0], dict)
+                ):
+                    # User provided: (body_dict, extra_excludes)
+                    body_copy = deepcopy(item[0])
+                    extra_excludes = item[1]
+                    webhook_expectations.append((body_copy, extra_excludes, test_name))
+                elif isinstance(item, dict):
+                    # User provided: body_dict only
                     body_copy = deepcopy(item)
-                    webhook_expectations.append((body_copy, test_name))
+                    webhook_expectations.append((body_copy, [], test_name))
                 else:
                     # Count only - string event type
                     webhook_expectations.append(item)
