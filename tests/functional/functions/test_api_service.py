@@ -3,6 +3,7 @@ import json
 from http import HTTPStatus
 
 import pytest
+from conftest import ID_404
 
 pytestmark = [
     pytest.mark.functional,
@@ -954,14 +955,14 @@ def test_Webhook_Details_400(lambda_context, api_event_factory, api_service, met
 )
 # pylint: disable=redefined-outer-name
 def test_Webhook_Details_404(
-    lambda_context, api_event_factory, api_service, mock_neptune_client, id_404, method
+    lambda_context, api_event_factory, api_service, mock_neptune_client, method
 ):
     """
     Verifies that HEAD/GET requests for non-existent webhook return 404 Not Found.
     """
     # Arrange
     mock_neptune_client.execute_open_cypher_query.return_value = {"results": []}
-    event = api_event_factory(method, f"/service/webhooks/{id_404}")
+    event = api_event_factory(method, f"/service/webhooks/{ID_404}")
 
     # Act
     response = api_service.lambda_handler(event, lambda_context)
@@ -1049,7 +1050,6 @@ def test_Register_Webhook_URL_PUT_404_update(
     api_event_factory,
     api_service,
     mock_neptune_client,
-    id_404,
     stub_webhook_basic,
 ):
     """
@@ -1057,8 +1057,8 @@ def test_Register_Webhook_URL_PUT_404_update(
     """
     # Arrange
     mock_neptune_client.execute_open_cypher_query.return_value = {"results": []}
-    webhook = {**stub_webhook_basic, "id": id_404, "status": "created"}
-    event = api_event_factory("PUT", f"/service/webhooks/{id_404}", json_body=webhook)
+    webhook = {**stub_webhook_basic, "id": ID_404, "status": "created"}
+    event = api_event_factory("PUT", f"/service/webhooks/{ID_404}", json_body=webhook)
 
     # Act
     response = api_service.lambda_handler(event, lambda_context)

@@ -3,7 +3,7 @@ from collections import deque
 
 import pytest
 import requests
-from conftest import assert_json_response
+from conftest import ID_404, assert_json_response
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -42,15 +42,13 @@ def test_Delete_Flow_Segment_DELETE_202(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 202)
     response_json = response.json()
     delete_requests.append(response_json["id"])
-    assert "location" in response_headers_lower
     assert (
         f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
-        == response_headers_lower["location"]
+        == response.headers.get("Location", "")
     )
     assert "id" in response_json
     assert "flow_id" in response_json
@@ -115,15 +113,13 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
         path,
         params={"timerange": "[3:5_4:5)"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 202)
     response_json = response.json()
     delete_requests.append(response_json["id"])
-    assert "location" in response_headers_lower
     assert (
         f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
-        == response_headers_lower["location"]
+        == response.headers.get("Location", "")
     )
     assert "id" in response_json
     assert "flow_id" in response_json
@@ -242,9 +238,9 @@ def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito, stub_audio
     )
 
 
-def test_Delete_Flow_Segment_DELETE_404(api_client_cognito, id_404):
+def test_Delete_Flow_Segment_DELETE_404(api_client_cognito):
     # Arrange
-    path = f"/flows/{id_404}/segments"
+    path = f"/flows/{ID_404}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -256,9 +252,9 @@ def test_Delete_Flow_Segment_DELETE_404(api_client_cognito, id_404):
     assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
-def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito, id_404):
+def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito):
     # Arrange
-    path = f"/flows/{id_404}/segments"
+    path = f"/flows/{ID_404}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -271,9 +267,9 @@ def test_Delete_Flow_Segment_DELETE_404_object_id(api_client_cognito, id_404):
     assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
-def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito, id_404):
+def test_Delete_Flow_Segment_DELETE_404_timerange(api_client_cognito):
     # Arrange
-    path = f"/flows/{id_404}/segments"
+    path = f"/flows/{ID_404}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -301,15 +297,13 @@ def test_Delete_Flow_DELETE_202_VIDEO(
         "DELETE",
         path,
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 202)
     response_json = response.json()
     delete_requests.append(response_json["id"])
-    assert "location" in response_headers_lower
     assert (
         f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
-        == response_headers_lower["location"]
+        == response.headers.get("Location", "")
     )
     assert "id" in response_json
     assert "flow_id" in response_json
@@ -360,9 +354,9 @@ def test_Delete_Flow_DELETE_403(api_client_cognito, stub_audio_flow):
     )
 
 
-def test_Delete_Flow_DELETE_404(api_client_cognito, id_404):
+def test_Delete_Flow_DELETE_404(api_client_cognito):
     # Arrange
-    path = f"/flows/{id_404}"
+    path = f"/flows/{ID_404}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -557,9 +551,9 @@ def test_Flow_Delete_Request_Details_HEAD_200(api_client_cognito, delete_request
     assert_json_response(response, 200, empty_body=True)
 
 
-def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito, id_404):
+def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito):
     # Arrange
-    path = f"/flow-delete-requests/{id_404}"
+    path = f"/flow-delete-requests/{ID_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -569,9 +563,9 @@ def test_Flow_Delete_Request_Details_HEAD_404(api_client_cognito, id_404):
     assert_json_response(response, 404, empty_body=True)
 
 
-def test_Flow_Delete_Request_Details_GET_404(api_client_cognito, id_404):
+def test_Flow_Delete_Request_Details_GET_404(api_client_cognito):
     # Arrange
-    path = f"/flow-delete-requests/{id_404}"
+    path = f"/flow-delete-requests/{ID_404}"
     # Act
     response = api_client_cognito.request(
         "GET",

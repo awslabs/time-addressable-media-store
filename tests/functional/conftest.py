@@ -24,6 +24,8 @@ os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
 os.environ["DUPLICATION_QUEUE_URL"] = "duplication-queue-url"
 os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
+ID_404 = "00000000-0000-1000-8000-00000000000a"
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,11 +54,6 @@ def alternative_storage_id():
         str: A UUID string representing a backend storage ID
     """
     yield str(uuid.uuid4())
-
-
-@pytest.fixture(scope="session")
-def id_404():
-    return "00000000-0000-1000-8000-00000000000a"
 
 
 @pytest.fixture(scope="module", autouse=True)

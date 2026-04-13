@@ -1,6 +1,6 @@
 import pytest
 import requests
-from conftest import assert_json_response
+from conftest import ID_404, assert_headers_present, assert_json_response
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -299,12 +299,9 @@ def test_List_Webhook_URLs_HEAD_200_limit(api_client_cognito):
     path = "/service/webhooks"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"limit": "1"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 200, empty_body=True)
-    assert "link" in response_headers_lower
-    assert "x-paging-limit" in response_headers_lower
-    assert "x-paging-nextkey" in response_headers_lower
+    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
 
 
 def test_List_Webhook_URLs_HEAD_200_page(api_client_cognito):
@@ -456,13 +453,10 @@ def test_List_Webhook_URLs_GET_200_limit(api_client_cognito):
     path = "/service/webhooks"
     # Act
     response = api_client_cognito.request("GET", path, params={"limit": "1"})
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 200)
+    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
     response_json = response.json()
-    assert "link" in response_headers_lower
-    assert "x-paging-limit" in response_headers_lower
-    assert "x-paging-nextkey" in response_headers_lower
     assert 1 == len(response_json)
 
 
@@ -516,9 +510,9 @@ def test_Webhook_Details_HEAD_400(api_client_cognito):
     assert_json_response(response, 400, empty_body=True)
 
 
-def test_Webhook_Details_HEAD_404(api_client_cognito, id_404):
+def test_Webhook_Details_HEAD_404(api_client_cognito):
     # Arrange
-    path = f"/service/webhooks/{id_404}"
+    path = f"/service/webhooks/{ID_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -562,9 +556,9 @@ def test_Webhook_Details_GET_400(api_client_cognito):
     assert response_json["message"][0]["type"] == "string_pattern_mismatch"
 
 
-def test_Webhook_Details_GET_404(api_client_cognito, id_404):
+def test_Webhook_Details_GET_404(api_client_cognito):
     # Arrange
-    path = f"/service/webhooks/{id_404}"
+    path = f"/service/webhooks/{ID_404}"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -619,12 +613,10 @@ def test_Register_Webhook_URL_PUT_400_update(api_client_cognito, stub_webhook_ba
     assert response_json["message"][0]["type"] == "string_pattern_mismatch"
 
 
-def test_Register_Webhook_URL_PUT_404_update(
-    api_client_cognito, id_404, stub_webhook_basic
-):
+def test_Register_Webhook_URL_PUT_404_update(api_client_cognito, stub_webhook_basic):
     # Arrange
-    path = f"/service/webhooks/{id_404}"
-    webhook = {**stub_webhook_basic, "id": id_404, "status": "created"}
+    path = f"/service/webhooks/{ID_404}"
+    webhook = {**stub_webhook_basic, "id": ID_404, "status": "created"}
     # Act
     response = api_client_cognito.request(
         "PUT",

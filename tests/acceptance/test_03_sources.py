@@ -1,7 +1,13 @@
 # pylint: disable=too-many-lines
 import pytest
 import requests
-from conftest import assert_equal_unordered, assert_json_response
+from conftest import (
+    ID_404,
+    assert_equal_unordered,
+    assert_headers_present,
+    assert_json_response,
+    remove_dynamic_props,
+)
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -78,12 +84,9 @@ def test_List_Sources_HEAD_200_limit(api_client_cognito):
         path,
         params={"limit": "2"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 200, empty_body=True)
-    assert "link" in response_headers_lower
-    assert "x-paging-limit" in response_headers_lower
-    assert "x-paging-nextkey" in response_headers_lower
+    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
 
 
 def test_List_Sources_HEAD_200_page(api_client_cognito):
@@ -205,7 +208,6 @@ def test_List_Sources_HEAD_400_tag_exists_name(api_client_cognito):
 
 def test_List_Sources_GET_200(
     api_client_cognito,
-    dynamic_props,
     stub_video_source,
     stub_audio_source,
     stub_data_source,
@@ -221,39 +223,21 @@ def test_List_Sources_GET_200(
     )
     # Assert
     assert_json_response(response, 200)
-    response_json = response.json()
-    for record in response_json:
-        if "source_collection" in record:
-            record["source_collection"] = sorted(
-                record["source_collection"], key=lambda sc: sc["id"]
-            )
+    response_json = remove_dynamic_props(response.json())
     assert 5 == len(response_json)
-    for prop in dynamic_props:
-        for record in response_json:
-            if prop in record:
-                del record[prop]
-    assert {
-        **stub_video_source,
-        "collected_by": [stub_multi_source["id"]],
-    } in response_json
-    assert {
-        **stub_audio_source,
-        "collected_by": [stub_multi_source["id"]],
-    } in response_json
-    assert {
-        **stub_data_source,
-        "collected_by": [stub_multi_source["id"]],
-    } in response_json
-    assert {
-        **stub_image_source,
-        "collected_by": [stub_multi_source["id"]],
-    } in response_json
-    assert stub_multi_source in response_json
+    assert_equal_unordered(
+        [
+            stub_multi_source,
+            stub_video_source,
+            stub_audio_source,
+            stub_data_source,
+            stub_image_source,
+        ],
+        response_json,
+    )
 
 
-def test_List_Sources_GET_200_format(
-    api_client_cognito, dynamic_props, stub_data_source, stub_multi_source
-):
+def test_List_Sources_GET_200_format(api_client_cognito, stub_data_source):
     """List sources with format query specified"""
     # Arrange
     path = "/sources"
@@ -265,20 +249,12 @@ def test_List_Sources_GET_200_format(
     )
     # Assert
     assert_json_response(response, 200)
-    response_json = response.json()
+    response_json = remove_dynamic_props(response.json())
     assert 1 == len(response_json)
-    for prop in dynamic_props:
-        for record in response_json:
-            if prop in record:
-                del record[prop]
-    assert_equal_unordered(
-        [{**stub_data_source, "collected_by": [stub_multi_source["id"]]}], response_json
-    )
+    assert_equal_unordered([stub_data_source], response_json)
 
 
-def test_List_Sources_GET_200_label(
-    api_client_cognito, dynamic_props, stub_multi_source
-):
+def test_List_Sources_GET_200_label(api_client_cognito, stub_multi_source):
     """List sources with label query specified"""
     # Arrange
     path = "/sources"
@@ -288,20 +264,10 @@ def test_List_Sources_GET_200_label(
         path,
         params={"label": "pytest"},
     )
-    response_json = response.json()
-    for record in response_json:
-        if "source_collection" in record:
-            record["source_collection"] = sorted(
-                record["source_collection"], key=lambda sc: sc["id"]
-            )
     # Assert
     assert_json_response(response, 200)
-    response_json = response.json()
+    response_json = remove_dynamic_props(response.json())
     assert 1 == len(response_json)
-    for prop in dynamic_props:
-        for record in response_json:
-            if prop in record:
-                del record[prop]
     assert_equal_unordered([stub_multi_source], response_json)
 
 
@@ -315,13 +281,10 @@ def test_List_Sources_GET_200_limit(api_client_cognito):
         path,
         params={"limit": "2"},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 200)
+    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
     response_json = response.json()
-    assert "link" in response_headers_lower
-    assert "x-paging-limit" in response_headers_lower
-    assert "x-paging-nextkey" in response_headers_lower
     assert 2 == len(response_json)
 
 
@@ -341,9 +304,7 @@ def test_List_Sources_GET_200_page(api_client_cognito):
     assert 4 == len(response_json)
 
 
-def test_List_Sources_GET_200_tag_name(
-    api_client_cognito, dynamic_props, stub_multi_source
-):
+def test_List_Sources_GET_200_tag_name(api_client_cognito, stub_multi_source):
     """List sources with tag.{name} query specified"""
     # Arrange
     path = "/sources"
@@ -355,17 +316,8 @@ def test_List_Sources_GET_200_tag_name(
     )
     # Assert
     assert_json_response(response, 200)
-    response_json = response.json()
-    for record in response_json:
-        if "source_collection" in record:
-            record["source_collection"] = sorted(
-                record["source_collection"], key=lambda sc: sc["id"]
-            )
+    response_json = remove_dynamic_props(response.json())
     assert 1 == len(response_json)
-    for prop in dynamic_props:
-        for record in response_json:
-            if prop in record:
-                del record[prop]
     assert_equal_unordered([stub_multi_source], response_json)
 
 
@@ -515,9 +467,9 @@ def test_Source_Details_HEAD_200(api_client_cognito, stub_multi_source):
     assert_json_response(response, 200, empty_body=True)
 
 
-def test_Source_Details_HEAD_404(api_client_cognito, id_404):
+def test_Source_Details_HEAD_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}"
+    path = f"/sources/{ID_404}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -527,9 +479,7 @@ def test_Source_Details_HEAD_404(api_client_cognito, id_404):
     assert_json_response(response, 404, empty_body=True)
 
 
-def test_Source_Details_GET_200(
-    api_client_cognito, dynamic_props, stub_data_source, stub_multi_source
-):
+def test_Source_Details_GET_200(api_client_cognito, stub_data_source):
     # Arrange
     path = f'/sources/{stub_data_source["id"]}'
     # Act
@@ -539,18 +489,13 @@ def test_Source_Details_GET_200(
     )
     # Assert
     assert_json_response(response, 200)
-    response_json = response.json()
-    for prop in dynamic_props:
-        if prop in response_json:
-            del response_json[prop]
-    assert_equal_unordered(
-        {**stub_data_source, "collected_by": [stub_multi_source["id"]]}, response_json
-    )
+    response_json = remove_dynamic_props(response.json())
+    assert_equal_unordered(stub_data_source, response_json)
 
 
-def test_Source_Details_GET_404(api_client_cognito, id_404):
+def test_Source_Details_GET_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}"
+    path = f"/sources/{ID_404}"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -574,9 +519,9 @@ def test_List_Source_Tags_HEAD_200(api_client_cognito, stub_multi_source):
     assert_json_response(response, 200, empty_body=True)
 
 
-def test_List_Source_Tags_HEAD_404(api_client_cognito, id_404):
+def test_List_Source_Tags_HEAD_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/tags"
+    path = f"/sources/{ID_404}/tags"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -600,9 +545,9 @@ def test_List_Source_Tags_GET_200(api_client_cognito, stub_multi_source):
     assert stub_multi_source["tags"] == response_json
 
 
-def test_List_Source_Tags_GET_404(api_client_cognito, id_404):
+def test_List_Source_Tags_GET_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/tags"
+    path = f"/sources/{ID_404}/tags"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -638,9 +583,9 @@ def test_Source_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_source
     assert_json_response(response, 404, empty_body=True)
 
 
-def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito, id_404):
+def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/tags/flow_status"
+    path = f"/sources/{ID_404}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -678,9 +623,9 @@ def test_Source_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_source)
     assert "The requested Source or tag does not exist." == response_json["message"]
 
 
-def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito, id_404):
+def test_Source_Tag_Value_GET_404_bad_source_id(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/tags/flow_status"
+    path = f"/sources/{ID_404}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -696,32 +641,48 @@ def test_Create_or_Update_Source_Tag_PUT_204_create(
     api_client_cognito, stub_multi_source, expect_webhooks
 ):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
+    tag_name = "pytest"
+    tag_value = "test"
+    path = f'/sources/{stub_multi_source["id"]}/tags/{tag_name}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="test",
+        json=tag_value,
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    stub_multi_source["tags"][tag_name] = tag_value
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_multi_source},
+        },
+    )
 
 
 def test_Create_or_Update_Source_Tag_PUT_204_update(
     api_client_cognito, stub_multi_source, expect_webhooks
 ):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/test'
+    tag_name = "test"
+    tag_value = "something else"
+    path = f'/sources/{stub_multi_source["id"]}/tags/{tag_name}'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="something else",
+        json=tag_value,
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    stub_multi_source["tags"][tag_name] = tag_value
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_multi_source},
+        },
+    )
 
 
 def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito, stub_multi_source):
@@ -740,9 +701,9 @@ def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito, stub_multi_sour
     assert 0 < len(response_json["message"])
 
 
-def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito, id_404):
+def test_Create_or_Update_Source_Tag_PUT_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/tags/pytest"
+    path = f"/sources/{ID_404}/tags/pytest"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -762,7 +723,8 @@ def test_Delete_Source_Tag_DELETE_204(
     api_client_cognito, stub_multi_source, expect_webhooks
 ):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
+    tag_name = "pytest"
+    path = f'/sources/{stub_multi_source["id"]}/tags/{tag_name}'
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -770,12 +732,18 @@ def test_Delete_Source_Tag_DELETE_204(
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    del stub_multi_source["tags"][tag_name]
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_multi_source},
+        },
+    )
 
 
-def test_Delete_Source_Tag_DELETE_404(api_client_cognito, id_404):
+def test_Delete_Source_Tag_DELETE_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/tags/test"
+    path = f"/sources/{ID_404}/tags/test"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -802,9 +770,9 @@ def test_Source_Description_HEAD_200(api_client_cognito, stub_multi_source):
     assert_json_response(response, 200, empty_body=True)
 
 
-def test_Source_Description_HEAD_404(api_client_cognito, id_404):
+def test_Source_Description_HEAD_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/description"
+    path = f"/sources/{ID_404}/description"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -828,9 +796,9 @@ def test_Source_Description_GET_200(api_client_cognito, stub_multi_source):
     assert stub_multi_source["description"] == response_json
 
 
-def test_Source_Description_GET_404(api_client_cognito, id_404):
+def test_Source_Description_GET_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/description"
+    path = f"/sources/{ID_404}/description"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -846,32 +814,46 @@ def test_Create_or_Update_Source_Description_PUT_204_create(
     api_client_cognito, stub_audio_source, expect_webhooks
 ):
     # Arrange
+    value = "pytest - audio"
     path = f'/sources/{stub_audio_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="pytest - audio",
+        json=value,
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    stub_audio_source["description"] = value
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_audio_source},
+        },
+    )
 
 
 def test_Create_or_Update_Source_Description_PUT_204_update(
     api_client_cognito, stub_video_source, expect_webhooks
 ):
     # Arrange
+    value = "pytest"
     path = f'/sources/{stub_video_source["id"]}/description'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="pytest",
+        json=value,
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    stub_video_source["description"] = value
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_video_source},
+        },
+    )
 
 
 def test_Create_or_Update_Source_Description_PUT_400(
@@ -892,9 +874,9 @@ def test_Create_or_Update_Source_Description_PUT_400(
     assert 0 < len(response_json["message"])
 
 
-def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito, id_404):
+def test_Create_or_Update_Source_Description_PUT_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/description"
+    path = f"/sources/{ID_404}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -919,12 +901,18 @@ def test_Delete_Source_Description_DELETE_204(
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    del stub_audio_source["description"]
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_audio_source},
+        },
+    )
 
 
-def test_Delete_Source_Description_DELETE_404(api_client_cognito, id_404):
+def test_Delete_Source_Description_DELETE_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/description"
+    path = f"/sources/{ID_404}/description"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -948,9 +936,9 @@ def test_Source_Label_HEAD_200(api_client_cognito, stub_multi_source):
     assert_json_response(response, 200, empty_body=True)
 
 
-def test_Source_Label_HEAD_404(api_client_cognito, id_404):
+def test_Source_Label_HEAD_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/label"
+    path = f"/sources/{ID_404}/label"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -974,9 +962,9 @@ def test_Source_Label_GET_200(api_client_cognito, stub_multi_source):
     assert stub_multi_source["label"] == response_json
 
 
-def test_Source_Label_GET_404(api_client_cognito, id_404):
+def test_Source_Label_GET_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/label"
+    path = f"/sources/{ID_404}/label"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -995,32 +983,46 @@ def test_Create_or_Update_Source_Label_PUT_204_create(
     api_client_cognito, stub_audio_source, expect_webhooks
 ):
     # Arrange
+    value = "pytest - audio"
     path = f'/sources/{stub_audio_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="pytest - audio",
+        json=value,
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    stub_audio_source["label"] = value
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_audio_source},
+        },
+    )
 
 
 def test_Create_or_Update_Source_Label_PUT_204_update(
     api_client_cognito, stub_video_source, expect_webhooks
 ):
     # Arrange
+    value = "pytest"
     path = f'/sources/{stub_video_source["id"]}/label'
     # Act
     response = api_client_cognito.request(
         "PUT",
         path,
-        json="pytest",
+        json=value,
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    stub_video_source["label"] = value
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_video_source},
+        },
+    )
 
 
 def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito, stub_video_source):
@@ -1039,9 +1041,9 @@ def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito, stub_video_so
     assert 0 < len(response_json["message"])
 
 
-def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito, id_404):
+def test_Create_or_Update_Source_Label_PUT_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/label"
+    path = f"/sources/{ID_404}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1066,12 +1068,18 @@ def test_Delete_Source_Label_DELETE_204(
     )
     # Assert
     assert_json_response(response, 204, empty_body=True)
-    expect_webhooks("sources/updated")
+    del stub_audio_source["label"]
+    expect_webhooks(
+        {
+            "event_type": "sources/updated",
+            "event": {"source": stub_audio_source},
+        },
+    )
 
 
-def test_Delete_Source_Label_DELETE_404(api_client_cognito, id_404):
+def test_Delete_Source_Label_DELETE_404(api_client_cognito):
     # Arrange
-    path = f"/sources/{id_404}/label"
+    path = f"/sources/{ID_404}/label"
     # Act
     response = api_client_cognito.request(
         "DELETE",

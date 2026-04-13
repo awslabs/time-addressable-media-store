@@ -24,6 +24,15 @@ STACK_NAME = os.environ["TAMS_STACK_NAME"]
 REGION = os.environ["TAMS_REGION"]
 PROFILE = os.environ["AWS_PROFILE"]
 
+DYNAMIC_PROPS = [
+    "created",
+    "created_by",
+    "updated",
+    "updated_by",
+    "metadata_updated",
+    "segments_updated",
+]
+ID_404 = "00000000-0000-1000-8000-00000000000a"
 
 ############
 # FIXTURES #
@@ -178,24 +187,6 @@ def delete_requests():
 
 
 @pytest.fixture(scope="session")
-def dynamic_props():
-    return [
-        "created_by",
-        "updated_by",
-        "created",
-        "metadata_updated",
-        "updated",
-        "source_collection",
-        "segments_updated",
-    ]
-
-
-@pytest.fixture(scope="session")
-def id_404():
-    return "00000000-0000-1000-8000-00000000000a"
-
-
-@pytest.fixture(scope="session")
 def stub_video_flow():
     return {
         "id": "10000000-0000-1000-8000-000000000000",
@@ -220,6 +211,7 @@ def stub_video_flow():
             "vert_chroma_subs": 1,
             "avc_parameters": {"profile": 122, "level": 42, "flags": 0},
         },
+        "collected_by": ["10000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -240,6 +232,7 @@ def stub_audio_flow():
             "bit_depth": 32,
             "codec_parameters": {"coded_frame_size": 1024, "mp4_oti": 2},
         },
+        "collected_by": ["10000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -258,6 +251,7 @@ def stub_data_flow():
             "data_type": "text",
         },
         "read_only": True,
+        "collected_by": ["10000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -277,6 +271,7 @@ def stub_image_flow():
             "frame_width": 320,
             "frame_height": 180,
         },
+        "collected_by": ["10000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -312,6 +307,7 @@ def stub_video_source():
         "label": "pytest - video",
         "description": "pytest - video",
         "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "collected_by": ["00000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -322,6 +318,7 @@ def stub_audio_source():
         "format": "urn:x-nmos:format:audio",
         "label": "pytest - audio",
         "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "collected_by": ["00000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -333,6 +330,7 @@ def stub_data_source():
         "label": "pytest - data",
         "description": "pytest - data",
         "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "collected_by": ["00000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -344,6 +342,7 @@ def stub_image_source():
         "label": "pytest - image",
         "description": "pytest - image",
         "tags": {"input_quality": "contribution", "flow_status": "ingesting"},
+        "collected_by": ["00000000-0000-1000-8000-000000000003"],
     }
 
 
@@ -359,6 +358,12 @@ def stub_multi_source():
             "flow_status": "ingesting",
             "test": "this",
         },
+        "source_collection": [
+            {"id": "00000000-0000-1000-8000-000000000000", "role": "video"},
+            {"id": "00000000-0000-1000-8000-000000000001", "role": "audio"},
+            {"id": "00000000-0000-1000-8000-000000000002", "role": "data"},
+            {"id": "00000000-0000-1000-8000-000000000004", "role": "image"},
+        ],
     }
 
 
@@ -629,3 +634,32 @@ def assert_json_response(response, status_code, empty_body=False):
     assert "application/json" == headers["content-type"]
     if empty_body:
         assert "" == response.content.decode("utf-8")
+
+
+def assert_headers_present(response, *headers):
+    """Assert that specified headers are present in the response (case-insensitive)."""
+    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
+    for header in headers:
+        assert header in response_headers_lower, f"Header '{header}' not found"
+
+
+def remove_fields(record, *fields):
+    """Remove specified fields from a dict without mutating the original."""
+    return {k: v for k, v in record.items() if k not in fields}
+
+
+def remove_dynamic_props(records):
+    """Remove dynamic properties from records (single dict or list of dicts)."""
+    # Handle single dict
+    if isinstance(records, dict):
+        for prop in DYNAMIC_PROPS:
+            if prop in records:
+                del records[prop]
+        return records
+
+    # Handle list of dicts
+    for prop in DYNAMIC_PROPS:
+        for record in records:
+            if prop in record:
+                del record[prop]
+    return records

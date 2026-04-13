@@ -289,11 +289,11 @@ def compare_webhook_counts(expected_events: list, actual_webhooks: list[dict]) -
 def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) -> None:
     """Validate webhook body content using matching algorithm."""
     # Extract expectations with body validation
-    # Format: (body_dict, test_name)
+    # Format: (body_dict, extra_excludes, test_name)
     body_expectations = []
     for item in expected_events:
         if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[0], dict):
-            # Body validation: (body_dict, test_name)
+            # Body validation: (body_dict, extra_excludes, test_name)
             body_expectations.append(item)
 
     if not body_expectations:
@@ -307,9 +307,10 @@ def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) 
     validation_errors = []
 
     for expectation in body_expectations:
-        # Extract body dict and test name
+        # Extract body dict, extra_excludes and test name
         expected_body = expectation[0]
-        test_name = expectation[1] if len(expectation) > 1 else "unknown"
+        extra_excludes = expectation[1] if len(expectation) > 1 else []
+        test_name = expectation[2] if len(expectation) > 2 else "unknown"
 
         # Extract event_type from the body
         event_type = expected_body.get("event_type")
@@ -322,6 +323,9 @@ def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) 
 
         # Get exclude fields from dictionary based on event type
         exclude_fields = WEBHOOK_EXCLUDE_FIELDS.get(event_type, [])
+
+        # Merge with any extra excludes from the test
+        exclude_fields = list(set(exclude_fields + extra_excludes))
 
         # Find all unmatched webhooks of this type
         candidates = [

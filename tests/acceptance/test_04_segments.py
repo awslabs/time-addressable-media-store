@@ -4,7 +4,13 @@ import json
 
 import pytest
 import requests
-from conftest import assert_equal_unordered, assert_json_response
+from conftest import (
+    ID_404,
+    assert_equal_unordered,
+    assert_headers_present,
+    assert_json_response,
+    remove_dynamic_props,
+)
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -152,9 +158,9 @@ def test_Allocate_Flow_Storage_POST_403(api_client_cognito, stub_audio_flow):
     )
 
 
-def test_Allocate_Flow_Storage_POST_404(api_client_cognito, id_404):
+def test_Allocate_Flow_Storage_POST_404(api_client_cognito):
     # Arrange
-    path = f"/flows/{id_404}/storage"
+    path = f"/flows/{ID_404}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -481,14 +487,16 @@ def test_List_Flow_Segments_HEAD_200_accept_get_urls(
         path,
         params={"accept_get_urls": ""},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 200, empty_body=True)
-    assert "link" in response_headers_lower
-    assert "x-paging-count" in response_headers_lower
-    assert "x-paging-nextkey" in response_headers_lower
-    assert "x-paging-reverse-order" in response_headers_lower
-    assert "x-paging-timerange" in response_headers_lower
+    assert_headers_present(
+        response,
+        "link",
+        "x-paging-count",
+        "x-paging-nextkey",
+        "x-paging-reverse-order",
+        "x-paging-timerange",
+    )
 
 
 def test_List_Flow_Segments_HEAD_200_limit(api_client_cognito, stub_video_flow):
@@ -501,14 +509,16 @@ def test_List_Flow_Segments_HEAD_200_limit(api_client_cognito, stub_video_flow):
         path,
         params={"limit": 2},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 200, empty_body=True)
-    assert "link" in response_headers_lower
-    assert "x-paging-count" in response_headers_lower
-    assert "x-paging-nextkey" in response_headers_lower
-    assert "x-paging-reverse-order" in response_headers_lower
-    assert "x-paging-timerange" in response_headers_lower
+    assert_headers_present(
+        response,
+        "link",
+        "x-paging-count",
+        "x-paging-nextkey",
+        "x-paging-reverse-order",
+        "x-paging-timerange",
+    )
 
 
 def test_List_Flow_Segments_HEAD_200_object_id(
@@ -783,9 +793,7 @@ def test_Flow_Details_GET_200_include_timerange(api_client_cognito, stub_multi_f
     assert "segments_updated" in response_json
 
 
-def test_Flow_Details_GET_200_timerange(
-    api_client_cognito, dynamic_props, stub_video_flow, stub_multi_flow
-):
+def test_Flow_Details_GET_200_timerange(api_client_cognito, stub_video_flow):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}'
     # Act
@@ -796,15 +804,12 @@ def test_Flow_Details_GET_200_timerange(
     assert_json_response(response, 200)
     response_json = response.json()
     assert "segments_updated" in response_json
-    for prop in dynamic_props:
-        if prop in response_json:
-            del response_json[prop]
+    response_json = remove_dynamic_props(response_json)
     assert_equal_unordered(
         {
             **stub_video_flow,
             "label": "pytest",
             "description": "pytest",
-            "collected_by": [stub_multi_flow["id"]],
             "timerange": "[1:0_3:0)",
             "avg_bit_rate": 6000000,
             "max_bit_rate": 6000000,
@@ -863,10 +868,10 @@ def test_List_Flow_Segments_GET_200(api_client_cognito, stub_video_flow):
         assert 2 == len(record["get_urls"])
 
 
-def test_List_Flow_Segments_GET_200_non_existant(api_client_cognito, id_404):
+def test_List_Flow_Segments_GET_200_non_existant(api_client_cognito):
     """A request for segments from a non-existent flow will return an empty list, not a 404."""
     # Arrange
-    path = f"/flows/{id_404}/segments"
+    path = f"/flows/{ID_404}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -955,15 +960,17 @@ def test_List_Flow_Segments_GET_200_limit(api_client_cognito, stub_video_flow):
         path,
         params={"limit": 2},
     )
-    response_headers_lower = {k.lower(): v for k, v in response.headers.items()}
     # Assert
     assert_json_response(response, 200)
+    assert_headers_present(
+        response,
+        "link",
+        "x-paging-count",
+        "x-paging-nextkey",
+        "x-paging-reverse-order",
+        "x-paging-timerange",
+    )
     response_json = response.json()
-    assert "link" in response_headers_lower
-    assert "x-paging-count" in response_headers_lower
-    assert "x-paging-nextkey" in response_headers_lower
-    assert "x-paging-reverse-order" in response_headers_lower
-    assert "x-paging-timerange" in response_headers_lower
     assert 2 == len(response_json)
 
 
@@ -1368,9 +1375,9 @@ def test_Create_Flow_Segment_POST_403(
     )
 
 
-def test_Create_Flow_Segment_POST_404(api_client_cognito, media_objects, id_404):
+def test_Create_Flow_Segment_POST_404(api_client_cognito, media_objects):
     # Arrange
-    path = f"/flows/{id_404}/segments"
+    path = f"/flows/{ID_404}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1591,7 +1598,7 @@ def test_Get_Media_Object_Information_GET_200_with_storage_ids_default(
 
 
 def test_Get_Media_Object_Information_GET_200_with_storage_ids_multiple(
-    api_client_cognito, media_objects, default_storage_id, id_404
+    api_client_cognito, media_objects, default_storage_id
 ):
     # Arrange
     object_id = media_objects[5]["object_id"]
@@ -1601,7 +1608,7 @@ def test_Get_Media_Object_Information_GET_200_with_storage_ids_multiple(
         "GET",
         path,
         params={
-            "accept_storage_ids": ",".join([default_storage_id, id_404]),
+            "accept_storage_ids": ",".join([default_storage_id, ID_404]),
         },
     )
     # Assert
@@ -1612,7 +1619,7 @@ def test_Get_Media_Object_Information_GET_200_with_storage_ids_multiple(
 
 
 def test_Get_Media_Object_Information_GET_200_with_storage_ids_missing(
-    api_client_cognito, media_objects, id_404
+    api_client_cognito, media_objects
 ):
     # Arrange
     object_id = media_objects[5]["object_id"]
@@ -1622,7 +1629,7 @@ def test_Get_Media_Object_Information_GET_200_with_storage_ids_missing(
         "GET",
         path,
         params={
-            "accept_storage_ids": id_404,
+            "accept_storage_ids": ID_404,
         },
     )
     # Assert
@@ -1859,9 +1866,9 @@ def test_Register_Media_Object_Instance_POST_400(api_client_cognito, media_objec
     assert_json_response(response, 400)
 
 
-def test_Register_Media_Object_Instance_POST_404(api_client_cognito, id_404):
+def test_Register_Media_Object_Instance_POST_404(api_client_cognito):
     # Arrange
-    path = f"/objects/{id_404}/instances"
+    path = f"/objects/{ID_404}/instances"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1905,9 +1912,9 @@ def test_Delete_Media_Object_Instance_DELETE_400(api_client_cognito, media_objec
     assert_json_response(response, 400)
 
 
-def test_Delete_Media_Object_Instance_DELETE_404(api_client_cognito, id_404):
+def test_Delete_Media_Object_Instance_DELETE_404(api_client_cognito):
     # Arrange
-    path = f"/objects/{id_404}/instances"
+    path = f"/objects/{ID_404}/instances"
     # Act
     response = api_client_cognito.request(
         "DELETE",
