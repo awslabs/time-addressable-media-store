@@ -7,7 +7,7 @@ package-mode = false
 
 [tool.poetry.group.dev.dependencies]
 requests = "^2.33.0"
-pytest = "^9.0.2"
+pytest = "^9.0.3"
 boto3 = "^1.42.78"
 pyaml = "^26.2.1"
 aws-lambda-powertools = "^3.26.0"
