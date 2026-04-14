@@ -187,7 +187,7 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
 
 
 def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
-    api_client_cognito, media_objects, stub_video_flow, expect_webhooks
+    api_client_cognito, media_objects, stub_video_flow, expect_webhooks, region
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -202,23 +202,49 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
         assert_json_response(response, 201)
     expect_webhooks(
         *[
-            (
-                {
-                    "event_type": "flows/updated",
-                    "event": {
-                        "flow": stub_video_flow,
+            expectation
+            for n, record in enumerate(media_objects[:-2])
+            for expectation in [
+                (
+                    {
+                        "event_type": "flows/updated",
+                        "event": {
+                            "flow": stub_video_flow,
+                        },
                     },
-                },
-                ["event.flow.segments_updated"],
-            ),
+                    ["event.flow.segments_updated"],
+                ),
+                (
+                    {
+                        "event_type": "flows/segments_added",
+                        "event": {
+                            "flow_id": stub_video_flow["id"],
+                            "segments": [
+                                {
+                                    "object_id": record["object_id"],
+                                    "timerange": f"[{n}:0_{n + 1}:0)",
+                                    "get_urls": [
+                                        {
+                                            "label": f"aws.{region}:s3:Example TAMS",
+                                        },
+                                        {
+                                            "presigned": True,
+                                            "label": f"aws.{region}:s3.presigned:Example TAMS",
+                                        },
+                                    ],
+                                }
+                            ],
+                        },
+                    },
+                    ["event.segments[].get_urls[].url"],
+                ),
+            ]
         ]
-        * len(media_objects[:-2]),
-        *["flows/segments_added"] * len(media_objects[:-2]),
     )
 
 
 def test_Create_Flow_Segment_POST_201_MULTI(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -243,12 +269,35 @@ def test_Create_Flow_Segment_POST_201_MULTI(
             },
             ["event.flow.segments_updated"],
         ),
-        "flows/segments_added",
+        (
+            {
+                "event_type": "flows/segments_added",
+                "event": {
+                    "flow_id": stub_multi_flow["id"],
+                    "segments": [
+                        {
+                            "object_id": media_objects[0]["object_id"],
+                            "timerange": "[0:0_1:0)",
+                            "get_urls": [
+                                {
+                                    "label": f"aws.{region}:s3:Example TAMS",
+                                },
+                                {
+                                    "presigned": True,
+                                    "label": f"aws.{region}:s3.presigned:Example TAMS",
+                                },
+                            ],
+                        }
+                    ],
+                },
+            },
+            ["event.segments[].get_urls[].url"],
+        ),
     )
 
 
 def test_Create_Flow_Segment_POST_201_negative(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -273,67 +322,112 @@ def test_Create_Flow_Segment_POST_201_negative(
             },
             ["event.flow.segments_updated"],
         ),
-        "flows/segments_added",
+        (
+            {
+                "event_type": "flows/segments_added",
+                "event": {
+                    "flow_id": stub_multi_flow["id"],
+                    "segments": [
+                        {
+                            "object_id": media_objects[5]["object_id"],
+                            "timerange": "[-60:0_-30:0)",
+                            "get_urls": [
+                                {
+                                    "label": f"aws.{region}:s3:Example TAMS",
+                                },
+                                {
+                                    "presigned": True,
+                                    "label": f"aws.{region}:s3.presigned:Example TAMS",
+                                },
+                            ],
+                        }
+                    ],
+                },
+            },
+            ["event.segments[].get_urls[].url"],
+        ),
     )
 
 
 def test_Create_Flow_Segment_POST_201_list_ok(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
 ):
     # Arrange
+    segments = [
+        (media_objects[6]["object_id"], "[1:0_2:0)"),
+        (media_objects[7]["object_id"], "[2:0_3:0)"),
+    ]
     path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
         json=[
-            {
-                "object_id": media_objects[6]["object_id"],
-                "timerange": "[1:0_2:0)",
-            },
-            {
-                "object_id": media_objects[7]["object_id"],
-                "timerange": "[2:0_3:0)",
-            },
+            {"object_id": object_id, "timerange": timerange}
+            for object_id, timerange in segments
         ],
     )
     # Assert
     assert_json_response(response, 201)
     expect_webhooks(
         *[
-            (
-                {
-                    "event_type": "flows/updated",
-                    "event": {
-                        "flow": stub_multi_flow,
+            expectation
+            for object_id, timerange in segments
+            for expectation in [
+                (
+                    {
+                        "event_type": "flows/updated",
+                        "event": {
+                            "flow": stub_multi_flow,
+                        },
                     },
-                },
-                ["event.flow.segments_updated"],
-            ),
-            "flows/segments_added",
+                    ["event.flow.segments_updated"],
+                ),
+                (
+                    {
+                        "event_type": "flows/segments_added",
+                        "event": {
+                            "flow_id": stub_multi_flow["id"],
+                            "segments": [
+                                {
+                                    "object_id": object_id,
+                                    "timerange": timerange,
+                                    "get_urls": [
+                                        {
+                                            "label": f"aws.{region}:s3:Example TAMS",
+                                        },
+                                        {
+                                            "presigned": True,
+                                            "label": f"aws.{region}:s3.presigned:Example TAMS",
+                                        },
+                                    ],
+                                }
+                            ],
+                        },
+                    },
+                    ["event.segments[].get_urls[].url"],
+                ),
+            ]
         ]
-        * 2
     )
 
 
 def test_Create_Flow_Segment_POST_200_list_partial(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
 ):
     # Arrange
+    segments = [
+        (media_objects[8]["object_id"], "[2:0_3:0)"),
+        (media_objects[9]["object_id"], "[3:0_4:0)"),
+    ]
     path = f'/flows/{stub_multi_flow["id"]}/segments'
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
         json=[
-            {
-                "object_id": media_objects[8]["object_id"],
-                "timerange": "[2:0_3:0)",
-            },
-            {
-                "object_id": media_objects[9]["object_id"],
-                "timerange": "[3:0_4:0)",
-            },
+            {"object_id": object_id, "timerange": timerange}
+            for object_id, timerange in segments
         ],
     )
     # Assert
@@ -351,7 +445,30 @@ def test_Create_Flow_Segment_POST_200_list_partial(
             },
             ["event.flow.segments_updated"],
         ),
-        "flows/segments_added",
+        (
+            {
+                "event_type": "flows/segments_added",
+                "event": {
+                    "flow_id": stub_multi_flow["id"],
+                    "segments": [
+                        {
+                            "object_id": segments[1][0],
+                            "timerange": segments[1][1],
+                            "get_urls": [
+                                {
+                                    "label": f"aws.{region}:s3:Example TAMS",
+                                },
+                                {
+                                    "presigned": True,
+                                    "label": f"aws.{region}:s3.presigned:Example TAMS",
+                                },
+                            ],
+                        }
+                    ],
+                },
+            },
+            ["event.segments[].get_urls[].url"],
+        ),
     )
 
 
@@ -388,20 +505,21 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
     path = f'/flows/{stub_multi_flow["id"]}/segments'
     bucket_name = stack["outputs"]["MediaStorageBucket"]
     object_id = "test-123"
+    segment = {
+        "object_id": object_id,
+        "timerange": "[4:0_5:0)",
+        "get_urls": [
+            {
+                "label": f"aws.{region}:s3:Example TAMS",
+                "url": f"https://{bucket_name}.s3.{region}.amazonaws.com/{object_id}",
+            }
+        ],
+    }
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
-        json={
-            "object_id": object_id,
-            "timerange": "[4:0_5:0)",
-            "get_urls": [
-                {
-                    "label": f"aws.{region}:s3:Example TAMS",
-                    "url": f"https://{bucket_name}.s3.{region}.amazonaws.com/{object_id}",
-                }
-            ],
-        },
+        json=segment,
     )
     # Assert
     assert_json_response(response, 201)
@@ -415,7 +533,13 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
             },
             ["event.flow.segments_updated"],
         ),
-        "flows/segments_added",
+        {
+            "event_type": "flows/segments_added",
+            "event": {
+                "flow_id": stub_multi_flow["id"],
+                "segments": [segment],
+            },
+        },
     )
 
 
@@ -425,20 +549,21 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
     object_id = "test-456"
+    segment = {
+        "object_id": object_id,
+        "timerange": "[5:0_6:0)",
+        "get_urls": [
+            {
+                "label": "something-external",
+                "url": f"https://foo.bar/{object_id}",
+            }
+        ],
+    }
     # Act
     response = api_client_cognito.request(
         "POST",
         path,
-        json={
-            "object_id": object_id,
-            "timerange": "[5:0_6:0)",
-            "get_urls": [
-                {
-                    "label": "something-external",
-                    "url": f"https://foo.bar/{object_id}",
-                }
-            ],
-        },
+        json=segment,
     )
     # Assert
     assert_json_response(response, 201)
@@ -452,7 +577,13 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
             },
             ["event.flow.segments_updated"],
         ),
-        "flows/segments_added",
+        {
+            "event_type": "flows/segments_added",
+            "event": {
+                "flow_id": stub_multi_flow["id"],
+                "segments": [segment],
+            },
+        },
     )
 
 

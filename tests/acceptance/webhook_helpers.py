@@ -30,7 +30,7 @@ WEBHOOK_EXCLUDE_FIELDS = {
         "event.flow.metadata_updated",
     ],
     "flows/deleted": ["event_timestamp"],
-    "flows/segments_added": ["event_timestamp", "event.segments.get_urls.url"],
+    "flows/segments_added": ["event_timestamp"],
     "flows/segments_deleted": ["event_timestamp"],
     "sources/created": [
         "event_timestamp",
@@ -468,30 +468,61 @@ def validate_webhook_bodies(expected_events: list, actual_webhooks: list[dict]) 
         print(f"      ✅ All {len(body_expectations)} bodies matched!")
 
 
-def _remove_nested_field(obj: dict, field_path: str) -> None:
-    """Remove nested field using dot notation (e.g., 'event.flow.created_at')."""
-    keys = field_path.split(".")
-    current = obj
+def _remove_nested_field(obj, field_path: str) -> None:
+    """Remove nested field using dot notation (e.g., 'event.flow.created_at').
+    Supports arrays using [] notation (e.g., 'event.segments[].get_urls[].url').
+    """
+    # Normalize: remove [] and split on dots
+    keys = field_path.replace("[]", "").split(".")
 
-    # Navigate to parent
-    for key in keys[:-1]:
-        if not isinstance(current, dict) or key not in current:
-            return  # Path doesn't exist
-        current = current[key]
+    def _remove_from_path(current, remaining_keys):
+        if not remaining_keys:
+            return
 
-    # Remove final key
-    if isinstance(current, dict) and keys[-1] in current:
-        del current[keys[-1]]
+        key = remaining_keys[0]
+        rest = remaining_keys[1:]
+
+        if isinstance(current, list):
+            # Remove from all items in the list
+            for item in current:
+                _remove_from_path(item, remaining_keys)
+        elif isinstance(current, dict):
+            if len(remaining_keys) == 1:
+                # Last key - remove it
+                if key in current:
+                    del current[key]
+            else:
+                # Navigate deeper
+                if key in current:
+                    _remove_from_path(current[key], rest)
+
+    _remove_from_path(obj, keys)
 
 
-def _field_exists(obj: dict, field_path: str) -> bool:
-    """Check if a nested field exists using dot notation."""
-    keys = field_path.split(".")
-    current = obj
+def _field_exists(obj, field_path: str) -> bool:
+    """Check if a nested field exists using dot notation.
+    Supports arrays using [] notation (e.g., 'event.segments[].get_urls[].url').
+    """
+    # Normalize: remove [] and split on dots
+    keys = field_path.replace("[]", "").split(".")
 
-    for key in keys:
-        if not isinstance(current, dict) or key not in current:
+    def _check_path(current, remaining_keys):
+        if not remaining_keys:
+            return True  # Reached the end of the path
+
+        key = remaining_keys[0]
+        rest = remaining_keys[1:]
+
+        if isinstance(current, list):
+            # Check all items in the list
+            if not current:  # Empty list
+                return False
+            return all(_check_path(item, remaining_keys) for item in current)
+        elif isinstance(current, dict):
+            if key not in current:
+                return False
+            return _check_path(current[key], rest)
+        else:
             return False
-        current = current[key]
 
-    return True
+    return _check_path(obj, keys)
