@@ -8,7 +8,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import get_default_storage_backend, get_storage_backend, get_store_name
 from neptune import get_matching_webhooks, set_node_property_base
 from segment_get_urls import populate_get_urls
-from utils import get_resource_id_from_event, model_dump, put_message
+from utils import filter_dict, get_resource_id_from_event, model_dump, put_message
 
 tracer = Tracer()
 logger = Logger()
@@ -57,6 +57,9 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
         }
         # Add ALL get_urls to event
         populate_get_urls(event.detail["segments"], include_storage_id=True)
+        # Remove object_timerange from segments as it's not included by default
+        for segment in event.detail["segments"]:
+            segment.pop("object_timerange", None)
     for item in schema_items:
         # Update status to started if created
         if item.status.value == "created":
@@ -75,7 +78,12 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
             and item.presigned is None
             and item.verbose_storage is None
         ):
-            post_event(event, item, get_urls)
+            # Remove storage_id since no verbose_storage requested
+            post_event(
+                event,
+                item,
+                [filter_dict(get_url, {"storage_id"}) for get_url in get_urls],
+            )
             continue
         # No get_urls are requested so send event with no get_urls
         if item.accept_get_urls is not None and len(item.accept_get_urls) == 0:
@@ -115,4 +123,7 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
                 }
                 for get_url in get_urls
             ]
+        # Remove storage_id if verbose_storage not requested
+        else:
+            get_urls = [filter_dict(get_url, {"storage_id"}) for get_url in get_urls]
         post_event(event, item, get_urls)
