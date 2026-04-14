@@ -80,7 +80,7 @@ def test_Delete_Flow_Segment_DELETE_202(
                     "flow": stub_multi_flow,
                 },
             },
-            ["event.flow.segments_updated"],
+            ["event.flow.segments_updated", "event.flow.flow_collection"],
         ),
     )
 

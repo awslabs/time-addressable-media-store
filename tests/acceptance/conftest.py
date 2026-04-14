@@ -501,8 +501,8 @@ def webhook_verification_lifecycle(
 
     try:
         # 6. Wait for async webhook delivery
-        print("   Waiting 10s for async webhook delivery...")
-        time.sleep(10)
+        print("   Waiting 30s for async webhook delivery...")
+        time.sleep(30)
 
         # 7. Collect CloudWatch logs
         print(f"   Collecting logs from {log_group_name}...")
