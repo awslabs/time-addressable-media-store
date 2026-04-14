@@ -53,7 +53,7 @@ def record_handler(record: SQSRecord) -> None:
     match event.detail_type:
         case "flows/created" | "flows/updated":
             event.detail["flow"] = model_dump(Flow(event.detail["flow"]))
-        case "source/created" | "source/updated":
+        case "sources/created" | "sources/updated":
             event.detail["source"] = model_dump(Source(**event.detail["source"]))
         case "flows/segments_added":
             event.detail["segments"][0]["get_urls"] = get_urls
