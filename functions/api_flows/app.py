@@ -330,7 +330,7 @@ def get_flow_tag_value(
         raise NotFoundError("The requested flow or tag does not exist.")  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return tags[tag_name], HTTPStatus.OK.value  # 200
+    return json.dumps(tags[tag_name]), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>/tags/<name>")
@@ -408,7 +408,7 @@ def get_flow_description(
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return description, HTTPStatus.OK.value  # 200
+    return json.dumps(description), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>/description")
@@ -476,7 +476,7 @@ def get_flow_label(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
         ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return label, HTTPStatus.OK.value  # 200
+    return json.dumps(label), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>/label")
@@ -611,7 +611,7 @@ def get_flow_max_bit_rate(
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return max_bit_rate, HTTPStatus.OK.value  # 200
+    return json.dumps(max_bit_rate), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>/max_bit_rate")
@@ -679,7 +679,7 @@ def get_flow_avg_bit_rate(
         raise NotFoundError("The requested Flow does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return avg_bit_rate, HTTPStatus.OK.value  # 200
+    return json.dumps(avg_bit_rate), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>/avg_bit_rate")
