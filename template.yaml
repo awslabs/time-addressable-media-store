@@ -1710,6 +1710,9 @@ Outputs:
   UtilsLayerArn:
     Value: !Ref UtilsLayer
 
+  DefaultStorageId:
+    Value: !Ref StorageBackend
+
   AdditionalStorageCrStorageBackendFunctionArn:
     Value: !GetAtt CrStorageBackendFunction.Arn
     Export:

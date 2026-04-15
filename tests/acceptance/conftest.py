@@ -24,7 +24,7 @@ from webhook_helpers import (
 STACK_NAME = os.environ["TAMS_STACK_NAME"]
 REGION = os.environ["TAMS_REGION"]
 PROFILE = os.environ["AWS_PROFILE"]
-
+STORE_NAME = "Example TAMS"
 DYNAMIC_PROPS = [
     "created",
     "created_by",
@@ -42,26 +42,14 @@ ID_404 = "00000000-0000-1000-8000-00000000000a"
 
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def profile():
-    return PROFILE
+def session():
+    return boto3.Session(profile_name=PROFILE)
 
 
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def region():
-    return REGION
-
-
-@pytest.fixture(scope="session")
-# pylint: disable=redefined-outer-name
-def session(profile):
-    return boto3.Session(profile_name=profile)
-
-
-@pytest.fixture(scope="session")
-# pylint: disable=redefined-outer-name
-def stack(region, session):
-    cloudformation = session.resource("cloudformation", region_name=region)
+def stack(session):
+    cloudformation = session.resource("cloudformation", region_name=REGION)
     get_stack = cloudformation.Stack(STACK_NAME)
     return {
         "outputs": {o["OutputKey"]: o["OutputValue"] for o in get_stack.outputs},
@@ -79,7 +67,7 @@ def api_endpoint(stack):
 
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def token_factory(stack, session, region):
+def token_factory(stack, session):
     """Create tokens with specific scopes (cached per scope combination)."""
     cache = {}
 
@@ -90,7 +78,7 @@ def token_factory(stack, session, region):
 
         user_pool_id = stack["outputs"]["UserPoolId"]
         client_id = stack["outputs"]["UserPoolClientId"]
-        client_secret = get_client_secret(session, user_pool_id, client_id, region)
+        client_secret = get_client_secret(session, user_pool_id, client_id, REGION)
         form_data = {
             "client_id": client_id,
             "client_secret": client_secret,
@@ -160,21 +148,9 @@ def webhook_ids():
 
 
 @pytest.fixture(scope="session")
-def storage_backends():
-    return []
-
-
-@pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
-def default_storage_id(storage_backends):
-    return next(
-        (
-            storage_backend["id"]
-            for storage_backend in storage_backends
-            if storage_backend.get("default_storage", False)
-        ),
-        None,
-    )
+def default_storage_id(stack):
+    return stack["outputs"]["DefaultStorageId"]
 
 
 @pytest.fixture(scope="session")
@@ -401,7 +377,7 @@ def webhook_test_data():
 # pylint: disable=redefined-outer-name
 @pytest.fixture(scope="session", autouse=True)
 def webhook_verification_lifecycle(
-    session, region, api_client_cognito, webhook_test_data, webhook_expectations
+    session, api_client_cognito, webhook_test_data, webhook_expectations
 ):
     """
     Automated webhook delivery verification.
@@ -445,18 +421,18 @@ def webhook_verification_lifecycle(
         )
 
         print(f"   Deploying stack: {stack_name}...")
-        deploy_webhook_stack(session, region, stack_name, template_path)
-        wait_for_stack_create(session, region, stack_name)
+        deploy_webhook_stack(session, REGION, stack_name, template_path)
+        wait_for_stack_create(session, REGION, stack_name)
         print("   ✅ Stack deployed")
 
         # 2. Get stack outputs
-        outputs = get_stack_outputs(session, region, stack_name)
+        outputs = get_stack_outputs(session, REGION, stack_name)
         webhook_url = outputs["ApiUrl"]
         api_key_id = outputs["ApiKeyId"]
         log_group_name = outputs["LogGroupName"]
 
         # 3. Get API key value
-        api_key_value = get_api_key_value(session, region, api_key_id)
+        api_key_value = get_api_key_value(session, REGION, api_key_id)
 
         # 4. Register webhook with TAMS
         print(f"   Registering webhook: {webhook_url}/test-events...")
@@ -487,7 +463,7 @@ def webhook_verification_lifecycle(
         # Cleanup on setup failure
         if webhook_test_data.get("stack_name"):
             try:
-                delete_webhook_stack(session, region, webhook_test_data["stack_name"])
+                delete_webhook_stack(session, REGION, webhook_test_data["stack_name"])
             # pylint: disable=broad-exception-caught
             except Exception:
                 pass
@@ -507,7 +483,7 @@ def webhook_verification_lifecycle(
         # 7. Collect CloudWatch logs
         print(f"   Collecting logs from {log_group_name}...")
         log_events = collect_cloudwatch_logs(
-            session, region, log_group_name, webhook_test_data["start_time"]
+            session, REGION, log_group_name, webhook_test_data["start_time"]
         )
         print(f"   Found {len(log_events)} log events")
 
@@ -552,7 +528,7 @@ def webhook_verification_lifecycle(
         if webhook_test_data.get("stack_name"):
             try:
                 print(f"   Deleting stack: {stack_name}...")
-                delete_webhook_stack(session, region, stack_name)
+                delete_webhook_stack(session, REGION, stack_name)
                 print("   ⏳ Stack deletion initiated (async)")
             # pylint: disable=broad-exception-caught
             except Exception as e:
@@ -663,3 +639,20 @@ def remove_dynamic_props(records):
             if prop in record:
                 del record[prop]
     return records
+
+
+def create_storage_label(suffix=""):
+    return f"aws.{REGION}:s3{f'.{suffix}' if suffix else ''}:{STORE_NAME}"
+
+
+def default_get_urls():
+    """Return the standard get_urls structure for webhook expectations."""
+    return [
+        {
+            "label": create_storage_label(),
+        },
+        {
+            "presigned": True,
+            "label": create_storage_label("presigned"),
+        },
+    ]

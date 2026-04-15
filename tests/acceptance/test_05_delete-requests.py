@@ -3,7 +3,7 @@ from collections import deque
 
 import pytest
 import requests
-from conftest import ID_404, assert_json_response
+from conftest import ID_404, REGION, assert_json_response
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -601,9 +601,9 @@ def test_Flow_Delete_Request_Details_GET_404(api_client_cognito):
     )
 
 
-def test_FlowSegments_Table_Empty(session, region, stack):
+def test_FlowSegments_Table_Empty(session, stack):
     # Arrange
-    dynamodb = session.resource("dynamodb", region_name=region)
+    dynamodb = session.resource("dynamodb", region_name=REGION)
     segments_table = dynamodb.Table(stack["outputs"]["FlowSegmentsTable"])
     # Act
     scan = segments_table.scan(Select="COUNT")
@@ -611,10 +611,10 @@ def test_FlowSegments_Table_Empty(session, region, stack):
     assert 0 == scan["Count"]
 
 
-def test_FlowStorage_Table_Empty(session, region, stack):
+def test_FlowStorage_Table_Empty(session, stack):
     time.sleep(3)  # Wait to allow for SQS queue to be processed.
     # Arrange
-    dynamodb = session.resource("dynamodb", region_name=region)
+    dynamodb = session.resource("dynamodb", region_name=REGION)
     storage_table = dynamodb.Table(stack["outputs"]["FlowStorageTable"])
     # Act
     scan = storage_table.scan(ProjectionExpression="id")
@@ -625,9 +625,9 @@ def test_FlowStorage_Table_Empty(session, region, stack):
             batch.delete_item(Key=item)
 
 
-def test_S3_Bucket_Empty(session, region, stack):
+def test_S3_Bucket_Empty(session, stack):
     # Arrange
-    sqs = session.client("sqs", region_name=region)
+    sqs = session.client("sqs", region_name=REGION)
     queue_attributes = sqs.get_queue_attributes(
         QueueUrl=stack["outputs"]["CleanupS3QueueUrl"],
         AttributeNames=[
@@ -649,7 +649,7 @@ def test_S3_Bucket_Empty(session, region, stack):
         )
         total_messages = sum(map(int, queue_attributes["Attributes"].values()))
     bucket_name = stack["outputs"]["MediaStorageBucket"]
-    s3 = session.resource("s3", region_name=region)
+    s3 = session.resource("s3", region_name=REGION)
     bucket = s3.Bucket(bucket_name)
     # Act
     objects_list = bucket.objects.all()

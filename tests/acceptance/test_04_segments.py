@@ -6,9 +6,12 @@ import pytest
 import requests
 from conftest import (
     ID_404,
+    REGION,
     assert_equal_unordered,
     assert_headers_present,
     assert_json_response,
+    create_storage_label,
+    default_get_urls,
     remove_dynamic_props,
 )
 
@@ -187,7 +190,7 @@ def test_Presigned_PUT_URL_POST_200(media_objects):
 
 
 def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
-    api_client_cognito, media_objects, stub_video_flow, expect_webhooks, region
+    api_client_cognito, media_objects, stub_video_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -223,15 +226,7 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
                                 {
                                     "object_id": record["object_id"],
                                     "timerange": f"[{n}:0_{n + 1}:0)",
-                                    "get_urls": [
-                                        {
-                                            "label": f"aws.{region}:s3:Example TAMS",
-                                        },
-                                        {
-                                            "presigned": True,
-                                            "label": f"aws.{region}:s3.presigned:Example TAMS",
-                                        },
-                                    ],
+                                    "get_urls": default_get_urls(),
                                 }
                             ],
                         },
@@ -244,7 +239,7 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
 
 
 def test_Create_Flow_Segment_POST_201_MULTI(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -278,15 +273,7 @@ def test_Create_Flow_Segment_POST_201_MULTI(
                         {
                             "object_id": media_objects[0]["object_id"],
                             "timerange": "[0:0_1:0)",
-                            "get_urls": [
-                                {
-                                    "label": f"aws.{region}:s3:Example TAMS",
-                                },
-                                {
-                                    "presigned": True,
-                                    "label": f"aws.{region}:s3.presigned:Example TAMS",
-                                },
-                            ],
+                            "get_urls": default_get_urls(),
                         }
                     ],
                 },
@@ -297,7 +284,7 @@ def test_Create_Flow_Segment_POST_201_MULTI(
 
 
 def test_Create_Flow_Segment_POST_201_negative(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -331,15 +318,7 @@ def test_Create_Flow_Segment_POST_201_negative(
                         {
                             "object_id": media_objects[5]["object_id"],
                             "timerange": "[-60:0_-30:0)",
-                            "get_urls": [
-                                {
-                                    "label": f"aws.{region}:s3:Example TAMS",
-                                },
-                                {
-                                    "presigned": True,
-                                    "label": f"aws.{region}:s3.presigned:Example TAMS",
-                                },
-                            ],
+                            "get_urls": default_get_urls(),
                         }
                     ],
                 },
@@ -350,7 +329,7 @@ def test_Create_Flow_Segment_POST_201_negative(
 
 
 def test_Create_Flow_Segment_POST_201_list_ok(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     segments = [
@@ -392,15 +371,7 @@ def test_Create_Flow_Segment_POST_201_list_ok(
                                 {
                                     "object_id": object_id,
                                     "timerange": timerange,
-                                    "get_urls": [
-                                        {
-                                            "label": f"aws.{region}:s3:Example TAMS",
-                                        },
-                                        {
-                                            "presigned": True,
-                                            "label": f"aws.{region}:s3.presigned:Example TAMS",
-                                        },
-                                    ],
+                                    "get_urls": default_get_urls(),
                                 }
                             ],
                         },
@@ -413,7 +384,7 @@ def test_Create_Flow_Segment_POST_201_list_ok(
 
 
 def test_Create_Flow_Segment_POST_200_list_partial(
-    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks, region
+    api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     segments = [
@@ -454,15 +425,7 @@ def test_Create_Flow_Segment_POST_200_list_partial(
                         {
                             "object_id": segments[1][0],
                             "timerange": segments[1][1],
-                            "get_urls": [
-                                {
-                                    "label": f"aws.{region}:s3:Example TAMS",
-                                },
-                                {
-                                    "presigned": True,
-                                    "label": f"aws.{region}:s3.presigned:Example TAMS",
-                                },
-                            ],
+                            "get_urls": default_get_urls(),
                         }
                     ],
                 },
@@ -499,7 +462,7 @@ def test_Create_Flow_Segment_POST_200_list_failed(
 
 
 def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
-    api_client_cognito, region, stack, stub_multi_flow, expect_webhooks
+    api_client_cognito, stack, stub_multi_flow, expect_webhooks
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -510,8 +473,8 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
         "timerange": "[4:0_5:0)",
         "get_urls": [
             {
-                "label": f"aws.{region}:s3:Example TAMS",
-                "url": f"https://{bucket_name}.s3.{region}.amazonaws.com/{object_id}",
+                "label": create_storage_label(),
+                "url": f"https://{bucket_name}.s3.{REGION}.amazonaws.com/{object_id}",
             }
         ],
     }
@@ -588,7 +551,7 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
 
 
 def test_List_Flow_Segments_GET_200_with_get_urls_same_store(
-    api_client_cognito, region, stub_multi_flow
+    api_client_cognito, stub_multi_flow
 ):
     # Arrange
     path = f'/flows/{stub_multi_flow["id"]}/segments'
@@ -598,7 +561,7 @@ def test_List_Flow_Segments_GET_200_with_get_urls_same_store(
         path,
         params={
             "object_id": "test-123",
-            "accept_get_urls": f"aws.{region}:s3:Example TAMS",
+            "accept_get_urls": create_storage_label(),
         },
     )
     # Assert
@@ -1133,7 +1096,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_empty(
 
 
 def test_List_Flow_Segments_GET_200_accept_get_urls_single(
-    api_client_cognito, region, stub_video_flow
+    api_client_cognito, stub_video_flow
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -1141,7 +1104,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_single(
     response = api_client_cognito.request(
         "GET",
         path,
-        params={"accept_get_urls": f"aws.{region}:s3:Example TAMS"},
+        params={"accept_get_urls": create_storage_label()},
     )
     # Assert
     assert_json_response(response, 200)
@@ -1155,7 +1118,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_single(
 
 
 def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
-    api_client_cognito, region, stub_video_flow
+    api_client_cognito, stub_video_flow
 ):
     # Arrange
     path = f'/flows/{stub_video_flow["id"]}/segments'
@@ -1164,7 +1127,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
         "GET",
         path,
         params={
-            "accept_get_urls": f"aws.{region}:s3:Example TAMS,aws.{region}:s3.presigned:Example TAMS"
+            "accept_get_urls": f"{create_storage_label()},{create_storage_label("presigned")}"
         },
     )
     # Assert
@@ -1761,12 +1724,12 @@ def test_Get_Media_Object_Information_GET_200_page(
 
 
 def test_Get_Media_Object_Information_GET_200_get_urls(
-    api_client_cognito, region, media_objects
+    api_client_cognito, media_objects
 ):
     # Arrange
     object_id = media_objects[5]["object_id"]
     path = f"/objects/{object_id}"
-    label = f"aws.{region}:s3:Example TAMS"
+    label = create_storage_label()
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1972,7 +1935,7 @@ def test_Get_Media_Object_Information_GET_200_with_presigned_false(
 
 
 def test_Get_Media_Object_Information_GET_200_with_verbose_true(
-    api_client_cognito, region, media_objects, default_storage_id
+    api_client_cognito, media_objects, default_storage_id
 ):
     # Arrange
     object_id = media_objects[5]["object_id"]
@@ -1998,7 +1961,7 @@ def test_Get_Media_Object_Information_GET_200_with_verbose_true(
     assert "controlled" in response_json["get_urls"][0]
     assert "http_object_store" == response_json["get_urls"][0]["store_type"]
     assert "aws" == response_json["get_urls"][0]["provider"]
-    assert region == response_json["get_urls"][0]["region"]
+    assert REGION == response_json["get_urls"][0]["region"]
     assert "s3" == response_json["get_urls"][0]["store_product"]
     assert default_storage_id == response_json["get_urls"][0]["storage_id"]
     assert response_json["get_urls"][0]["controlled"]

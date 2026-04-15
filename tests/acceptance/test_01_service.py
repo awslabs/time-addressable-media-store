@@ -1,6 +1,14 @@
 import pytest
 import requests
-from conftest import ID_404, assert_headers_present, assert_json_response
+from conftest import (
+    ID_404,
+    REGION,
+    STORE_NAME,
+    assert_equal_unordered,
+    assert_headers_present,
+    assert_json_response,
+    create_storage_label,
+)
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -97,7 +105,7 @@ def test_Update_Service_Information_POST_200(api_client_cognito):
         "POST",
         path,
         json={
-            "name": "Example TAMS",
+            "name": STORE_NAME,
             "description": "An example Time Addressable Media Store",
         },
     )
@@ -676,7 +684,7 @@ def test_Service_StorageBackends_HEAD_200(api_client_cognito):
     assert_json_response(response, 200, empty_body=True)
 
 
-def test_Service_StorageBackends_GET_200(api_client_cognito, storage_backends):
+def test_Service_StorageBackends_GET_200(api_client_cognito, default_storage_id):
     # Arrange
     path = "/service/storage-backends"
     # Act
@@ -687,5 +695,17 @@ def test_Service_StorageBackends_GET_200(api_client_cognito, storage_backends):
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    storage_backends.extend(response_json)
     assert isinstance(response_json, list)
+    assert 1 == len(response_json)
+    assert_equal_unordered(
+        {
+            "store_type": "http_object_store",
+            "provider": "aws",
+            "region": REGION,
+            "store_product": "s3",
+            "id": default_storage_id,
+            "label": create_storage_label(),
+            "default_storage": True,
+        },
+        response_json[0],
+    )

@@ -3,7 +3,7 @@ import json
 from http import HTTPStatus
 
 import pytest
-from conftest import ID_404
+from conftest import ID_404, STORE_NAME
 
 pytestmark = [
     pytest.mark.functional,
@@ -143,7 +143,7 @@ def test_Update_Service_Information_POST_200(
         "POST",
         "/service",
         json_body={
-            "name": "Example TAMS",
+            "name": STORE_NAME,
             "description": "An example Time Addressable Media Store",
         },
     )

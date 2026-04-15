@@ -7,7 +7,7 @@ import boto3
 import pytest
 
 # pylint: disable=no-name-in-module
-from conftest import serialise_dict
+from conftest import STORE_NAME, serialise_dict
 from pytest_lazy_fixtures import lf
 
 pytestmark = [
@@ -84,8 +84,8 @@ def get_message_attributes_from_queue(queue_url):
 # Constants for test parameters
 SAMPLE_FLOW_ID = str(uuid.uuid4())
 SAMPLE_LABELS = [
-    "aws.eu-west-1:s3:Example TAMS",
-    "aws.eu-west-1:s3.presigned:Example TAMS",
+    f"aws.eu-west-1:s3:{STORE_NAME}",
+    f"aws.eu-west-1:s3.presigned:{STORE_NAME}",
 ]
 INVALID_STORAGE_ID = str(uuid.uuid4())
 

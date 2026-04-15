@@ -25,6 +25,7 @@ os.environ["DUPLICATION_QUEUE_URL"] = "duplication-queue-url"
 os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
 ID_404 = "00000000-0000-1000-8000-00000000000a"
+STORE_NAME = "Example TAMS"
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +237,7 @@ def service_table(default_storage_id, alternative_storage_id):
         Item={
             "record_type": "service",
             "id": "1",
-            "name": "Example TAMS",
+            "name": STORE_NAME,
             "description": "An example Time Addressable Media Store",
         }
     )
