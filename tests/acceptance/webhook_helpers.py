@@ -10,6 +10,7 @@ These functions handle:
 
 import copy
 import json
+import time
 from datetime import datetime, timezone
 
 from deepdiff import DeepDiff
@@ -153,7 +154,8 @@ def collect_cloudwatch_logs(
     kwargs = {
         "logGroupName": log_group_name,
         "startTime": start_time,
-        "filterPattern": "",  # Get all events
+        "endTime": int(time.time() * 1000),
+        "filterPattern": "{ $.pathParameters.identifier = * }",
     }
 
     try:
@@ -180,14 +182,6 @@ def parse_webhook_events(log_events: list[dict[str, any]]) -> list[dict[str, any
 
     for event in log_events:
         message = event.get("message", "")
-
-        # Skip empty messages
-        if not message.strip():
-            continue
-
-        # Skip Lambda runtime messages (START/END/REPORT lines)
-        if message.startswith(("START", "END", "REPORT")):
-            continue
 
         # Lambda function does: print(json.dumps(event))
         # So the message is the full event object, and body is nested inside
