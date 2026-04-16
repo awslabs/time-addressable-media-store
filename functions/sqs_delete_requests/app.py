@@ -43,7 +43,9 @@ def record_handler(
             publish_event(
                 "flows/deleted",
                 {"flow_id": body["flow_id"]},
-                enhance_resources([f'tams:flow:{body["flow_id"]}']),
+                enhance_resources(
+                    [f'tams:flow:{body["flow_id"]}', f"tams:source:{source_id}"]
+                ),
             )
         # Delete source if no longer referenced by any other flows
         if check_delete_source(source_id):
