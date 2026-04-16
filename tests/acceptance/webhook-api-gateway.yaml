@@ -1,9 +1,8 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 
 Transform: AWS::Serverless-2016-10-31
 
 Resources:
-
   TamsWebhookApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -26,8 +25,10 @@ Resources:
       Runtime: python3.14
       Handler: index.lambda_handler
       InlineCode: |
+        import json
+
         def lambda_handler(event, context):
-            print(event.get("body", "{}"))
+            print(json.dumps(event))
             return {
                 "statusCode": 200,
                 "body": "OK"
@@ -39,6 +40,17 @@ Resources:
             RestApiId: !Ref TamsWebhookApi
             Path: /{identifier}
             Method: POST
+
+  LoggingFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: Encryption not required
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${LoggingFunction}
+      RetentionInDays: 1
 
 Outputs:
   ApiUrl:

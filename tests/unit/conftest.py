@@ -16,6 +16,8 @@ os.environ["STORAGE_TABLE"] = "storage-table"
 os.environ["USER_POOL_ID"] = "123"
 os.environ["WEBHOOKS_QUEUE_URL"] = "test-queue"
 
+STORE_NAME = "Example TAMS"
+
 logger = logging.getLogger(__name__)
 builder = ConditionExpressionBuilder()
 
@@ -88,7 +90,7 @@ def stub_flowsegment():
                 "last_duration": "string",
                 "get_urls": [
                     {
-                        "label": "aws.eu-west-2:s3:Example TAMS",
+                        "label": f"aws.eu-west-2:s3:{STORE_NAME}",
                         "url": "https://BUCKET.s3.REGION.amazonaws.com/550e8400-e29b-41d4-a716-446655440002",
                     }
                 ],

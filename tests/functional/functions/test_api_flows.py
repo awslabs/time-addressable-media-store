@@ -5,6 +5,7 @@ from http import HTTPStatus
 
 import constants
 import pytest
+from conftest import ALTERNATIVE_STORAGE_ID, DEFAULT_STORAGE_ID
 
 pytestmark = [
     pytest.mark.functional,
@@ -99,7 +100,6 @@ def test_POST_storage_returns_201_with_default_storage_objects_when_flow_exists(
     mock_neptune_client,
     storage_table,
     sample_flow_id,
-    default_storage_id,
     body_value,
     media_objects_length,
 ):
@@ -158,7 +158,7 @@ def test_POST_storage_returns_201_with_default_storage_objects_when_flow_exists(
         item = storage_table.get_item(Key={"id": media_object["object_id"]})["Item"]
         assert item is not None
         assert item.get("expire_at")
-        assert item["storage_id"] == default_storage_id
+        assert item["storage_id"] == DEFAULT_STORAGE_ID
 
 
 # pylint: disable=redefined-outer-name
@@ -169,7 +169,6 @@ def test_POST_storage_returns_201_with_alternative_storage_objects_when_flow_exi
     mock_neptune_client,
     storage_table,
     sample_flow_id,
-    alternative_storage_id,
 ):
     """
     Verifies that a POST request to the storage endpoint returns 201 Created
@@ -192,7 +191,7 @@ def test_POST_storage_returns_201_with_alternative_storage_objects_when_flow_exi
         "POST",
         f"/flows/{sample_flow_id}/storage",
         query_params=None,
-        json_body={"limit": 1, "storage_id": alternative_storage_id},
+        json_body={"limit": 1, "storage_id": ALTERNATIVE_STORAGE_ID},
     )
 
     # Act
@@ -216,7 +215,7 @@ def test_POST_storage_returns_201_with_alternative_storage_objects_when_flow_exi
         item = storage_table.get_item(Key={"id": media_object["object_id"]})["Item"]
         assert item is not None
         assert item.get("expire_at")
-        assert item["storage_id"] == alternative_storage_id
+        assert item["storage_id"] == ALTERNATIVE_STORAGE_ID
 
 
 # pylint: disable=redefined-outer-name

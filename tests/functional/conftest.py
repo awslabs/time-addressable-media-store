@@ -24,39 +24,18 @@ os.environ["DELETE_QUEUE_URL"] = "delete-queue-url"
 os.environ["DUPLICATION_QUEUE_URL"] = "duplication-queue-url"
 os.environ["S3_QUEUE_URL"] = "s3-queue-url"
 
+ID_404 = "00000000-0000-1000-8000-00000000000a"
+STORE_NAME = "Example TAMS"
+DEFAULT_STORAGE_ID = str(uuid.uuid4())
+ALTERNATIVE_STORAGE_ID = str(uuid.uuid4())
+
+
 logger = logging.getLogger(__name__)
 
 
 ############
 # FIXTURES #
 ############
-
-
-@pytest.fixture(scope="session")
-def default_storage_id():
-    """
-    Provides a default unique backend storage ID for testing.
-
-    Returns:
-        str: A UUID string representing a backend storage ID
-    """
-    yield str(uuid.uuid4())
-
-
-@pytest.fixture(scope="session")
-def alternative_storage_id():
-    """
-    Provides an alternative unique backend storage ID for testing.
-
-    Returns:
-        str: A UUID string representing a backend storage ID
-    """
-    yield str(uuid.uuid4())
-
-
-@pytest.fixture(scope="session")
-def id_404():
-    return "00000000-0000-1000-8000-00000000000a"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -209,7 +188,7 @@ def s3_bucket():
 
 @pytest.fixture(scope="session", autouse=True)
 # pylint: disable=redefined-outer-name
-def service_table(default_storage_id, alternative_storage_id):
+def service_table():
     """
     Create and manage a test DynamoDB service table for the test module.
 
@@ -239,14 +218,14 @@ def service_table(default_storage_id, alternative_storage_id):
         Item={
             "record_type": "service",
             "id": "1",
-            "name": "Example TAMS",
+            "name": STORE_NAME,
             "description": "An example Time Addressable Media Store",
         }
     )
     table.put_item(
         Item={
             "record_type": "storage-backend",
-            "id": default_storage_id,
+            "id": DEFAULT_STORAGE_ID,
             "bucket_name": os.environ["BUCKET"],
             "provider": "aws",
             "region": os.environ["BUCKET_REGION"],
@@ -258,7 +237,7 @@ def service_table(default_storage_id, alternative_storage_id):
     table.put_item(
         Item={
             "record_type": "storage-backend",
-            "id": alternative_storage_id,
+            "id": ALTERNATIVE_STORAGE_ID,
             "bucket_name": "alternative-storage",
             "provider": "aws",
             "region": "alternative-region",
@@ -354,6 +333,24 @@ def webhooks_queue():
     response = client.create_queue(QueueName="webhooks-queue")
     os.environ["WEBHOOKS_QUEUE_URL"] = response["QueueUrl"]
     yield
+    client.delete_queue(QueueUrl=response["QueueUrl"])
+
+
+@pytest.fixture(scope="module", autouse=True)
+def error_queue():
+    """
+    Create and manage a test SQS Queue for errors.
+
+    Creates an error SQS Queue before tests run and cleans it up afterward.
+
+    Returns:
+        str: The SQS queue URL for test use
+    """
+    # Create SQS Queue
+    client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
+    response = client.create_queue(QueueName="error-queue")
+    os.environ["ERROR_QUEUE_URL"] = response["QueueUrl"]
+    yield response["QueueUrl"]
     client.delete_queue(QueueUrl=response["QueueUrl"])
 
 

@@ -7,8 +7,7 @@ import boto3
 import pytest
 
 # pylint: disable=no-name-in-module
-from conftest import serialise_dict
-from pytest_lazy_fixtures import lf
+from conftest import DEFAULT_STORAGE_ID, STORE_NAME, serialise_dict
 
 pytestmark = [
     pytest.mark.functional,
@@ -45,6 +44,10 @@ def generate_opencyher_query(event_type, where_conditions):
             " AND "
             + rf'(webhook.SERIALISE_{k} IS NULL OR webhook.SERIALISE_{k} CONTAINS "\"{v}\"")'
         )
+    # Add collected_by exclusions at the end (to match actual query order)
+    for k in ["flow_collected_by_ids", "source_collected_by_ids"]:
+        if k not in where_conditions:
+            where_expression += " AND " + rf"webhook.SERIALISE_{k} IS NULL"
     return (
         r"MATCH (webhook: webhook)-[: has_tags]->(t: tags) WHERE "
         + rf'webhook.status IN ["created", "started"] AND webhook.SERIALISE_events CONTAINS "\"{event_type}\""'
@@ -61,8 +64,8 @@ def generate_opencyher_query(event_type, where_conditions):
 # Constants for test parameters
 SAMPLE_FLOW_ID = str(uuid.uuid4())
 SAMPLE_LABELS = [
-    "aws.eu-west-1:s3:Example TAMS",
-    "aws.eu-west-1:s3.presigned:Example TAMS",
+    f"aws.eu-west-1:s3:{STORE_NAME}",
+    f"aws.eu-west-1:s3.presigned:{STORE_NAME}",
 ]
 INVALID_STORAGE_ID = str(uuid.uuid4())
 
@@ -179,7 +182,7 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
-                "accept_storage_ids": [lf("default_storage_id")],
+                "accept_storage_ids": [DEFAULT_STORAGE_ID],
             },
             {
                 "event_type": "flows/segments_added",
@@ -296,7 +299,6 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
 def test_segments_added_using_controlled_storage(
     lambda_context,
     webhooks,
-    default_storage_id,
     mock_neptune_client,
     webhook_item,
     query_data,
@@ -316,7 +318,7 @@ def test_segments_added_using_controlled_storage(
                 "timerange": "[0:0_6:0)",
                 "timerange_start": 0,
                 "timerange_end": 5999999999,
-                "storage_ids": [default_storage_id],
+                "storage_ids": [DEFAULT_STORAGE_ID],
             }
         ],
     }
@@ -365,7 +367,7 @@ def test_segments_added_using_controlled_storage(
         )
 
     # Check storage filter
-    if webhook_item.get("accept_storage_ids"):
+    if webhook_item.get("accept_storage_ids") and webhook_item.get("verbose_storage"):
         assert not any(
             True
             for get_url in message_body["get_urls"]
@@ -517,7 +519,7 @@ def test_segments_added_using_controlled_storage(
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
-                "accept_storage_ids": [lf("default_storage_id")],
+                "accept_storage_ids": [DEFAULT_STORAGE_ID],
             },
             {
                 "event_type": "flows/segments_added",
@@ -700,7 +702,7 @@ def test_segments_added_using_legacy_storage(
         )
 
     # Check storage filter
-    if webhook_item.get("accept_storage_ids"):
+    if webhook_item.get("accept_storage_ids") and webhook_item.get("verbose_storage"):
         assert not any(
             True
             for get_url in message_body["get_urls"]
@@ -1006,7 +1008,7 @@ def test_segments_added_using_external_storage(
         )
 
     # Check storage filter
-    if webhook_item.get("accept_storage_ids"):
+    if webhook_item.get("accept_storage_ids") and webhook_item.get("verbose_storage"):
         assert not any(
             True
             for get_url in message_body["get_urls"]
