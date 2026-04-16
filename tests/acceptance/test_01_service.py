@@ -326,7 +326,7 @@ def test_List_Webhook_URLs_GET_200(
     webhook_ids,
     stub_webhook_basic,
     stub_webhook_tags,
-    webhook_verification_enabled,
+    webhook_test_data,
 ):
     # Arrange
     path = "/service/webhooks"
@@ -335,7 +335,7 @@ def test_List_Webhook_URLs_GET_200(
         "GET",
         path,
     )
-    expected_count = len(webhook_ids) + (1 if webhook_verification_enabled else 0)
+    expected_count = len(webhook_ids) + len(webhook_test_data["webhooks"])
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
@@ -422,7 +422,7 @@ def test_List_Webhook_URLs_GET_200_tag_exists_name_false(
     api_client_cognito,
     webhook_ids,
     stub_webhook_basic,
-    webhook_verification_enabled,
+    webhook_test_data,
 ):
     # Arrange
     path = "/service/webhooks"
@@ -433,7 +433,7 @@ def test_List_Webhook_URLs_GET_200_tag_exists_name_false(
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert (3 if webhook_verification_enabled else 2) == len(response_json)
+    assert (2 + len(webhook_test_data["webhooks"])) == len(response_json)
     assert {
         **stub_webhook_basic,
         "id": webhook_ids[0],
@@ -481,9 +481,7 @@ def test_List_Webhook_URLs_GET_400_limit_bad(api_client_cognito):
     assert response_json["message"][0]["type"] == "int_parsing"
 
 
-def test_List_Webhook_URLs_GET_200_page(
-    api_client_cognito, webhook_verification_enabled
-):
+def test_List_Webhook_URLs_GET_200_page(api_client_cognito, webhook_test_data):
     # Arrange
     path = "/service/webhooks"
     # Act
@@ -491,7 +489,7 @@ def test_List_Webhook_URLs_GET_200_page(
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert (3 if webhook_verification_enabled else 2) == len(response_json)
+    assert (2 + len(webhook_test_data["webhooks"])) == len(response_json)
 
 
 def test_Webhook_Details_HEAD_200(api_client_cognito, webhook_ids):

@@ -156,7 +156,7 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
                     "flow": stub_video_flow,
                 },
             },
-            ["event.flow.segments_updated"],
+            ["event.flow.segments_updated", "event.flow.collected_by"],
         ),
     )
 
