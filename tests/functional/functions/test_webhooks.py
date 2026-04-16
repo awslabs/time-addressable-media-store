@@ -40,13 +40,10 @@ def webhooks():
 def generate_opencyher_query(event_type, where_conditions):
     where_expression = ""
     for k, v in where_conditions.items():
-        if v:
-            where_expression += (
-                " AND "
-                + rf'(webhook.SERIALISE_{k} IS NULL OR webhook.SERIALISE_{k} CONTAINS "\"{v}\"")'
-            )
-        else:
-            where_expression += " AND " + rf"webhook.SERIALISE_{k} IS NULL"
+        where_expression += (
+            " AND "
+            + rf'(webhook.SERIALISE_{k} IS NULL OR webhook.SERIALISE_{k} CONTAINS "\"{v}\"")'
+        )
     # Add collected_by exclusions at the end (to match actual query order)
     for k in ["flow_collected_by_ids", "source_collected_by_ids"]:
         if k not in where_conditions:
