@@ -1001,6 +1001,10 @@ def get_matching_webhooks(event: EventBridgeEvent) -> list[Webhookfull]:
                 rf'webhook.{constants.SERIALISE_PREFIX}{attr} CONTAINS "\"{resource_id}\""'
             )
         where_literals.append(f"({' OR '.join(resource_conditions)})")
+    # Explicitly exclude webhooks with collected_by filters when event has no collected_by resources
+    for attr in ["flow_collected_by_ids", "source_collected_by_ids"]:
+        if attr not in expressions:
+            where_literals.append(f"webhook.{constants.SERIALISE_PREFIX}{attr} IS NULL")
     query = generate_webhook_query(
         {
             "webhook": {},
