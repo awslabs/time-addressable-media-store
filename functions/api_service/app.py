@@ -151,7 +151,10 @@ def get_webhooks(
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump([Webhookget(**item) for item in items]),
+        body=model_dump(
+            [Webhookget(**item) for item in items],
+            preserve_empty_list_fields={"accept_get_urls"},
+        ),
         headers=custom_headers,
     )
 
@@ -168,7 +171,8 @@ def post_webhooks(webhook: Annotated[Webhookpost, Body()]):
         id=app.current_event.request_context.request_id,
     )
     item_dict = model_dump(
-        Webhookget(**merge_webhook(webhook_put.model_dump(mode="json"), None))
+        Webhookget(**merge_webhook(webhook_put.model_dump(mode="json"), None)),
+        preserve_empty_list_fields={"accept_get_urls"},
     )
     return item_dict, HTTPStatus.CREATED.value  # 201
 
@@ -187,7 +191,10 @@ def get_webhook_by_id(
         ) from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump(Webhookget(**item)), HTTPStatus.OK.value  # 200
+    return (
+        model_dump(Webhookget(**item), preserve_empty_list_fields={"accept_get_urls"}),
+        HTTPStatus.OK.value,
+    )  # 200
 
 
 @app.put("/service/webhooks/<webhookId>")
@@ -213,7 +220,13 @@ def put_webhook_by_id(
             "Bad request. The Webhook is currently in an error status and therefore cannot be updated to disabled."
         )  # 400
     updated_webhook = merge_webhook(model_dump(webhook), existing_item)
-    return model_dump(Webhookget(**updated_webhook)), HTTPStatus.CREATED.value  # 201
+    return (
+        model_dump(
+            Webhookget(**updated_webhook),
+            preserve_empty_list_fields={"accept_get_urls"},
+        ),
+        HTTPStatus.CREATED.value,
+    )  # 201
 
 
 @app.delete("/service/webhooks/<webhookId>")

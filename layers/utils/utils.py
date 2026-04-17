@@ -208,15 +208,39 @@ def require_auth_classes_tag_update_permission(
 
 @tracer.capture_method(capture_response=False)
 def model_dump(
-    model: BaseModel | list[BaseModel], **kwargs: None | dict
+    model: BaseModel | list[BaseModel],
+    preserve_empty_list_fields: set[str] | None = None,
+    **kwargs: None | dict,
 ) -> dict | list:
-    """Dumps a pydantic model to a dict, removing null and other "empty" keys"""
+    """Dumps a pydantic model to a dict, removing null and other "empty" keys
+
+    Args:
+        model: The Pydantic model or list of models to dump
+        preserve_empty_list_fields: Set of field names where empty lists [] should be
+        preserved if they were explicitly set (checked via model_fields_set)
+        **kwargs: Additional arguments passed to model.model_dump()
+    """
     if isinstance(model, list):
-        model_dict = [model_dump(m, **kwargs) for m in model]
+        model_dict = [
+            model_dump(m, preserve_empty_list_fields, **kwargs) for m in model
+        ]
     else:
         args = {"by_alias": True, "exclude_unset": True, "exclude_none": True, **kwargs}
         model_dict = model.model_dump(mode="json", **args)
+        # Track which fields were explicitly set to [] and should be preserved
+        fields_to_restore = set()
+        if preserve_empty_list_fields:
+            for field_name in preserve_empty_list_fields:
+                if (
+                    field_name in model.model_fields_set
+                    and hasattr(model, field_name)
+                    and getattr(model, field_name) == []
+                ):
+                    fields_to_restore.add(field_name)
         remove_null(model_dict)
+        # Restore explicitly set empty lists for specified fields
+        for field_name in fields_to_restore:
+            model_dict[field_name] = []
     return model_dict
 
 
