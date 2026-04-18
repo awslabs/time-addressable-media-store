@@ -153,7 +153,7 @@ def get_webhooks(
         content_type=content_types.APPLICATION_JSON,
         body=model_dump(
             [Webhookget(**item) for item in items],
-            preserve_empty_list_fields={"accept_get_urls"},
+            preserve_empty_list_fields={"accept_get_urls", "events"},
         ),
         headers=custom_headers,
     )
@@ -172,7 +172,7 @@ def post_webhooks(webhook: Annotated[Webhookpost, Body()]):
     )
     item_dict = model_dump(
         Webhookget(**merge_webhook(webhook_put.model_dump(mode="json"), None)),
-        preserve_empty_list_fields={"accept_get_urls"},
+        preserve_empty_list_fields={"accept_get_urls", "events"},
     )
     return item_dict, HTTPStatus.CREATED.value  # 201
 
@@ -192,7 +192,9 @@ def get_webhook_by_id(
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
     return (
-        model_dump(Webhookget(**item), preserve_empty_list_fields={"accept_get_urls"}),
+        model_dump(
+            Webhookget(**item), preserve_empty_list_fields={"accept_get_urls", "events"}
+        ),
         HTTPStatus.OK.value,
     )  # 200
 
@@ -223,7 +225,7 @@ def put_webhook_by_id(
     return (
         model_dump(
             Webhookget(**updated_webhook),
-            preserve_empty_list_fields={"accept_get_urls"},
+            preserve_empty_list_fields={"accept_get_urls", "events"},
         ),
         HTTPStatus.CREATED.value,
     )  # 201
