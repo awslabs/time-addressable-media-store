@@ -604,3 +604,39 @@ def test_allow_route_with_wildcard_resource(
     assert response["policyDocument"]["Statement"][0]["Resource"][0].endswith(
         "/flows/*"
     )
+
+
+@patch("lambda_authorizer.app.allowed_issuers", ["https://allowed-issuer.com"])
+@patch("lambda_authorizer.app.jwt.PyJWK")
+@patch("lambda_authorizer.app.get_jwks")
+@patch("lambda_authorizer.app.jwt.decode")
+@patch("lambda_authorizer.app.jwt.get_unverified_header")
+def test_allow_proxy_route_without_scopes(
+    mock_header,
+    mock_decode,
+    mock_jwks,
+    mock_pyjwk,
+    lambda_context,
+    auth_event_factory,
+    lambda_authorizer,
+):
+    """
+    Test that /{proxy+} routes allow through without scope checks
+    """
+    # Arrange
+    event = auth_event_factory(
+        "GET", "/{proxy+}", "/flows/", {"Authorization": "Bearer valid_token"}
+    )
+    mock_decode.side_effect = [
+        {"iss": "https://allowed-issuer.com", "sub": "user123"},
+        {"iss": "https://allowed-issuer.com", "sub": "user123"},  # No scope
+    ]
+    mock_header.return_value = {"kid": "key123", "alg": "RS256"}
+    mock_jwks.return_value = {"keys": [{"kid": "key123"}]}
+    mock_pyjwk.return_value.key = "mock_public_key"
+
+    # Act
+    response = lambda_authorizer.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["policyDocument"]["Statement"][0]["Effect"] == "Allow"

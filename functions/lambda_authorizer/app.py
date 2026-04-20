@@ -333,7 +333,15 @@ def lambda_handler(event: APIGatewayAuthorizerRequestEvent, context: LambdaConte
         if set(supplied_scopes) & set(required_scopes):
             policy.allow_route(event.http_method, resource_to_arn_path(event.resource))
         else:
-            policy.deny_all_routes()
+            # If no scopes are defined (empty list), this is a catch-all or unsupported method
+            # Allow through to Lambda for friendly 404s
+            # Convert ANY to * for IAM policy
+            http_method = "*" if event.http_method == "ANY" else event.http_method
+            if not required_scopes:
+                policy.allow_route(http_method, resource_to_arn_path(event.resource))
+            else:
+                # Scopes are defined but don't match - deny
+                policy.deny_all_routes()
         return policy.asdict()
 
     except (PermissionError, jwt.PyJWTError, ValueError) as e:
