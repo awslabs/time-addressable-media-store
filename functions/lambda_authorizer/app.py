@@ -295,6 +295,16 @@ def get_auth_classes(claims: dict) -> list[str]:
     return []
 
 
+def allow_route_with_and_without_trailing_slash(
+    policy, http_method: str, arn_path: str
+):
+    """Allow route with and without trailing slash for caching compatibility."""
+    policy.allow_route(http_method, arn_path)
+    # Also allow with trailing slash
+    if not arn_path.endswith("/"):
+        policy.allow_route(http_method, arn_path + "/")
+
+
 @logger.inject_lambda_context(log_event=True)
 @metrics.log_metrics(capture_cold_start_metric=True)
 # pylint: disable=no-value-for-parameter
@@ -329,11 +339,25 @@ def lambda_handler(event: APIGatewayAuthorizerRequestEvent, context: LambdaConte
             stage=arn.stage,
         )
         required_scopes = get_required_scopes(event.http_method, event.resource)
+        # Convert resource to ARN path format (e.g., {flowId} -> *)
+        arn_path = resource_to_arn_path(event.resource)
         # Check if supplied scopes contain one of the required scopes
         if set(supplied_scopes) & set(required_scopes):
-            policy.allow_route(event.http_method, resource_to_arn_path(event.resource))
+            allow_route_with_and_without_trailing_slash(
+                policy, event.http_method, arn_path
+            )
         else:
-            policy.deny_all_routes()
+            # If no scopes are defined (empty list), this is a catch-all or unsupported method
+            # Allow through to Lambda for friendly 404s (not 403s)
+            # Convert ANY to * for IAM policy
+            http_method = "*" if event.http_method == "ANY" else event.http_method
+            if not required_scopes:
+                allow_route_with_and_without_trailing_slash(
+                    policy, http_method, arn_path
+                )
+            else:
+                # Scopes are defined but don't match - deny
+                policy.deny_all_routes()
         return policy.asdict()
 
     except (PermissionError, jwt.PyJWTError, ValueError) as e:
