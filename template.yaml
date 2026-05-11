@@ -450,6 +450,9 @@ Resources:
       BuildMethod: python3.14
       BuildArchitecture: arm64
     Properties:
+      LayerName: !Sub
+        - ${AWS::StackName}-UtilsLayer-${id}
+        - id: !Select [4, !Split ["-", !Select [2, !Split [/, !Ref "AWS::StackId"]]]]
       RetentionPolicy: Delete
       ContentUri: layers/utils/
       CompatibleRuntimes:
