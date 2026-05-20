@@ -431,6 +431,7 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
                 "tag_exists",
                 "frame_width",
                 "frame_height",
+                "init_segments",
             ]
         }
     )

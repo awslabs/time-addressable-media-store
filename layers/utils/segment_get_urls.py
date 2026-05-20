@@ -156,6 +156,10 @@ def populate_get_urls(
     if accept_get_urls == "":
         for segment in segments:
             segment["get_urls"] = []
+            if segment.get("init_object_id"):
+                init_id = segment.pop("init_object_id")
+                segment.pop("init_storage_ids", None)
+                segment["init_object"] = {"id": init_id, "get_urls": []}
         return
     should_create_presigned_urls = (presigned or presigned is None) and (
         accept_get_urls is None or ":s3.presigned:" in accept_get_urls
@@ -222,3 +226,85 @@ def populate_get_urls(
             else:
                 get_urls.append(get_url)
         segment["get_urls"] = get_urls
+    # Build init_object for segments that have init_object_id
+    init_segments = [s for s in segments if s.get("init_object_id")]
+    if not init_segments:
+        return
+    # Deduplicate init objects by id
+    init_object_map = {}
+    for segment in init_segments:
+        init_id = segment["init_object_id"]
+        if init_id not in init_object_map:
+            init_object_map[init_id] = {
+                "object_id": init_id,
+                "storage_ids": list(segment.get("init_storage_ids", [])),
+            }
+        else:
+            for sid in segment.get("init_storage_ids", []):
+                if sid not in init_object_map[init_id]["storage_ids"]:
+                    init_object_map[init_id]["storage_ids"].append(sid)
+    # Generate get_urls for each unique init object
+    for item in init_object_map.values():
+        storage_ids = item.get("storage_ids", [])
+        get_urls = []
+        if not storage_ids:
+            if default_storage_backend:
+                get_urls.extend(
+                    create_segment_access_urls(
+                        item,
+                        default_storage_backend,
+                        should_create_presigned_urls,
+                        verbose_storage,
+                        include_storage_id,
+                    )
+                )
+        for storage_id in storage_ids:
+            if storage_backends.get(storage_id):
+                get_urls.extend(
+                    create_segment_access_urls(
+                        item,
+                        storage_backends[storage_id],
+                        should_create_presigned_urls,
+                        verbose_storage,
+                        include_storage_id,
+                    )
+                )
+        if filter_labels:
+            get_urls = [
+                get_url for get_url in get_urls if get_url["label"] in filter_labels
+            ]
+        if presigned is not None:
+            get_urls = [
+                get_url
+                for get_url in get_urls
+                if get_url.get("presigned", False) == presigned
+            ]
+        item["get_urls"] = get_urls
+    # Generate presigned urls for init objects
+    init_urls_needing_presigning = {
+        get_url["url"]
+        for item in init_object_map.values()
+        for get_url in item["get_urls"]
+        if get_url.get("presigned", False)
+    }
+    if init_urls_needing_presigning:
+        init_presigned_mapping = create_presigned_urls_parallel(
+            init_urls_needing_presigning
+        )
+        for item in init_object_map.values():
+            item["get_urls"] = [
+                (
+                    {**get_url, "url": init_presigned_mapping[get_url["url"]]}
+                    if get_url.get("presigned", False)
+                    else get_url
+                )
+                for get_url in item["get_urls"]
+            ]
+    # Attach init_object to segments and remove init_object_id
+    for segment in init_segments:
+        init_id = segment.pop("init_object_id")
+        segment.pop("init_storage_ids", None)
+        segment["init_object"] = {
+            "id": init_id,
+            "get_urls": init_object_map[init_id]["get_urls"],
+        }

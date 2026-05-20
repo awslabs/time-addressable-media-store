@@ -109,6 +109,7 @@ def get_flows(
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
     param_frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
+    param_init_segments: Annotated[Optional[str], Query(alias="init_segments")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
@@ -127,6 +128,7 @@ def get_flows(
             "tag_exists": param_tag_exists,
             "frame_width": param_frame_width,
             "frame_height": param_frame_height,
+            "init_segments": param_init_segments,
             "page": param_page,
             "limit": param_limit,
         }
@@ -808,11 +810,14 @@ def post_flow_storage_by_id(
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
         )  # 400
+    content_type = (
+        flow_storage_post.content_type.root
+        if flow_storage_post.content_type
+        else flow.root.container.root
+    )
     flow_storage: Flowstorage = Flowstorage(
         media_objects=[
-            get_presigned_put(
-                flow.root.container.root, storage_backend["bucket_name"], object_id
-            )
+            get_presigned_put(content_type, storage_backend["bucket_name"], object_id)
             for object_id in (
                 flow_storage_post.object_ids or [None] * flow_storage_post.limit
             )

@@ -118,6 +118,35 @@ def get_objects_by_id(
         param_accept_storage_ids,
         param_presigned,
     )
+    # Build init_object if any segment references one
+    init_object_data = None
+    init_object_id = next(
+        (item.get("init_object_id") for item in items if "init_object_id" in item),
+        None,
+    )
+    if init_object_id:
+        init_combined = {
+            "object_id": init_object_id,
+            "storage_ids": list(
+                {
+                    sid
+                    for item in items
+                    for sid in item.get("init_storage_ids", [])
+                    if "init_object_id" in item
+                }
+            ),
+        }
+        populate_get_urls(
+            [init_combined],
+            param_accept_get_urls,
+            param_verbose_storage,
+            param_accept_storage_ids,
+            param_presigned,
+        )
+        init_object_data = {
+            "id": init_object_id,
+            "get_urls": init_combined.get("get_urls"),
+        }
     schema_item = Object(
         **{
             "id": object_id,
@@ -135,6 +164,7 @@ def get_objects_by_id(
                 ),
                 None,
             ),
+            "init_object": init_object_data,
         }
     )
     # Filter referenced_by_flows by tag parameters if provided

@@ -333,6 +333,8 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     )
     if validation["storage_id"]:
         item_dict["storage_ids"] = [validation["storage_id"]]
+    if validation["init_storage_id"]:
+        item_dict["init_storage_ids"] = [validation["init_storage_id"]]
     if (
         validation["object_timerange"]
         and validation["object_timerange"] != item_dict["timerange"]
