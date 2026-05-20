@@ -851,6 +851,11 @@ paths:
         description: Filter on video Flows that have the given frame height.
         schema:
           type: integer
+      - name: init_segments
+        in: query
+        description: Filter Flows on the value of `init_segments`.
+        schema:
+          type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -938,6 +943,11 @@ paths:
         description: Filter on video Flows that have the given frame height.
         schema:
           type: integer
+      - name: init_segments
+        in: query
+        description: Filter Flows on the value of `init_segments`.
+        schema:
+          type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1039,6 +1049,9 @@ paths:
                 mxf_h264:
                   summary: Video Flow - H.264 (MXF container)
                   externalValue: examples/flow-get-200-video-h264-mxf.json
+                fmp4_h264:
+                  summary: Video Flow - H.264 (fmp4 container)
+                  externalValue: examples/flow-get-200-video-h264-fmp4.json
                 jp2_jpeg2k_singleframe:
                   summary: Video Flow - JPEG-2000 (JP2 container, single frame segments)
                   externalValue: examples/flow-get-200-video-jpeg-jp2.json
@@ -1740,39 +1753,39 @@ paths:
         in: query
         description: |
           Include storage metadata in `get_urls` in the response.
-          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls` and `init_object.get_urls`.
         schema:
           default: false
           type: boolean
       - name: accept_get_urls
         in: query
         description: |
-          A comma separated list of labels of Flow Segment `get_urls` to include in the response.
-          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
-          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
-          Flow Segment `get_urls` with no label will only be returned if `accept_get_urls` is omitted.
+          A comma separated list of labels of Flow Segment `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          An empty `accept_get_urls` results in `get_urls` and `init_object.get_urls` being empty or omitted in the response.
+          Flow Segment `get_urls` and `init_object.get_urls` with no label will only be returned if `accept_get_urls` is omitted.
           Without `get_urls`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs for example.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           $ref: '#/components/schemas/urllabellist'
       - name: accept_storage_ids
         in: query
         description: |
-          A comma separated list of `storage_id`s of Flow Segment `get_urls` to include in the response.
-          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
-          Flow Segment `get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
+          A comma separated list of `storage_id`s of Flow Segment `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          Flow Segment `get_urls` and `init_object.get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
           A full list of available `storage_id`s may be found at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           $ref: '#/components/schemas/uuidlist'
       - name: presigned
         in: query
         description: |
-          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls` in the response.
-          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls` and `init_object.get_urls` in the response.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls` and `init_object.get_urls`.
           If omitted, both presigned and non-presigned URLs will be returned.
           If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           type: boolean
       - name: include_object_timerange
@@ -1842,6 +1855,9 @@ paths:
 
         Note that for codecs with temporal re-ordering, the timerange representes the _presentation_ timeline, and clients may need to check the `key_frame_count` property and/or read backwards from the start of the requested timerange to retrieve enough reference material to start decoding.
 
+        Where Flow Segments reference initialisation segment Objects with the same ID, the initialisation segment is the same.
+        Consuming clients may choose to ignore initialisation segment Objects that haven't changed in subsequent Flow Segments.
+
         When making requests to the provided `get_urls`, clients should include credentials if the provided URL is on the same origin as the API itself, akin to the `same-origin` mode in the [WhatWG Fetch Standard](https://fetch.spec.whatwg.org/#concept-request-credentials-mode).
       operationId: GET_flows-flowId-segments
       tags:
@@ -1867,39 +1883,39 @@ paths:
         in: query
         description: |
           Include storage metadata in `get_urls` in the response.
-          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls` and `init_object.get_urls`.
         schema:
           default: false
           type: boolean
       - name: accept_get_urls
         in: query
         description: |
-          A comma separated list of labels of Flow Segment `get_urls` to include in the response.
-          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
-          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
-          Flow Segment `get_urls` with no label will only be returned if `accept_get_urls` is omitted.
+          A comma separated list of labels of Flow Segment `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          An empty `accept_get_urls` results in `get_urls` and `init_object.get_urls` being empty or omitted in the response.
+          Flow Segment `get_urls` and `init_object.get_urls` with no label will only be returned if `accept_get_urls` is omitted.
           Without `get_urls`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs for example.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           $ref: '#/components/schemas/urllabellist'
       - name: accept_storage_ids
         in: query
         description: |
-          A comma separated list of `storage_id`s of Flow Segment `get_urls` to include in the response.
-          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
-          Flow Segment `get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
+          A comma separated list of `storage_id`s of Flow Segment `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          Flow Segment `get_urls` and `init_object.get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
           A full list of available `storage_id`s may be found at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           $ref: '#/components/schemas/uuidlist'
       - name: presigned
         in: query
         description: |
-          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls`.
-          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls` and `init_object.get_urls`.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls` and `init_object.get_urls`.
           If omitted, both presigned and non-presigned URLs will be returned.
           If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           type: boolean
       - name: include_object_timerange
@@ -1960,6 +1976,12 @@ paths:
                     This example shows how the Media Object for a Flow Segment could be accessed using multiple URLs.
                     Clients are free to choose any of the URLs given (which return identical Media Objects), however the service has expressed a preference for the "pipeline-a" URLs by putting them first in the list.
                   externalValue: examples/flow-segments-get-200-multiple-urls.json
+                init_segments:
+                  summary: Objects with initialisation segments
+                  description: |
+                    This example shows how Media Objects signal the use of initialisation segments.
+                    Note the re-use of the same initialisation segment in some consecutive Flow Segments.
+                  externalValue: examples/flow-segments-get-200-init.json
         '400':
           description: Bad request. Invalid query options.
         '404':
@@ -2000,7 +2022,10 @@ paths:
           - The timerange of the Segment MUST NOT overlap any other Segment in the same Flow.
           - The Flow Segment's `timerange` start and end, once offset by `ts_offset`, MUST be contained entirely within the Media Object's `timerange`
 
-        When re-using Media Objects, requests which change object properties (e.g. `key_frame_count` or `object_timerange`) SHOULD be rejected.
+        When re-using Media Objects, requests which change object properties (e.g. `key_frame_count`, `object_timerange`, or `init_object_id`) SHOULD be rejected.
+
+        If an Object has previously been registered as an initialisation segment (i.e. via `init_object_id`), Service implementations SHOULD reject its use as a media segment (i.e. via `object_id`).
+        If an Object has previously been registered as a media segment (i.e. via `object_id`), Service implementations SHOULD reject its use as an initialisation segment (i.e. via `init_object_id`).
       operationId: POST_flows-flowId-segments
       tags:
       - FlowSegments
@@ -2099,6 +2124,12 @@ paths:
         Objects will likely go unused in cases such as shutdown of ingesting clients, the end of ingested live streams, and unexpected network congestion.
         Clients SHOULD, however, adapt the number of Objects they request such that they may reasonably expect to use them before the timeout advertised in [`min_object_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).
 
+        Where media format make use of initialisation segments, the mime-type of those initialisation segments may differ from that of the media segments.
+        In such cases, the `container` on the Flow will be set to the mime-type of the media segments and is the assumed default.
+        A separate request to this endpoint should be made to allocate storage for the initialisation segment(s) with `content-type` set to the mime type of the initialisation segment(s).
+        `content-type` MUST NOT be set in the request body of this end point at any other time.
+        Initialisation segment Objects SHOULD be re-used wherever possible.
+
         Service implementations need to handle situations where Objects are not used, and where content is were uploaded but no Flow Segment was registered successfully.
         In these circumstances, Services should garbage collect Objects after the timeout advertised in [`min_object_timeout` at the `/service`](#/operations/GET_service) endpoint.
 
@@ -2158,42 +2189,42 @@ paths:
         in: query
         description: |
           Include storage metadata in `get_urls`.
-          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls` and `init_object.get_urls`.
         schema:
           default: false
           type: boolean
       - name: accept_get_urls
         in: query
         description: |
-          A comma separated list of labels of Media Object `get_urls` to include in the response.
-          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
-          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
-          Media Object `get_urls` with no label will only be returned if `accept_get_urls` is omitted.
-          Without `get_urls`, the response from the service could be substantially faster if it is not required to
+          A comma separated list of labels of Media Object `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          An empty `accept_get_urls` results in `get_urls` and `init_object.get_urls` being empty or omitted in the response.
+          Media Object `get_urls` and `init_object.get_urls` with no label will only be returned if `accept_get_urls` is omitted.
+          Without `get_urls` or `init_object.get_urls`, the response from the service could be substantially faster if it is not required to
           generate a large number of pre-signed URLs for example.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           $ref: '#/components/schemas/urllabellist'
       - name: accept_storage_ids
         in: query
         description: |
-          A comma separated list of `storage_id`s of Media Object `get_urls` to include in the response.
-          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
-          Media Object `get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
+          A comma separated list of `storage_id`s of Media Object `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          Media Object `get_urls` and `init_object.get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
           A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           type: string
           pattern: ^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$
       - name: presigned
         in: query
         description: |
-          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls`.
-          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls` and `init_object.get_urls`.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls` and `init_object.get_urls`.
           If omitted, both presigned and non-presigned URLs will be returned.
           If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to
           generate a large number of pre-signed URLs.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           type: boolean
       - name: flow_tag.{name}
@@ -2255,42 +2286,42 @@ paths:
         in: query
         description: |
           Include storage metadata in `get_urls`.
-          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls`.
+          When `verbose_storage` is `false` only `url`, `presigned`, and `label` will be included in `get_urls` and `init_object.get_urls`.
         schema:
           default: false
           type: boolean
       - name: accept_get_urls
         in: query
         description: |
-          A comma separated list of labels of Media Object `get_urls` to include in the response.
-          Omitting `accept_get_urls` will result in no filtering of `get_urls`.
-          An empty `accept_get_urls` results in an empty or no `get_urls` in the response.
-          Media Object `get_urls` with no label will only be returned if `accept_get_urls` is omitted.
-          Without `get_urls`, the response from the service could be substantially faster if it is not required to
+          A comma separated list of labels of Media Object `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_get_urls` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          An empty `accept_get_urls` results in `get_urls` and `init_object.get_urls` being empty or omitted in the response.
+          Media Object `get_urls` and `init_object.get_urls` with no label will only be returned if `accept_get_urls` is omitted.
+          Without `get_urls` and `init_object.get_urls`, the response from the service could be substantially faster if it is not required to
           generate a large number of pre-signed URLs for example.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           $ref: '#/components/schemas/urllabellist'
       - name: accept_storage_ids
         in: query
         description: |
-          A comma separated list of `storage_id`s of Media Object `get_urls` to include in the response.
-          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls`.
-          Media Object `get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
+          A comma separated list of `storage_id`s of Media Object `get_urls` and `init_object.get_urls` to include in the response.
+          Omitting `accept_storage_ids`, or providing an empty `accept_storage_ids` will result in no filtering of `get_urls` or `init_object.get_urls`.
+          Media Object `get_urls` and `init_object.get_urls` with no storage ID will only be returned if `accept_storage_ids` is omitted or empty.
           A full list of available `storage_id`s may be found at the `service/storage-backends` endpoint.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           type: string
           pattern: ^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$
       - name: presigned
         in: query
         description: |
-          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls`.
-          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls`.
+          If set to `true`, only presigned URLs (i.e. those whos `presigned` property is `true`) will be returned in `get_urls` and `init_object.get_urls`.
+          If set to `false`, only non-presigned URLs (i.e. those whos `presigned` property is `false`) will be returned in `get_urls` and `init_object.get_urls`.
           If omitted, both presigned and non-presigned URLs will be returned.
           If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to
           generate a large number of pre-signed URLs.
-          Where multiple filter query parameters are provided, the returned `get_urls` will match all filters.
+          Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
         schema:
           type: boolean
       - name: flow_tag.{name}
@@ -2325,8 +2356,13 @@ paths:
                 type: string
           content:
             application/json:
-              example:
-                $ref: examples/objects-get-200.json
+              examples:
+                basic:
+                  summary: Basic example
+                  externalValue: examples/objects-get-200.json
+                init_segment:
+                  summary: Object that makes use of an initialisation segment
+                  externalValue: examples/objects-get-200-init.json
               schema:
                 $ref: '#/components/schemas/object'
         '400':
@@ -2346,6 +2382,9 @@ paths:
         - Start advertising the new copy in `get_urls` once ready
 
         The API instances SHOULD be capable of handling the case where the only existant instances are uncontrolled.
+
+        API instances SHALL NOT cascade the creation of new Object instances to initialisation Objects.
+        Clients MUST initiate the creation of new Object instances of initialisation Objects directly.
 
         Where a client has written a new uncontrolled Object instance, the client is responsible for ensuring that the Object written is complete and correct before registering it with this method.
 
@@ -2392,6 +2431,9 @@ paths:
         API instances should remove the Media Object instance from the `get_urls` list and then, if the instance is controlled, delete the Object instance from storage.
 
         API instances SHOULD prevent clients from deleting all Object instances. Additionally, API instances MAY prevent clients from deleting all controlled Object instances. Where clients wish to remove all copies of an Object from the store, they should do so by deleting all Flows or Flow Segments which reference the Object.
+
+        API instances SHALL NOT cascade the deletion of Object instances to initialisation Objects.
+        Clients MUST initiate the deletion of Object instances of initialisation Objects directly.
       operationId: DELETE_objects-instances
       tags:
       - Objects
@@ -3062,6 +3104,9 @@ components:
                     - interleaved
                     - planar
                     - pairs
+              init_segments:
+                description: Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.
+                type: boolean
     flowcollection:
       title: Flow Collection
       description: Describes how Flows are collected into another Flow
@@ -3133,8 +3178,8 @@ components:
           description: A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.
           $ref: '#/components/schemas/mimetype'
         container:
-          description: The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence
-            Flows that do reference Media Objects), this property MUST NOT be set.
+          description: The container MIME type for Flow Segments. Where the media format employs initialisation segments, this is the mime type of the media segments and NOT the initialisation segment(s). Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type
+            to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence Flows that do reference Media Objects), this property MUST NOT be set.
           $ref: '#/components/schemas/mimetype'
         avg_bit_rate:
           description: The average bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
@@ -3199,6 +3244,9 @@ components:
               data_type:
                 description: The type of information encoded in the Flow, identified using a URN. e.g. The data_type may be urn:x-tams:data:bounding-box, and the codec `application/json`.
                 type: string
+              init_segments:
+                description: Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.
+                type: boolean
     flowimage:
       title: Image Flow
       description: Describes a still image Flow, for use by thumbnail tracks etc
@@ -3263,6 +3311,15 @@ components:
             type: string
             enum:
             - urn:x-nmos:format:multi
+          essence_parameters:
+            title: Multi Flow Essence Parameters
+            description: Describes the parameters of the essence inside this multi Flow
+            type: object
+            additionalProperties: false
+            properties:
+              init_segments:
+                description: Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.
+                type: boolean
     flowsegment:
       type: object
       description: Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
@@ -3296,7 +3353,20 @@ components:
             description: 'The count of samples in the Segment (which may be fewer than in the Media Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. DEPRECATED: Use object_timerange instead - see AppNote 0036. Service implementations SHOULD continue to store and return it if set.'
             type: integer
             deprecated: true
-      - $ref: '#/components/schemas/objectcore'
+          init_object:
+            title: Initialisation Object
+            description: The Object containing the initialisation segment required to decode the parent Media Object.
+            unevaluatedProperties: false
+            allOf:
+            - type: object
+              required:
+              - id
+              properties:
+                id:
+                  description: The identifier of the initialisation Object.
+                  type: string
+            - $ref: '#/components/schemas/objectcore'
+      - $ref: '#/components/schemas/objectmediacore'
     flowsegmentbulkfailure:
       title: Failed Segments
       description: List of Segments that have failed to register
@@ -3331,7 +3401,10 @@ components:
       - timerange
       properties:
         object_id:
-          description: The Object identifier for the Media Object.
+          description: The Object identifier for the Media Object. The `content-type` of the Media Object MUST match the `container` mime-type of the Flow.
+          type: string
+        init_object_id:
+          description: The Object identifier for the initialisation segment Object required to decode the Media Object. The `content-type` of the initialisation segment Object MAY differ from the `container` mime-type of the Flow. This parameter MUST only be set where the media format makes use of initialisation segments. Initialisation Objects SHOULD be re-used where possible. This parameter SHOULD be omitted where the Object `object_id` already exists and is being re-used.
           type: string
         ts_offset:
           description: The timestamp offset between the sample timestamps stored in, or inferred from, the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](#/schemas/timestamp) type
@@ -3374,7 +3447,7 @@ components:
     flowstorage:
       type: object
       title: Media Bucket Object Store
-      description: Gives information on storage for Media Objects. This schema is for the `http_object_store` Storage Backend type which provides URLs for storing Media Objects in object store buckets, and is the only Storage Backend type currently implemented.  URLs SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details.
+      description: Gives information on storage for Media Objects. This schema is for the `http_object_store` Storage Backend type which provides URLs for storing Media Objects in object store buckets, and is the only Storage Backend type currently implemented.  URLs SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details. Where included in the response, `content-type` MUST match the corresponding value in the request.
       properties:
         media_objects:
           type: array
@@ -3408,6 +3481,9 @@ components:
         storage_id:
           description: The Storage Backend to allocate storage in. A Storage Backend identifier as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint. If not set the default, as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint, will be used if available. An invalid Storage Backend identifier will result in a 400 error.
           $ref: '#/components/schemas/uuid'
+        content-type:
+          description: The `content-type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of th Flow if not set.
+          $ref: '#/components/schemas/mimetype'
       not:
         allOf:
         - required:
@@ -3582,6 +3658,9 @@ components:
                 description: If `true`, the frame rate of the Flow is variable and `frame_rate` MUST NOT be set. If `false` or omitted, the frame rate of the Flow is fixed and `frame_rate` MUST be set.
                 type: boolean
                 default: false
+              init_segments:
+                description: Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.
+                type: boolean
             if:
               properties:
                 vfr:
@@ -3646,7 +3725,20 @@ components:
           timerange:
             description: The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline.
             $ref: '#/components/schemas/timerange'
-      - $ref: '#/components/schemas/objectcore'
+          init_object:
+            title: Initialisation Object
+            description: The Object containing the initialisation segment required to decode the parent Media Object.
+            unevaluatedProperties: false
+            allOf:
+            - type: object
+              required:
+              - id
+              properties:
+                id:
+                  description: The identifier of the initialisation Object.
+                  type: string
+            - $ref: '#/components/schemas/objectcore'
+      - $ref: '#/components/schemas/objectmediacore'
     objectcore:
       type: object
       description: Provides the location and metadata of the media files corresponding to a Media Object.
@@ -3679,9 +3771,16 @@ components:
                 controlled:
                   description: If `true`, this URL is on a Storage Backend controlled by this service instance. If `false`, this URL is uncontrolled and does not have it's lifecycle managed by this instance. If this parameter is unset, assume `true`.
                   type: boolean
-        key_frame_count:
-          description: The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point
-          type: integer
+    objectmediacore:
+      type: object
+      description: Provides the location and metadata of the media files corresponding to a Media Object.
+      title: Object
+      allOf:
+      - properties:
+          key_frame_count:
+            description: The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point
+            type: integer
+      - $ref: '#/components/schemas/objectcore'
     objectsinstancespost:
       type: object
       description: Register a Media Object instance in the store.

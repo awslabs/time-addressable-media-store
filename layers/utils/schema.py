@@ -212,6 +212,10 @@ class EssenceParameters(BaseModel):
     unc_parameters: UncParameters | None = Field(
         None, title="Uncompressed Audio Parameters"
     )
+    init_segments: bool | None = Field(
+        None,
+        description="Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.",
+    )
 
 
 class SegmentDuration(BaseModel):
@@ -242,6 +246,10 @@ class EssenceParameters1(BaseModel):
     data_type: str | None = Field(
         None,
         description="The type of information encoded in the Flow, identified using a URN. e.g. The data_type may be urn:x-tams:data:bounding-box, and the codec `application/json`.",
+    )
+    init_segments: bool | None = Field(
+        None,
+        description="Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.",
     )
 
 
@@ -288,6 +296,20 @@ class Format3(StrEnum):
     """
 
     urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
+
+
+class EssenceParameters3(BaseModel):
+    """
+    Describes the parameters of the essence inside this multi Flow
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    init_segments: bool | None = Field(
+        None,
+        description="Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.",
+    )
 
 
 class GetUrl(BaseModel):
@@ -413,7 +435,7 @@ class FrameRate(BaseModel):
     denominator: PositiveInt | None = Field(1, description="denominator")
 
 
-class EssenceParameters3(BaseModel):
+class EssenceParameters4(BaseModel):
     """
     Describes the parameters of the essence inside this video Flow
     """
@@ -471,6 +493,10 @@ class EssenceParameters3(BaseModel):
     vfr: bool | None = Field(
         False,
         description="If `true`, the frame rate of the Flow is variable and `frame_rate` MUST NOT be set. If `false` or omitted, the frame rate of the Flow is fixed and `frame_rate` MUST be set.",
+    )
+    init_segments: bool | None = Field(
+        None,
+        description="Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.",
     )
 
 
@@ -896,7 +922,7 @@ class Flowcore(BaseModel):
     )
     container: Mimetype | None = Field(
         None,
-        description="The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence Flows that do reference Media Objects), this property MUST NOT be set.",
+        description="The container MIME type for Flow Segments. Where the media format employs initialisation segments, this is the mime type of the media segments and NOT the initialisation segment(s). Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence Flows that do reference Media Objects), this property MUST NOT be set.",
     )
     avg_bit_rate: conint(ge=0) | None = Field(
         None,
@@ -967,6 +993,11 @@ class Flowmulti(Flowcore):
     format: Format3 = Field(
         ..., description="The primary content type URN for the Flow."
     )
+    essence_parameters: EssenceParameters3 | None = Field(
+        None,
+        description="Describes the parameters of the essence inside this multi Flow",
+        title="Multi Flow Essence Parameters",
+    )
 
 
 class FailedSegment(BaseModel):
@@ -1005,7 +1036,12 @@ class Flowsegmentpost(BaseModel):
     """
 
     object_id: str = Field(
-        ..., description="The Object identifier for the Media Object."
+        ...,
+        description="The Object identifier for the Media Object. The `content-type` of the Media Object MUST match the `container` mime-type of the Flow.",
+    )
+    init_object_id: str | None = Field(
+        None,
+        description="The Object identifier for the initialisation segment Object required to decode the Media Object. The `content-type` of the initialisation segment Object MAY differ from the `container` mime-type of the Flow. This parameter MUST only be set where the media format makes use of initialisation segments. Initialisation Objects SHOULD be re-used where possible. This parameter SHOULD be omitted where the Object `object_id` already exists and is being re-used.",
     )
     ts_offset: Timestamp | None = Field(
         None,
@@ -1056,7 +1092,7 @@ class MediaObject(BaseModel):
 
 class Flowstorage(BaseModel):
     """
-    Gives information on storage for Media Objects. This schema is for the `http_object_store` Storage Backend type which provides URLs for storing Media Objects in object store buckets, and is the only Storage Backend type currently implemented.  URLs SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details.
+    Gives information on storage for Media Objects. This schema is for the `http_object_store` Storage Backend type which provides URLs for storing Media Objects in object store buckets, and is the only Storage Backend type currently implemented.  URLs SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details. Where included in the response, `content-type` MUST match the corresponding value in the request.
     """
 
     model_config = ConfigDict(
@@ -1085,6 +1121,11 @@ class Flowstoragepost(BaseModel):
         None,
         description="The Storage Backend to allocate storage in. A Storage Backend identifier as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint. If not set the default, as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint, will be used if available. An invalid Storage Backend identifier will result in a 400 error.",
     )
+    content_type: Mimetype | None = Field(
+        None,
+        alias="content-type",
+        description="The `content-type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of th Flow if not set.",
+    )
 
 
 class Flowvideo(Flowcore):
@@ -1095,7 +1136,7 @@ class Flowvideo(Flowcore):
     format: Format4 = Field(
         ..., description="The primary content type URN for the Flow."
     )
-    essence_parameters: EssenceParameters3 = Field(
+    essence_parameters: EssenceParameters4 = Field(
         ...,
         description="Describes the parameters of the essence inside this video Flow",
         title="Video Flow Essence Parameters",
@@ -1135,6 +1176,13 @@ class Objectcore(BaseModel):
         None,
         description="A list of URLs to which a GET request can be made to directly retrieve the contents of the Media Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage Backend metadata for controlled URLs should be populated by the TAMS instance based on the Storage Backend the Meda Object instance resides in.",
     )
+
+
+class Objectmediacore(Objectcore):
+    """
+    Provides the location and metadata of the media files corresponding to a Media Object.
+    """
+
     key_frame_count: int | None = Field(
         None,
         description="The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point",
@@ -1310,7 +1358,18 @@ class Flowaudio(Flowcore):
     codec: Mimetype
 
 
-class Flowsegment(Objectcore):
+class InitObject(Objectcore):
+    """
+    The Object containing the initialisation segment required to decode the parent Media Object.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: str = Field(..., description="The identifier of the initialisation Object.")
+
+
+class Flowsegment(Objectmediacore):
     """
     Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
     """
@@ -1344,9 +1403,14 @@ class Flowsegment(Objectcore):
         deprecated=True,
         description="The count of samples in the Segment (which may be fewer than in the Media Object). The count could be less than expected given the Segment duration and rate if there are gaps. If not set, every sample from sample_offset onwards is used. Note that a sample is a video frame or audio sample. A (coded) audio frame has multiple audio samples. DEPRECATED: Use object_timerange instead - see AppNote 0036. Service implementations SHOULD continue to store and return it if set.",
     )
+    init_object: InitObject | None = Field(
+        None,
+        description="The Object containing the initialisation segment required to decode the parent Media Object.",
+        title="Initialisation Object",
+    )
 
 
-class Object(Objectcore):
+class Object(Objectmediacore):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -1362,6 +1426,11 @@ class Object(Objectcore):
     timerange: Timerange = Field(
         ...,
         description="The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline.",
+    )
+    init_object: InitObject | None = Field(
+        None,
+        description="The Object containing the initialisation segment required to decode the parent Media Object.",
+        title="Initialisation Object",
     )
 
 

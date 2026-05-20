@@ -11,6 +11,7 @@ essence_params = {
     "frame_rate": "dict",
     "frame_width": "int",
     "horiz_chroma_subs": "int",
+    "init_segments": "bool",
     "interlace_mode": "str",
     "pixel_aspect_ratio": "dict",
     "sample_rate": "int",
