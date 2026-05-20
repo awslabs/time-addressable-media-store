@@ -4,7 +4,8 @@ from urllib.parse import urlparse
 
 from aws_lambda_powertools import Tracer
 from dynamodb import list_storage_backends
-from utils import generate_presigned_url
+from schema import Storagebackend
+from utils import generate_presigned_url, model_dump
 
 tracer = Tracer()
 
@@ -118,7 +119,8 @@ def create_segment_access_urls(
     if verbose_storage:
         direct_url = {
             **direct_url,
-            **storage_backend,
+            **model_dump(Storagebackend(**storage_backend)),
+            "storage_id": storage_backend["id"],
             "controlled": True,
         }
     get_urls = [direct_url]
