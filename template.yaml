@@ -452,7 +452,7 @@ Resources:
     Properties:
       LayerName: !Sub
         - ${AWS::StackName}-UtilsLayer-${id}
-        - id: !Select [4, !Split ["-", !Select [2, !Split [/, !Ref "AWS::StackId"]]]]
+        - id: !Select [4, !Split ['-', !Select [2, !Split [/, !Ref "AWS::StackId"]]]]
       RetentionPolicy: Delete
       ContentUri: layers/utils/
       CompatibleRuntimes:
