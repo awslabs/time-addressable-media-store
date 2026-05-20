@@ -973,10 +973,7 @@ def test_Source_Label_GET_404(api_client_cognito):
     # Assert
     assert_json_response(response, 404)
     response_json = response.json()
-    assert (
-        "The requested Source does not exist, or does not have a label set."
-        == response_json["message"]
-    )
+    assert "The requested Source does not exist." == response_json["message"]
 
 
 def test_Create_or_Update_Source_Label_PUT_204_create(

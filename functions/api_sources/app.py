@@ -264,9 +264,7 @@ def get_source_label(
     try:
         label = query_node_property(record_type, source_id, "label")
     except ValueError as e:
-        raise NotFoundError(
-            "The requested Source does not exist, or does not have a label set."
-        ) from e  # 404
+        raise NotFoundError("The requested Source does not exist.") from e  # 404
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
     return json.dumps(label), HTTPStatus.OK.value  # 200
