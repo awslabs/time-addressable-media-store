@@ -535,6 +535,275 @@ class TestDynamoDB:
         assert 0 == mock_storage_table.update_item.call_count
         assert result["valid"]
 
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_new_object_with_init_object_id(
+        self, mock_storage_table
+    ):
+        """First use of new object with init_object_id stores it in put_item"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="init-123",
+            get_urls=[{"label": "test", "url": "http://example.com"}],
+        )
+        flow_id = "123"
+
+        mock_storage_table.get_item.side_effect = [
+            {},  # object_id doesn't exist
+            {"Item": {"id": "init-123", "flow_id": "123", "expire_at": 99999}},
+        ]
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert result["valid"]
+        assert result["init_storage_id"] is None
+        put_call = mock_storage_table.put_item.call_args[1]
+        assert put_call["Item"]["init_object_id"] == "init-123"
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_first_use_with_init_object_id(self, mock_storage_table):
+        """First use with expire_at stores init_object_id in update_item"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="init-123",
+        )
+        flow_id = "123"
+
+        mock_storage_table.get_item.side_effect = [
+            {
+                "Item": {
+                    "id": "abc",
+                    "flow_id": "123",
+                    "expire_at": 12345,
+                    "storage_id": "sid-1",
+                }
+            },
+            {
+                "Item": {
+                    "id": "init-123",
+                    "flow_id": "123",
+                    "is_init_object": True,
+                    "storage_id": "init-sid",
+                }
+            },
+        ]
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert result["valid"]
+        assert result["init_storage_id"] == "init-sid"
+        update_call = mock_storage_table.update_item.call_args[1]
+        assert ":init_object_id" in update_call["ExpressionAttributeValues"]
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_is_init_object_rejected_as_media(
+        self, mock_storage_table
+    ):
+        """An object marked as init cannot be used as a media object"""
+        segment = Flowsegmentpost(object_id="abc", timerange="_")
+        flow_id = "123"
+
+        mock_storage_table.get_item.return_value = {
+            "Item": {"id": "abc", "flow_id": "123", "is_init_object": True}
+        }
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert not result["valid"]
+        assert (
+            "initialisation segment Object cannot be used as a media segment"
+            in result["message"]
+        )
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_init_object_id_not_found(self, mock_storage_table):
+        """init_object_id that doesn't exist returns error"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="nonexistent",
+        )
+        flow_id = "123"
+
+        mock_storage_table.get_item.side_effect = [
+            {
+                "Item": {
+                    "id": "abc",
+                    "flow_id": "123",
+                    "expire_at": 12345,
+                    "storage_id": "sid-1",
+                }
+            },
+            {},  # init object not found
+        ]
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert not result["valid"]
+        assert "init_object_id does not exist" in result["message"]
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_init_object_already_media_object(
+        self, mock_storage_table
+    ):
+        """init_object_id pointing to an existing media object returns error"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="media-obj",
+        )
+        flow_id = "123"
+
+        mock_storage_table.get_item.side_effect = [
+            {
+                "Item": {
+                    "id": "abc",
+                    "flow_id": "123",
+                    "expire_at": 12345,
+                    "storage_id": "sid-1",
+                }
+            },
+            {"Item": {"id": "media-obj", "flow_id": "123"}},
+        ]
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert not result["valid"]
+        assert (
+            "media segment Object cannot be used as an initialisation segment"
+            in result["message"]
+        )
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_init_object_first_use_wrong_flow(
+        self, mock_storage_table
+    ):
+        """init_object_id first use with mismatched flow returns error"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="init-123",
+        )
+        flow_id = "flow-A"
+
+        mock_storage_table.get_item.side_effect = [
+            {
+                "Item": {
+                    "id": "abc",
+                    "flow_id": "flow-A",
+                    "expire_at": 12345,
+                    "storage_id": "sid-1",
+                }
+            },
+            {"Item": {"id": "init-123", "flow_id": "flow-B", "expire_at": 99999}},
+        ]
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert not result["valid"]
+        assert (
+            "init_object_id is not valid to be used for the flow id"
+            in result["message"]
+        )
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_init_object_first_use_marks_as_init(
+        self, mock_storage_table
+    ):
+        """init_object_id first use with matching flow marks object as init"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="init-123",
+        )
+        flow_id = "123"
+
+        mock_storage_table.get_item.side_effect = [
+            {
+                "Item": {
+                    "id": "abc",
+                    "flow_id": "123",
+                    "expire_at": 12345,
+                    "storage_id": "sid-1",
+                }
+            },
+            {
+                "Item": {
+                    "id": "init-123",
+                    "flow_id": "123",
+                    "expire_at": 99999,
+                    "storage_id": "init-sid",
+                }
+            },
+        ]
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert result["valid"]
+        assert result["init_storage_id"] == "init-sid"
+        assert mock_storage_table.update_item.call_count == 2
+        init_update = mock_storage_table.update_item.call_args_list[1][1]
+        assert init_update["Key"] == {"id": "init-123"}
+        assert ":flag" in init_update["ExpressionAttributeValues"]
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_reuse_with_changed_init_object_id(
+        self, mock_storage_table
+    ):
+        """Object re-use with different init_object_id returns error"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="new-init",
+        )
+        flow_id = "123"
+
+        mock_storage_table.get_item.return_value = {
+            "Item": {"id": "abc", "flow_id": "123", "init_object_id": "old-init"}
+        }
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert not result["valid"]
+        assert "init_object_id must not change" in result["message"]
+
+    @patch("dynamodb.storage_table")
+    def test_validate_object_id_reuse_with_same_init_object_id(
+        self, mock_storage_table
+    ):
+        """Object re-use with same init_object_id succeeds"""
+        segment = Flowsegmentpost(
+            object_id="abc",
+            timerange="_",
+            init_object_id="init-123",
+        )
+        flow_id = "123"
+
+        mock_storage_table.get_item.side_effect = [
+            {
+                "Item": {
+                    "id": "abc",
+                    "flow_id": "123",
+                    "init_object_id": "init-123",
+                    "storage_id": "sid-1",
+                }
+            },
+            {
+                "Item": {
+                    "id": "init-123",
+                    "flow_id": "123",
+                    "is_init_object": True,
+                    "storage_id": "init-sid",
+                }
+            },
+        ]
+
+        result = dynamodb.validate_object_id(segment, flow_id)
+
+        assert result["valid"]
+        assert result["init_storage_id"] == "init-sid"
+
     @patch("dynamodb.segments_table")
     @patch("dynamodb.storage_table")
     def test_delete_flow_storage_record_delete(
