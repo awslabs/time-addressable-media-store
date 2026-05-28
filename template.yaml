@@ -35,11 +35,11 @@ Parameters:
     AllowedPattern: ^db\.(serverless|[a-z0-9]+\.[a-z0-9]+)$
 
   NeptuneServerlessConfiguration:
-    Description: Neptune Serverless Scaling Configuration.
+    Description: Neptune Serverless Scaling Configuration. Only used when NeptuneDBInstanceClass is db.serverless.
     Type: String
     Default: 1,128
-    ConstraintDescription: ServerlessScalingConfiguration must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1-128.
-    AllowedPattern: (12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9]),(12[0-8]|1[01][0-9]|[1-9][0-9]|[1-9])
+    ConstraintDescription: ServerlessScalingConfiguration must be a comma-separated pair of MinCapacity and MaxCapacity. MinCapacity valid values are 1-128, MaxCapacity valid values are 2-128. Both support half-step increments (e.g. 8, 8.5, 9).
+    AllowedPattern: ^(128|12[0-7](\.5)?|1[01][0-9](\.5)?|[1-9][0-9](\.5)?|[1-9](\.5)?),(128|12[0-7](\.5)?|1[01][0-9](\.5)?|[1-9][0-9](\.5)?|[2-9](\.5)?)$
 
   DeployWaf:
     Description: Configure whether a WAF should be deployed infront of the API.
