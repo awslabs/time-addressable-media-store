@@ -1142,7 +1142,9 @@ paths:
       summary: Delete Flow
       description: |
         Deletes the Flow and associated Segments.
-        If Flow Segment deletion takes too long then this request will return 202 Accepted and the `Location` header will point to a Flow Delete Request to monitor deletion progress
+        If Flow Segment deletion takes too long then this request will return 202 Accepted and the `Location` header will point to a Flow Delete Request to monitor deletion progress.
+
+        Services SHALL only delete Media Objects when they are no longer referenced by any Flow Segments or other Media Objects (i.e. as init Objects).
       operationId: DELETE_flows-flowId
       tags:
       - Flows
@@ -2061,7 +2063,9 @@ paths:
     delete:
       summary: Delete Flow Segment
       description: |
-        Deletes the Flow Segments. If the deletion takes too long then this request will return 202 Accepted and the `Location` header will point to a Flow Delete Request to monitor deletion progress
+        Deletes the Flow Segments. If the deletion takes too long then this request will return 202 Accepted and the `Location` header will point to a Flow Delete Request to monitor deletion progress.
+
+        Services SHALL only delete Media Objects when they are no longer referenced by any Flow Segments or other Media Objects (i.e. as init Objects).
       operationId: DELETE_flows-flowId-segments
       tags:
       - FlowSegments
@@ -3360,9 +3364,9 @@ components:
             allOf:
             - type: object
               required:
-              - id
+              - object_id
               properties:
-                id:
+                object_id:
                   description: The identifier of the initialisation Object.
                   type: string
             - $ref: '#/components/schemas/objectcore'
@@ -3401,10 +3405,10 @@ components:
       - timerange
       properties:
         object_id:
-          description: The Object identifier for the Media Object. The `content-type` of the Media Object MUST match the `container` mime-type of the Flow.
+          description: The Object identifier for the Media Object. The `content-type` of the Media Object MUST match the `container` mime-type of the Flow. Service implementations SHOULD reject Objects IDs which have previously been registered as an `init_object_id` on other Flow Segments. i.e. init segments may not be used as media segments.
           type: string
         init_object_id:
-          description: The Object identifier for the initialisation segment Object required to decode the Media Object. The `content-type` of the initialisation segment Object MAY differ from the `container` mime-type of the Flow. This parameter MUST only be set where the media format makes use of initialisation segments. Initialisation Objects SHOULD be re-used where possible. This parameter SHOULD be omitted where the Object `object_id` already exists and is being re-used.
+          description: The Object identifier for the initialisation segment Object required to decode the Media Object. The `content-type` of the initialisation segment Object MAY differ from the `container` mime-type of the Flow. This parameter MUST only be set where the media format makes use of initialisation segments. Initialisation Objects SHOULD be re-used where possible. This parameter SHOULD be omitted where the Object `object_id` already exists and is being re-used. Service implementations SHOULD reject Objects IDs which have previously been registered as an `id` on other Flow Segments. i.e. media segments may not be used as init segments.
           type: string
         ts_offset:
           description: The timestamp offset between the sample timestamps stored in, or inferred from, the media file and the corresponding timestamp in the Segment, ie. ts_offset = segment ts - media object ts. Assumed to be 0:0 if not set. Format as described by the [Timestamp](#/schemas/timestamp) type
@@ -3481,8 +3485,8 @@ components:
         storage_id:
           description: The Storage Backend to allocate storage in. A Storage Backend identifier as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint. If not set the default, as advertised at the [/service/storage-backends](#/operations/GET_storage-backends) endpoint, will be used if available. An invalid Storage Backend identifier will result in a 400 error.
           $ref: '#/components/schemas/uuid'
-        content-type:
-          description: The `content-type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of th Flow if not set.
+        content_type:
+          description: The `content_type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of the Flow if not set.
           $ref: '#/components/schemas/mimetype'
       not:
         allOf:

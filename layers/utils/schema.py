@@ -1037,11 +1037,11 @@ class Flowsegmentpost(BaseModel):
 
     object_id: str = Field(
         ...,
-        description="The Object identifier for the Media Object. The `content-type` of the Media Object MUST match the `container` mime-type of the Flow.",
+        description="The Object identifier for the Media Object. The `content-type` of the Media Object MUST match the `container` mime-type of the Flow. Service implementations SHOULD reject Objects IDs which have previously been registered as an `init_object_id` on other Flow Segments. i.e. init segments may not be used as media segments.",
     )
     init_object_id: str | None = Field(
         None,
-        description="The Object identifier for the initialisation segment Object required to decode the Media Object. The `content-type` of the initialisation segment Object MAY differ from the `container` mime-type of the Flow. This parameter MUST only be set where the media format makes use of initialisation segments. Initialisation Objects SHOULD be re-used where possible. This parameter SHOULD be omitted where the Object `object_id` already exists and is being re-used.",
+        description="The Object identifier for the initialisation segment Object required to decode the Media Object. The `content-type` of the initialisation segment Object MAY differ from the `container` mime-type of the Flow. This parameter MUST only be set where the media format makes use of initialisation segments. Initialisation Objects SHOULD be re-used where possible. This parameter SHOULD be omitted where the Object `object_id` already exists and is being re-used. Service implementations SHOULD reject Objects IDs which have previously been registered as an `id` on other Flow Segments. i.e. media segments may not be used as init segments.",
     )
     ts_offset: Timestamp | None = Field(
         None,
@@ -1123,8 +1123,7 @@ class Flowstoragepost(BaseModel):
     )
     content_type: Mimetype | None = Field(
         None,
-        alias="content-type",
-        description="The `content-type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of th Flow if not set.",
+        description="The `content_type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of the Flow if not set.",
     )
 
 
@@ -1366,7 +1365,9 @@ class InitObject(Objectcore):
     model_config = ConfigDict(
         extra="forbid",
     )
-    id: str = Field(..., description="The identifier of the initialisation Object.")
+    object_id: str = Field(
+        ..., description="The identifier of the initialisation Object."
+    )
 
 
 class Flowsegment(Objectmediacore):
@@ -1410,6 +1411,17 @@ class Flowsegment(Objectmediacore):
     )
 
 
+class InitObject1(Objectcore):
+    """
+    The Object containing the initialisation segment required to decode the parent Media Object.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: str = Field(..., description="The identifier of the initialisation Object.")
+
+
 class Object(Objectmediacore):
     model_config = ConfigDict(
         extra="forbid",
@@ -1427,7 +1439,7 @@ class Object(Objectmediacore):
         ...,
         description="The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline.",
     )
-    init_object: InitObject | None = Field(
+    init_object: InitObject1 | None = Field(
         None,
         description="The Object containing the initialisation segment required to decode the parent Media Object.",
         title="Initialisation Object",
