@@ -159,7 +159,7 @@ def populate_get_urls(
             if segment.get("init_object_id"):
                 init_id = segment.pop("init_object_id")
                 segment.pop("init_storage_ids", None)
-                segment["init_object"] = {"id": init_id, "get_urls": []}
+                segment["init_object"] = {"object_id": init_id, "get_urls": []}
         return
     should_create_presigned_urls = (presigned or presigned is None) and (
         accept_get_urls is None or ":s3.presigned:" in accept_get_urls
@@ -305,6 +305,6 @@ def populate_get_urls(
         init_id = segment.pop("init_object_id")
         segment.pop("init_storage_ids", None)
         segment["init_object"] = {
-            "id": init_id,
+            "object_id": init_id,
             "get_urls": init_object_map[init_id]["get_urls"],
         }
