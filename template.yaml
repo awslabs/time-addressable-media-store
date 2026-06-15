@@ -256,6 +256,8 @@ Resources:
           AttributeType: "N"
         - AttributeName: object_id
           AttributeType: S
+        - AttributeName: init_object_id
+          AttributeType: S
       KeySchema:
         - AttributeName: flow_id
           KeyType: HASH
@@ -265,6 +267,14 @@ Resources:
         - IndexName: object-id-index
           KeySchema:
             - AttributeName: object_id
+              KeyType: HASH
+            - AttributeName: flow_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: init-object-id-index
+          KeySchema:
+            - AttributeName: init_object_id
               KeyType: HASH
             - AttributeName: flow_id
               KeyType: RANGE
@@ -1597,6 +1607,7 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+                - !Sub ${FlowSegmentsTable.Arn}/index/init-object-id-index
             - Effect: Allow
               Action:
                 - dynamodb:GetItem

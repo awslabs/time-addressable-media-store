@@ -59,6 +59,13 @@ def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None
             )
             if "Attributes" in delete_item:
                 object_ids.add((item["object_id"], tuple(item.get("storage_ids", []))))
+                if item.get("init_object_id"):
+                    object_ids.add(
+                        (
+                            item["init_object_id"],
+                            tuple(item.get("init_storage_ids", [])),
+                        )
+                    )
                 publish_event(
                     "flows/segments_deleted",
                     {"flow_id": item["flow_id"], "timerange": item["timerange"]},
@@ -446,12 +453,17 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
 @tracer.capture_method(capture_response=False)
 def delete_flow_storage_record(object_id: str, storage_id: str | None = None) -> None:
     """Remove storage_id from object's DDB record, or delete the record entirely if no segments reference it"""
-    query = segments_table.query(
+    object_id_refs = segments_table.query(
         IndexName="object-id-index",
         KeyConditionExpression=Key("object_id").eq(object_id),
         Select="COUNT",
     )
-    if query["Count"] == 0:
+    init_object_id_refs = segments_table.query(
+        IndexName="init-object-id-index",
+        KeyConditionExpression=Key("init_object_id").eq(object_id),
+        Select="COUNT",
+    )
+    if object_id_refs["Count"] == 0 and init_object_id_refs["Count"] == 0:
         storage_table.delete_item(
             Key={"id": object_id},
         )

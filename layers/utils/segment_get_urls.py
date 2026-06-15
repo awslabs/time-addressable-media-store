@@ -22,7 +22,9 @@ def create_presigned_get_url(s3_url: str) -> tuple[str, str]:
     """
     url_parse = urlparse(s3_url)
     url = generate_presigned_url(
-        "get_object", url_parse.netloc.split(".")[0], url_parse.path.split("/", 1)[1]
+        "get_object",
+        url_parse.netloc.split(".")[0],
+        url_parse.path.split("/", 1)[1],
     )
     return (s3_url, url)
 

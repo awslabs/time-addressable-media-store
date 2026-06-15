@@ -68,6 +68,30 @@ class TestDynamoDB:
         assert mock_publish_event.call_count == expected_success_count
         assert result is None
 
+    @patch("dynamodb.publish_event")
+    @patch("dynamodb.segments_table")
+    def test_delete_segment_items_captures_init_object(
+        self, mock_segments_table, mock_publish_event
+    ):
+        items = [
+            {
+                "flow_id": "1",
+                "timerange_end": "1",
+                "object_id": "media-1",
+                "storage_ids": ["s-1"],
+                "init_object_id": "init-1",
+                "init_storage_ids": ["s-init"],
+                "timerange": "123",
+            },
+        ]
+        mock_segments_table.delete_item.return_value = {"Attributes": []}
+
+        object_ids = set()
+        dynamodb.delete_segment_items(items, object_ids)
+
+        assert ("media-1", ("s-1",)) in object_ids
+        assert ("init-1", ("s-init",)) in object_ids
+
     @patch("dynamodb.segments_table")
     def test_delete_segment_items_returns_exception(self, mock_segments_table):
         items = [
@@ -809,10 +833,14 @@ class TestDynamoDB:
     def test_delete_flow_storage_record_delete(
         self, mock_storage_table, mock_segments_table
     ):
-        mock_segments_table.query.return_value = {"Count": 0}
+        mock_segments_table.query.side_effect = [
+            {"Count": 0},  # object-id-index
+            {"Count": 0},  # init-object-id-index
+        ]
 
         dynamodb.delete_flow_storage_record("abc", "123")
 
+        assert 2 == mock_segments_table.query.call_count
         assert 1 == mock_storage_table.delete_item.call_count
         assert 0 == mock_storage_table.update_item.call_count
 
@@ -821,7 +849,26 @@ class TestDynamoDB:
     def test_delete_flow_storage_record_update_storage_id(
         self, mock_storage_table, mock_segments_table
     ):
-        mock_segments_table.query.return_value = {"Count": 1}
+        mock_segments_table.query.side_effect = [
+            {"Count": 1},  # object-id-index — still referenced as media
+            {"Count": 0},  # init-object-id-index
+        ]
+
+        dynamodb.delete_flow_storage_record("abc", "123")
+
+        assert 0 == mock_storage_table.delete_item.call_count
+        assert 1 == mock_storage_table.update_item.call_count
+
+    @patch("dynamodb.segments_table")
+    @patch("dynamodb.storage_table")
+    def test_delete_flow_storage_record_still_referenced_as_init(
+        self, mock_storage_table, mock_segments_table
+    ):
+        """An object no longer used as a media object but still referenced as an init object must NOT be deleted."""
+        mock_segments_table.query.side_effect = [
+            {"Count": 0},  # object-id-index — no media references
+            {"Count": 2},  # init-object-id-index — still used as init by 2 segments
+        ]
 
         dynamodb.delete_flow_storage_record("abc", "123")
 
