@@ -37,6 +37,12 @@ s3 = boto3.client(
     # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
 )
 
+CHECKSUM_PARAMS = {
+    name: ""
+    for name in s3.meta.service_model.operation_model("PutObject").input_shape.members
+    if name.startswith("Checksum")
+}
+
 
 @tracer.capture_method(capture_response=False)
 def base_delete_request_dict(
@@ -423,11 +429,18 @@ def generate_presigned_url(
     method: str, bucket: str, key: str, **kwargs: None | dict
 ) -> str:
     """Generates an S3 pre-signed URL"""
+    # Add conditional extra parameters to support the client's ability to use checksums for both pre-signed GET and PUT
+    method_params = {}
+    if method == "get_object":
+        method_params["ChecksumMode"] = "ENABLED"
+    if method == "put_object":
+        method_params = {**CHECKSUM_PARAMS}
     url = s3.generate_presigned_url(
         ClientMethod=method,
         Params={
             "Bucket": bucket,
             "Key": key,
+            **method_params,
             **kwargs,
         },
         ExpiresIn=constants.MIN_PRESIGNED_URL_TIMEOUT_SECS,
