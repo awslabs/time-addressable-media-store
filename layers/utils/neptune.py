@@ -361,7 +361,10 @@ def query_flow_collection(flow_id: str) -> list:
             .get()
         )
         results = execute_open_cypher_query(query)
-        return results["results"][0]["flow_collection"]
+        return [
+            deserialise_neptune_obj(item)
+            for item in results["results"][0]["flow_collection"]
+        ]
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
 
@@ -951,11 +954,7 @@ def generate_flow_collection_query(
     # process the supplied flow_collection into numbered records
     ref_names = []
     for n, collection in enumerate(flow_collection):
-        collection_properties = {
-            k: json.dumps(v) if isinstance(v, list) or isinstance(v, dict) else v
-            for k, v in collection.items()
-            if k != "id"
-        }
+        collection_properties = filter_dict(collection, {"id"})
         ref_names.append((f"f{n}", f"c{n}", collection["id"], collection_properties))
     # Add the match queries for each flow_collection record
     for f_ref, _, f_id, _ in ref_names:
@@ -970,10 +969,11 @@ def generate_flow_collection_query(
             .related_from(ref_name=c_ref, label="collected_by")
             .node(ref_name=f_ref)
         )
-    # Build the dict of set operations to carry out
+    # Build the dict of set operations to carry out. dict/list values (e.g.
+    # container_mapping) are serialised with the SERIALISE_ prefix so that
+    # deserialise_neptune_obj can reverse them on read.
     for _, c_ref, _, props in ref_names:
-        for k, v in props.items():
-            set_dict[f"{c_ref}.{opencypher_property_name(k)}"] = v
+        set_dict.update(serialise_neptune_obj(props, f"{c_ref}."))
     return query.set(set_dict)
 
 

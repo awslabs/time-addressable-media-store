@@ -353,6 +353,14 @@ def deserialise_neptune_obj(obj: dict) -> dict:
             deserialised[actual_name] = json.loads(prop_value)
         elif isinstance(prop_value, dict):
             deserialised[prop_name] = deserialise_neptune_obj(prop_value)
+        elif isinstance(prop_value, list):
+            # Recurse into dict elements (e.g. flow_collection / source_collection
+            # items) so their serialised properties are deserialised. Scalar
+            # elements (e.g. collected_by ids) are left untouched.
+            deserialised[prop_name] = [
+                deserialise_neptune_obj(item) if isinstance(item, dict) else item
+                for item in prop_value
+            ]
         else:
             deserialised[prop_name] = prop_value
     return deserialised
