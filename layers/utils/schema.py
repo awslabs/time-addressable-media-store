@@ -542,16 +542,16 @@ class Mimetype(
 
 class Objectsinstancespost2(BaseModel):
     """
-    Register an uncontrolled Media Object instance via its `url`.
+    Register an uncontrolled Object instance via its `url`.
     """
 
     url: str = Field(
         ...,
-        description="A URL to which a GET request can be made to directly retrieve the contents of the media object. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
+        description="A URL to which a GET request can be made to directly retrieve the contents of the Object. Clients should include credentials if the provide URL is on the same origin as the API endpoint",
     )
     label: str = Field(
         ...,
-        description="Label identifying this Media Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends.",
+        description="Label identifying this Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends.",
     )
 
 
@@ -631,7 +631,7 @@ class Timestamp(RootModel[constr(pattern=r"^-?(0|[1-9][0-9]*):(0|[1-9][0-9]{0,8}
 class Urllabellist(RootModel[constr(pattern=r"^([^,]+(,[^,]+)*)?$")]):
     root: constr(pattern=r"^([^,]+(,[^,]+)*)?$") = Field(
         ...,
-        description="A list of Media Object GET URL Labels, formatted for use in query string parameters",
+        description="A list of Object GET URL Labels, formatted for use in query string parameters",
         title="Query String GET URL Label list",
     )
 
@@ -1081,26 +1081,25 @@ class Flowsegmentpost(BaseModel):
 
 class MediaObject(BaseModel):
     """
-    Information for a Media Object
+    Information for a Object
     """
 
     object_id: str = Field(
-        ..., description="The object store identifier for the Media Object."
+        ..., description="The object store identifier for the Object."
     )
     put_url: Httprequest
 
 
 class Flowstorage(BaseModel):
     """
-    Gives information on storage for Media Objects. This schema is for the `http_object_store` Storage Backend type which provides URLs for storing Media Objects in object store buckets, and is the only Storage Backend type currently implemented.  URLs SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details. Where included in the response, `content-type` MUST match the corresponding value in the request.
+    Gives information on storage for Objects. This schema is for the `http_object_store` Storage Backend type which provides URLs for storing Objects in object store buckets, and is the only Storage Backend type currently implemented.  URLs SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details. Where included in the response, `content-type` MUST match the corresponding value in the request.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     media_objects: list[MediaObject] | None = Field(
-        None,
-        description="List of information for identifying and uploading Media Objects",
+        None, description="List of information for identifying and uploading Objects"
     )
 
 
@@ -1111,7 +1110,7 @@ class Flowstoragepost(BaseModel):
 
     limit: int | None = Field(
         None,
-        description="Limit the number of Media Objects in each response page. Service implementations may specify their own default and maximum for the limit",
+        description="Limit the number of Objects in each response page. Service implementations may specify their own default and maximum for the limit",
     )
     object_ids: list[str] | None = Field(
         None,
@@ -1150,7 +1149,7 @@ class GetUrl1(Storagebackend):
     storage_id: Uuid | None = Field(None, description="Storage Backend identifier")
     url: str = Field(
         ...,
-        description="A URL to which a GET request can be made to directly retrieve the contents of the media object. Clients should include credentials if the provide URL is on the same origin as the API endpoint. This URL SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details.",
+        description="A URL to which a GET request can be made to directly retrieve the contents of the Object. Clients should include credentials if the provide URL is on the same origin as the API endpoint. This URL SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details.",
     )
     presigned: bool | None = Field(
         None,
@@ -1168,12 +1167,12 @@ class GetUrl1(Storagebackend):
 
 class Objectcore(BaseModel):
     """
-    Provides the location and metadata of the media files corresponding to a Media Object.
+    Provides the location and metadata of the files corresponding to a Object.
     """
 
     get_urls: list[GetUrl1] | None = Field(
         None,
-        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the Media Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage Backend metadata for controlled URLs should be populated by the TAMS instance based on the Storage Backend the Meda Object instance resides in.",
+        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage Backend metadata for controlled URLs should be populated by the TAMS instance based on the Storage Backend the Object instance resides in.",
     )
 
 
@@ -1190,7 +1189,7 @@ class Objectmediacore(Objectcore):
 
 class Objectsinstancespost1(BaseModel):
     """
-    Request the duplication of a Media Object instance to a new Storage Backend, via it's `storage_id`.
+    Request the duplication of a Object instance to a new Storage Backend, via it's `storage_id`.
     """
 
     storage_id: Uuid = Field(..., description="Storage backend identifier")
@@ -1199,8 +1198,8 @@ class Objectsinstancespost1(BaseModel):
 class Objectsinstancespost(RootModel[Objectsinstancespost1 | Objectsinstancespost2]):
     root: Objectsinstancespost1 | Objectsinstancespost2 = Field(
         ...,
-        description="Register a Media Object instance in the store.",
-        title="Media object registration",
+        description="Register a Object instance in the store.",
+        title="Object registration",
     )
 
 
@@ -1235,7 +1234,7 @@ class Service(BaseModel):
     )
     min_object_timeout: Timestamp = Field(
         ...,
-        description="The minimum timeframe within which a Media Object created by this service must be registered against a Flow segment before it is garbage collected. Services SHOULD allow a small grace period beyond the advertised value to account for latency in assigning the Objects and returning them to the Client. This timeout MUST be `300:0` (i.e. 5 minutes) or greater. Clients MUST be capable of reaching this minimum performance level. Clients SHOULD adapt to this value by balancing how many object URLs to request per page against how fast they will be used. Services MAY allow this value to be configured at deploy-time. Format as described by the [Timestamp](#/schemas/timestamp) type. For more infomation, see the documentation of the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage) endpoint.",
+        description="The minimum timeframe within which a Object created by this service must be registered against a Flow segment before it is garbage collected. Services SHOULD allow a small grace period beyond the advertised value to account for latency in assigning the Objects and returning them to the Client. This timeout MUST be `300:0` (i.e. 5 minutes) or greater. Clients MUST be capable of reaching this minimum performance level. Clients SHOULD adapt to this value by balancing how many object URLs to request per page against how fast they will be used. Services MAY allow this value to be configured at deploy-time. Format as described by the [Timestamp](#/schemas/timestamp) type. For more infomation, see the documentation of the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage) endpoint.",
     )
     min_presigned_url_timeout: Timestamp | None = Field(
         None,
@@ -1426,18 +1425,18 @@ class Object(Objectmediacore):
     model_config = ConfigDict(
         extra="forbid",
     )
-    id: str = Field(..., description="The Media Object identifier.")
+    id: str = Field(..., description="The Object identifier.")
     referenced_by_flows: list[Uuid] = Field(
         ...,
-        description="List of Flows that reference this Media Object via Flow Segments in this store instance.",
+        description="List of Flows that reference this Object via Flow Segments in this store instance. For init Objects, this reference is indirect via Media Objects.",
     )
     first_referenced_by_flow: Uuid | None = Field(
         None,
-        description="The first Flow that had a Flow Segment reference the Media Object in this store instance. This Flow is also present in 'referenced_by_flows' if it is still referenced by the Flow. This property is optional and may in some implementations become unset if the Flow no longer references the media object, e.g. because it was deleted.",
+        description="The first Flow that had a Flow Segment reference the Object in this store instance. For init Objects, this reference is indirect via Media Objects. This Flow is also present in 'referenced_by_flows' if it is still referenced by the Flow. This property is optional and may in some implementations become unset if the Flow no longer references the Object, e.g. because it was deleted.",
     )
-    timerange: Timerange = Field(
-        ...,
-        description="The timerange covering the sample timestamps embedded in or derived from the Media Object itself, on the Media Object's timeline.",
+    timerange: Timerange | None = Field(
+        None,
+        description="The timerange covering the sample timestamps embedded in or derived from the Object itself, on the Media Object's timeline. This parameter MUST be set where the Object contains media. It MUST NOT be set where the Object contains an init segment.",
     )
     init_object: InitObject1 | None = Field(
         None,
