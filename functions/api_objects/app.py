@@ -24,6 +24,8 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import (
     append_to_segment_list,
     list_storage_backends,
+    page_targets_init_index,
+    query_segments_by_init_object_id,
     query_segments_by_object_id,
     remove_get_url_by_label_from_segment,
     remove_storage_id_from_segment,
@@ -77,13 +79,33 @@ def get_objects_by_id(
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
     )
-    items, last_evaluated_key, limit_used = query_segments_by_object_id(
-        object_id,
-        limit=param_limit,
-        page=param_page,
-    )
-    if len(items) == 0 and param_page is None:
-        raise NotFoundError("The requested media object does not exist.")  # 404
+    # An init Object is never a Segment's object_id; it is referenced
+    # indirectly via init_object_id on Media Object Segments. Query the right
+    # index: on a paged request the token itself indicates which index it came
+    # from; otherwise try the media index first and fall back to init.
+    if param_page is not None and page_targets_init_index(param_page):
+        is_init_object = True
+        items, last_evaluated_key, limit_used = query_segments_by_init_object_id(
+            object_id,
+            limit=param_limit,
+            page=param_page,
+        )
+    else:
+        is_init_object = False
+        items, last_evaluated_key, limit_used = query_segments_by_object_id(
+            object_id,
+            limit=param_limit,
+            page=param_page,
+        )
+        if len(items) == 0 and param_page is None:
+            items, last_evaluated_key, limit_used = query_segments_by_init_object_id(
+                object_id,
+                limit=param_limit,
+            )
+            if items:
+                is_init_object = True
+            else:
+                raise NotFoundError("The requested media object does not exist.")  # 404
     custom_headers = {}
     if last_evaluated_key:
         next_key = base64.b64encode(
@@ -104,13 +126,27 @@ def get_objects_by_id(
     get_item = storage_table.get_item(
         Key={"id": object_id}, ProjectionExpression="flow_id, timerange"
     )
-    combined_item = {
-        "object_id": object_id,
-        "get_urls": get_unique_get_urls(items),
-        "storage_ids": list(
-            {storage_id for item in items for storage_id in item.get("storage_ids", [])}
-        ),
-    }
+    if is_init_object:
+        # An init Object's location is held in the referencing Segments'
+        # init_storage_ids; it has no uncontrolled get_urls of its own.
+        combined_item = {
+            "object_id": object_id,
+            "storage_ids": list(
+                {sid for item in items for sid in item.get("init_storage_ids", [])}
+            ),
+        }
+    else:
+        combined_item = {
+            "object_id": object_id,
+            "get_urls": get_unique_get_urls(items),
+            "storage_ids": list(
+                {
+                    storage_id
+                    for item in items
+                    for storage_id in item.get("storage_ids", [])
+                }
+            ),
+        }
     populate_get_urls(
         [combined_item],
         param_accept_get_urls,
@@ -118,12 +154,15 @@ def get_objects_by_id(
         param_accept_storage_ids,
         param_presigned,
     )
-    # Build init_object if any segment references one
+    # Build init_object if any segment references one (never for an init
+    # Object itself, which has no init_object).
     init_object_data = None
-    init_object_id = next(
-        (item.get("init_object_id") for item in items if "init_object_id" in item),
-        None,
-    )
+    init_object_id = None
+    if not is_init_object:
+        init_object_id = next(
+            (item.get("init_object_id") for item in items if "init_object_id" in item),
+            None,
+        )
     if init_object_id:
         init_combined = {
             "object_id": init_object_id,
@@ -147,23 +186,32 @@ def get_objects_by_id(
             "id": init_object_id,
             "get_urls": init_combined.get("get_urls"),
         }
+    # An init Object MUST NOT report a timerange or key_frame_count.
+    if is_init_object:
+        timerange = None
+        key_frame_count = None
+    else:
+        timerange = (
+            get_item.get("Item", {}).get("timerange")
+            or items[0].get("object_timerange")
+            or items[0]["timerange"]
+        )
+        key_frame_count = next(
+            (
+                item.get("key_frame_count")
+                for item in items
+                if "key_frame_count" in item
+            ),
+            None,
+        )
     schema_item = Object(
         **{
             "id": object_id,
             "referenced_by_flows": set([item["flow_id"] for item in items]),
             "first_referenced_by_flow": get_item.get("Item", {}).get("flow_id"),
-            "timerange": get_item.get("Item", {}).get("timerange")
-            or items[0].get("object_timerange")
-            or items[0]["timerange"],
+            "timerange": timerange,
             "get_urls": combined_item.get("get_urls"),
-            "key_frame_count": next(
-                (
-                    item.get("key_frame_count")
-                    for item in items
-                    if "key_frame_count" in item
-                ),
-                None,
-            ),
+            "key_frame_count": key_frame_count,
             "init_object": init_object_data,
         }
     )

@@ -60,8 +60,8 @@ def record_handler(record: SQSRecord) -> None:
         media_items, _, _ = query_segments_by_object_id(
             object_id, projection="storage_ids", fetch_all=True
         )
-        init_items = query_segments_by_init_object_id(
-            object_id, projection="init_storage_ids"
+        init_items, _, _ = query_segments_by_init_object_id(
+            object_id, projection="init_storage_ids", fetch_all=True
         )
 
         # If nothing references this object as media or init, delete for all storage_ids

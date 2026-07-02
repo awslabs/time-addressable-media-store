@@ -496,7 +496,9 @@ def delete_flow_storage_record(object_id: str, storage_id: str | None = None) ->
 
 
 @tracer.capture_method(capture_response=False)
-def decode_and_validate_page(page: str, object_id: str) -> dict:
+def decode_and_validate_page(
+    page: str, object_id: str, key_name: str = "object_id"
+) -> dict:
     """Decode and validate base64 encoded pagination key"""
     try:
         decoded_page = base64.b64decode(page).decode("utf-8")
@@ -504,10 +506,10 @@ def decode_and_validate_page(page: str, object_id: str) -> dict:
     except Exception as ex:
         raise BadRequestError("Invalid page parameter value") from ex
     if any(
-        f not in exclusive_start_key for f in ["flow_id", "object_id", "timerange_end"]
+        f not in exclusive_start_key for f in ["flow_id", key_name, "timerange_end"]
     ):
         raise BadRequestError("Invalid page parameter value")
-    if exclusive_start_key["object_id"] != object_id:
+    if exclusive_start_key[key_name] != object_id:
         raise BadRequestError("Invalid page parameter value")
     return exclusive_start_key
 
@@ -549,21 +551,48 @@ def query_segments_by_object_id(
 def query_segments_by_init_object_id(
     init_object_id: str,
     projection: str | None = None,
-) -> list:
-    """Query all segments referencing an object as init_object_id using init-object-id-index"""
+    limit: int | None = None,
+    page: str | None = None,
+    fetch_all: bool = False,
+) -> tuple[list, dict | None, int | None]:
+    """Query segments by init_object_id using init-object-id-index"""
     kwargs = {
         "IndexName": "init-object-id-index",
         "KeyConditionExpression": Key("init_object_id").eq(init_object_id),
     }
     if projection:
         kwargs["ProjectionExpression"] = projection
+    if not fetch_all:
+        kwargs["Limit"] = (
+            min(limit, constants.MAX_PAGE_LIMIT)
+            if limit
+            else constants.DEFAULT_PAGE_LIMIT
+        )
+        if page:
+            kwargs["ExclusiveStartKey"] = decode_and_validate_page(
+                page, init_object_id, key_name="init_object_id"
+            )
     query = segments_table.query(**kwargs)
     items = query["Items"]
-    while "LastEvaluatedKey" in query:
+    while "LastEvaluatedKey" in query and (fetch_all or len(items) < kwargs["Limit"]):
         kwargs["ExclusiveStartKey"] = query["LastEvaluatedKey"]
         query = segments_table.query(**kwargs)
         items.extend(query["Items"])
-    return items
+    return items, query.get("LastEvaluatedKey"), kwargs.get("Limit")
+
+
+@tracer.capture_method(capture_response=False)
+def page_targets_init_index(page: str) -> bool:
+    """Return True if a pagination token belongs to the init-object-id-index.
+
+    A malformed token returns False so the caller's primary (media) query path
+    raises the canonical 'Invalid page parameter value' error.
+    """
+    try:
+        decoded = json.loads(base64.b64decode(page).decode("utf-8"))
+    except (ValueError, TypeError):
+        return False
+    return "init_object_id" in decoded
 
 
 @lru_cache()

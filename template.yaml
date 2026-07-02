@@ -1199,6 +1199,7 @@ Resources:
                 - dynamodb:Query
               Resource:
                 - !Sub ${FlowSegmentsTable.Arn}/index/object-id-index
+                - !Sub ${FlowSegmentsTable.Arn}/index/init-object-id-index
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
