@@ -15,6 +15,7 @@ from dynamodb import (
     delete_flow_storage_record,
     get_default_storage_backend,
     get_storage_backend,
+    query_segments_by_init_object_id,
     query_segments_by_object_id,
 )
 
@@ -53,20 +54,32 @@ def record_handler(record: SQSRecord) -> None:
             # Empty list means no S3 cleanup needed, just flow storage record
             delete_flow_storage_record(object_id)
 
-        items, _, _ = query_segments_by_object_id(
+        # An object may be referenced as a media object (object_id) or as an
+        # init object (init_object_id). Both keep the object alive, so check
+        # both indexes before deleting anything from S3.
+        media_items, _, _ = query_segments_by_object_id(
             object_id, projection="storage_ids", fetch_all=True
         )
+        init_items = query_segments_by_init_object_id(
+            object_id, projection="init_storage_ids"
+        )
 
-        # If no other records found with this object_id, delete for all storage_ids
-        if len(items) == 0:
+        # If nothing references this object as media or init, delete for all storage_ids
+        if len(media_items) == 0 and len(init_items) == 0:
             for storage_id in storage_ids:
                 delete_objects[storage_id].append({"Key": object_id})
         else:
-            # Collect all unique storage_ids from DDB records
+            # Collect all unique storage_ids still referencing this object
             ddb_storage_ids = set()
             # Handle DynamoDB storage_ids: missing -> default, empty -> empty
-            for item in items:
+            for item in media_items:
                 item_storage_ids = item.get("storage_ids")
+                if item_storage_ids is None:
+                    ddb_storage_ids.add(default_storage_backend["id"])
+                else:
+                    ddb_storage_ids.update(item_storage_ids)
+            for item in init_items:
+                item_storage_ids = item.get("init_storage_ids")
                 if item_storage_ids is None:
                     ddb_storage_ids.add(default_storage_backend["id"])
                 else:

@@ -532,6 +532,27 @@ def query_segments_by_object_id(
     return items, query.get("LastEvaluatedKey"), kwargs.get("Limit")
 
 
+@tracer.capture_method(capture_response=False)
+def query_segments_by_init_object_id(
+    init_object_id: str,
+    projection: str | None = None,
+) -> list:
+    """Query all segments referencing an object as init_object_id using init-object-id-index"""
+    kwargs = {
+        "IndexName": "init-object-id-index",
+        "KeyConditionExpression": Key("init_object_id").eq(init_object_id),
+    }
+    if projection:
+        kwargs["ProjectionExpression"] = projection
+    query = segments_table.query(**kwargs)
+    items = query["Items"]
+    while "LastEvaluatedKey" in query:
+        kwargs["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**kwargs)
+        items.extend(query["Items"])
+    return items
+
+
 @lru_cache()
 @tracer.capture_method(capture_response=False)
 def get_store_name() -> str:
