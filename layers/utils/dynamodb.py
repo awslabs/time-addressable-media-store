@@ -336,6 +336,7 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
         return {
             "valid": True,
             "storage_id": None,
+            "init_object_id": segment.init_object_id,
             "init_storage_id": None,
             "object_timerange": object_timerange,
             "message": None,
@@ -403,6 +404,7 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
                 "message": "Bad request. The init_object_id must not change when Media Objects are re-used.",
             }
     init_storage_id = None
+    effective_init_object_id = segment.init_object_id
     # Validate init_object_id if provided
     if segment.init_object_id:
         init_item = storage_table.get_item(Key={"id": segment.init_object_id}).get(
@@ -440,10 +442,21 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
                 "object_timerange": None,
                 "message": "Bad request. A media segment Object cannot be used as an initialisation segment Object.",
             }
+    elif not is_first_time_use and storage_item.get("init_object_id"):
+        # Object re-use with init_object_id omitted (as recommended by the spec).
+        # Recover the init reference from the stored Media Object so the new
+        # Segment still reports init_object on read.
+        effective_init_object_id = storage_item["init_object_id"]
+        init_item = storage_table.get_item(Key={"id": effective_init_object_id}).get(
+            "Item"
+        )
+        if init_item:
+            init_storage_id = init_item.get("storage_id")
     # Valid: either flow_id matches or object_id is reusable
     return {
         "valid": True,
         "storage_id": storage_item.get("storage_id"),
+        "init_object_id": effective_init_object_id,
         "init_storage_id": init_storage_id,
         "object_timerange": stored_timerange,
         "message": None,
