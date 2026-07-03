@@ -105,7 +105,7 @@ def get_objects_by_id(
             if items:
                 is_init_object = True
             else:
-                raise NotFoundError("The requested media object does not exist.")  # 404
+                raise NotFoundError("The requested Object does not exist.")  # 404
     custom_headers = {}
     if last_evaluated_key:
         next_key = base64.b64encode(

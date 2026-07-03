@@ -2023,7 +2023,7 @@ def test_Get_Media_Object_Information_GET_404(api_client_cognito):
     # Assert
     assert_json_response(response, 404)
     response_json = response.json()
-    assert "The requested media object does not exist." == response_json["message"]
+    assert "The requested Object does not exist." == response_json["message"]
 
 
 def test_Register_Media_Object_Instance_POST_201(api_client_cognito, media_objects):
