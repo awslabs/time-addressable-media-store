@@ -706,6 +706,10 @@ class Webhook(BaseModel):
         None,
         description="Whether to include storage metadata in the `get_urls` property in `flows/segments_added` events. This option is the same as the `verbose_storage` query parameter for the [/flows/{flowId}/segments](#/operations/GET_flows-flowId-segments) API endpoint.",
     )
+    include_object_timerange: bool | None = Field(
+        None,
+        description="If set to `true`, the underlying object's timerange should appear in `flows/segments_added` events. Assume `false` if omitted. This option is the same as the `include_object_timerange` query parameter for the [/flows/{flowId}/segments](#/operations/GET_flows-flowId-segments) API endpoint.",
+    )
     tags: Tags | None = None
 
 
@@ -868,7 +872,7 @@ class Flowcore(BaseModel):
     )
     generation: conint(ge=0) | None = Field(
         None,
-        description='An indication of how many lossy encodings the Flow content has been through. This parameter provides a hint to clients as to which is the "highest qualty" Flow available to them. A Flow with a higher generation may contain less of the original information than a Flow with a lower generation. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where the originating device outputs multiple qualities of the Source, `generation` should represent the encoding processes each has been through as accurately as possible.',
+        description='An indication of whether a particular Flow of a Source has been through more or fewer lossy encodings than another Flow of the same Source. This parameter provides a hint to clients as to which is the "highest quality" Flow available to them. A Flow with a higher generation may contain less of the original information than a Flow with a lower generation, although the absolute values generally have no particular meaning. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via lossless capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where a lossy transcode has been carried out on an existing Flow, the `generation` should be incremented by 1 on the transcoded Flow. Where the originating device outputs multiple qualities of the Source (for example an ingester generated a transcoded proxy and ingested it at the same time), `generation` should be set to represent the encoding processes each has been through.',
     )
     created: AwareDatetime | None = Field(
         None,
@@ -1268,7 +1272,7 @@ class Webhookget(Webhookwithid):
 
     error: Error | None = Field(
         None,
-        description="Provides more information for the error status, as described by the [Error](#/schemas/error) type",
+        description="Provides more information for the error status, as described by the [Error](#/schemas/error) type. Amongst other conditions, implementations MAY use this field to indicate failure to deliver webhooks resulting in return codes other than the 200 Success described in the the webhook event schemas.",
     )
     status: Status1 = Field(
         ...,

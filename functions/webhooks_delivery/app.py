@@ -57,6 +57,8 @@ def record_handler(record: SQSRecord) -> None:
             event.detail["source"] = model_dump(Source(**event.detail["source"]))
         case "flows/segments_added":
             event.detail["segments"][0]["get_urls"] = get_urls
+            if not body.get("include_object_timerange"):
+                event.detail["segments"][0].pop("object_timerange", None)
             event.detail["segments"][0] = model_dump(
                 Flowsegment(**event.detail["segments"][0])
             )

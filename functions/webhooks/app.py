@@ -19,10 +19,15 @@ store_name = get_store_name()
 
 
 @tracer.capture_method(capture_response=False)
-def post_event(event, item, get_urls=None):
+def post_event(event, item, get_urls=None, include_object_timerange=False):
     put_message(
         webhooks_queue,
-        {"event": event.raw_event, "item": model_dump(item), "get_urls": get_urls},
+        {
+            "event": event.raw_event,
+            "item": model_dump(item),
+            "get_urls": get_urls,
+            "include_object_timerange": include_object_timerange,
+        },
     )
 
 
@@ -51,9 +56,11 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
         }
         # Add ALL get_urls to event
         populate_get_urls(event.detail["segments"], include_storage_id=True)
-        # Remove object_timerange from segments as it's not included by default
+        # object_timerange is only stored when it differs from the segment
+        # timerange; fall back to the segment timerange so it can be included
+        # when a webhook requests it. Inclusion is decided per-webhook below.
         for segment in event.detail["segments"]:
-            segment.pop("object_timerange", None)
+            segment.setdefault("object_timerange", segment["timerange"])
     for item in schema_items:
         # Update status to started if created
         if item.status.value == "created":
@@ -77,11 +84,12 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
                 event,
                 item,
                 [filter_dict(get_url, {"storage_id"}) for get_url in get_urls],
+                bool(item.include_object_timerange),
             )
             continue
         # No get_urls are requested so send event with no get_urls
         if item.accept_get_urls is not None and len(item.accept_get_urls) == 0:
-            post_event(event, item, [])
+            post_event(event, item, [], bool(item.include_object_timerange))
             continue
         # Filter by label
         if item.accept_get_urls:
@@ -120,4 +128,4 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
         # Remove storage_id if verbose_storage not requested
         else:
             get_urls = [filter_dict(get_url, {"storage_id"}) for get_url in get_urls]
-        post_event(event, item, get_urls)
+        post_event(event, item, get_urls, bool(item.include_object_timerange))
