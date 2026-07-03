@@ -318,6 +318,23 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             validation["message"],
         )
+    # Enforce consistency between the Flow's init_segments flag and whether
+    # the Segment resolves to an init Object (init_object_id may be recovered
+    # by validate_object_id on Media Object re-use).
+    flow_init_segments = bool(flow.get("essence_parameters", {}).get("init_segments"))
+    segment_has_init = bool(validation.get("init_object_id"))
+    if segment_has_init and not flow_init_segments:
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. init_object_id may only be set when the Flow's `init_segments` is true.",
+        )
+    if flow_init_segments and not segment_has_init:
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. This Flow uses initialisation segments so every Flow Segment MUST reference an init_object_id.",
+        )
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
         return generate_failed_segment(
