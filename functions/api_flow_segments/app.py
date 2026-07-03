@@ -156,9 +156,13 @@ def get_flow_segments_by_id(
             body=None,
             headers=custom_headers,
         )
-    # Remove object_timerange from items if not requested
-    if not param_include_object_timerange:
-        for item in items:
+    # object_timerange is only stored when it differs from the segment
+    # timerange. When requested, always return it (falling back to the
+    # segment timerange when not stored); otherwise remove it.
+    for item in items:
+        if param_include_object_timerange:
+            item.setdefault("object_timerange", item["timerange"])
+        else:
             item.pop("object_timerange", None)
     populate_get_urls(
         items,
