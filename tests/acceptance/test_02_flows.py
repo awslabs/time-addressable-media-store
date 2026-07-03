@@ -2417,3 +2417,71 @@ def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
     assert_json_response(response, 404)
     response_json = response.json()
     assert "The requested flow does not exist." == response_json["message"]
+
+
+###############################################################################
+# INIT SEGMENTS - FLOW FIELD (TODO STUBS)
+#
+# These validate the flow-level `init_segments` essence parameter added by the
+# init_segments feature. They are intentionally left as stubs to populate later.
+#
+# NOTES FOR WHOEVER FILLS THESE IN:
+#
+# 1. `init_segments` is an essence_parameters field present on video, coded
+#    audio, data AND multi flows (schema.py EssenceParameters/1/3/4). Assert it
+#    round-trips: PUT a flow with essence_parameters.init_segments = true, then
+#    GET it and assert the field is returned. Mirror
+#    test_Create_or_Replace_Flow_PUT_201_VIDEO / _MULTI.
+#
+# 2. This will likely reuse the SAME stub_init_flow fixture that the segment
+#    init stubs need (see test_04_segments.py). If you add stub_init_flow to
+#    conftest.py, PUT it here (with its source) BEFORE the segment tests run so
+#    the flow exists for the segment write path. A multi variant
+#    (stub_init_multi_flow) is also worth covering since multi flows gained an
+#    essence_parameters object solely for init_segments.
+#
+# 3. The `/flows?init_segments=true|false` LIST FILTER mirrors the existing
+#    frame_width/frame_height filter tests (test_List_Flows_GET_200_frame_width
+#    etc.). Assert GET /flows?init_segments=true returns the init flow(s) and
+#    HEAD returns 200. Consider a init_segments=false case too. Exact expected
+#    result set depends on which flows the suite has created by then.
+###############################################################################
+
+
+def test_Create_or_Replace_Flow_PUT_201_init_segments():
+    """PUT a video flow whose essence_parameters.init_segments is true; assert
+    201 and that the response echoes init_segments. (Consider using/creating
+    stub_init_flow so later segment tests can reuse it.)"""
+    pytest.skip("TODO: assert init_segments round-trips on flow PUT")
+
+
+def test_Create_or_Replace_Flow_PUT_201_init_segments_multi():
+    """PUT a MULTI flow with essence_parameters.init_segments = true; assert
+    201 and the field is returned. Multi flows gained an essence_parameters
+    object specifically to carry init_segments (schema EssenceParameters3)."""
+    pytest.skip("TODO: assert init_segments round-trips on multi flow PUT")
+
+
+def test_Get_Flow_GET_200_init_segments():
+    """GET /flows/{id} for a flow created with init_segments = true; assert the
+    essence_parameters.init_segments field is present and true in the body."""
+    pytest.skip("TODO: assert init_segments returned on flow GET")
+
+
+def test_List_Flows_GET_200_init_segments():
+    """GET /flows?init_segments=true; assert 200 and that the returned set is
+    exactly the flow(s) with init_segments true (mirror
+    test_List_Flows_GET_200_frame_width)."""
+    pytest.skip("TODO: assert /flows?init_segments=true filter")
+
+
+def test_List_Flows_GET_200_init_segments_false():
+    """GET /flows?init_segments=false; assert 200 and that flows with
+    init_segments true are excluded."""
+    pytest.skip("TODO: assert /flows?init_segments=false filter")
+
+
+def test_List_Flows_HEAD_200_init_segments():
+    """HEAD /flows?init_segments=true; assert 200 with empty body (mirror
+    test_List_Flows_HEAD_200_frame_width)."""
+    pytest.skip("TODO: assert HEAD /flows?init_segments=true")
