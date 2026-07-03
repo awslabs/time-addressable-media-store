@@ -161,6 +161,7 @@ def populate_get_urls(
             if segment.get("init_object_id"):
                 init_id = segment.pop("init_object_id")
                 segment.pop("init_storage_ids", None)
+                segment.pop("init_get_urls", None)
                 segment["init_object"] = {"object_id": init_id, "get_urls": []}
         return
     should_create_presigned_urls = (presigned or presigned is None) and (
@@ -240,16 +241,22 @@ def populate_get_urls(
             init_object_map[init_id] = {
                 "object_id": init_id,
                 "storage_ids": list(segment.get("init_storage_ids", [])),
+                "uncontrolled_get_urls": list(segment.get("init_get_urls", [])),
             }
         else:
             for sid in segment.get("init_storage_ids", []):
                 if sid not in init_object_map[init_id]["storage_ids"]:
                     init_object_map[init_id]["storage_ids"].append(sid)
+            for get_url in segment.get("init_get_urls", []):
+                if get_url not in init_object_map[init_id]["uncontrolled_get_urls"]:
+                    init_object_map[init_id]["uncontrolled_get_urls"].append(get_url)
     # Generate get_urls for each unique init object
     for item in init_object_map.values():
         storage_ids = item.get("storage_ids", [])
-        get_urls = []
-        if not storage_ids:
+        get_urls = (
+            [] if accept_storage_ids else list(item.get("uncontrolled_get_urls", []))
+        )
+        if not storage_ids and not item.get("uncontrolled_get_urls"):
             if default_storage_backend:
                 get_urls.extend(
                     create_segment_access_urls(
@@ -306,6 +313,7 @@ def populate_get_urls(
     for segment in init_segments:
         init_id = segment.pop("init_object_id")
         segment.pop("init_storage_ids", None)
+        segment.pop("init_get_urls", None)
         segment["init_object"] = {
             "object_id": init_id,
             "get_urls": init_object_map[init_id]["get_urls"],

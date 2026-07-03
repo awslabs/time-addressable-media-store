@@ -680,24 +680,29 @@ def append_to_segment_list(item: dict, attribute: str, value: dict | str) -> Non
 
 
 @tracer.capture_method(capture_response=False)
-def remove_storage_id_from_segment(item: dict, storage_id: str) -> None:
-    """Remove a storage_id from a segment's storage_ids list with optimistic locking."""
+def remove_storage_id_from_segment(
+    item: dict, storage_id: str, attribute: str = "storage_ids"
+) -> None:
+    """Remove a storage_id from a segment's storage_ids list with optimistic locking.
+
+    `attribute` selects which list to mutate ("storage_ids" for the Media
+    Object, "init_storage_ids" for the init Object).
+    """
     current_item = item
     for attempt in range(constants.DDB_MAX_RETRIES):
         try:
-            filtered_ids = [
-                sid for sid in current_item["storage_ids"] if sid != storage_id
-            ]
+            filtered_ids = [sid for sid in current_item[attribute] if sid != storage_id]
             segments_table.update_item(
                 Key={
                     "flow_id": current_item["flow_id"],
                     "timerange_end": current_item["timerange_end"],
                 },
-                UpdateExpression="SET storage_ids = :ids",
-                ConditionExpression="storage_ids = :old_ids",
+                UpdateExpression="SET #attr = :ids",
+                ConditionExpression="#attr = :old_ids",
+                ExpressionAttributeNames={"#attr": attribute},
                 ExpressionAttributeValues={
                     ":ids": filtered_ids,
-                    ":old_ids": current_item["storage_ids"],
+                    ":old_ids": current_item[attribute],
                 },
             )
             break
@@ -717,24 +722,32 @@ def remove_storage_id_from_segment(item: dict, storage_id: str) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def remove_get_url_by_label_from_segment(item: dict, label: str) -> None:
-    """Remove a get_url dictionary with matching label from a segment's get_urls list with optimistic locking."""
+def remove_get_url_by_label_from_segment(
+    item: dict, label: str, attribute: str = "get_urls"
+) -> None:
+    """Remove a get_url dictionary with matching label from a segment's get_urls
+    list with optimistic locking.
+
+    `attribute` selects which list to mutate ("get_urls" for the Media Object,
+    "init_get_urls" for the init Object).
+    """
     current_item = item
     for attempt in range(constants.DDB_MAX_RETRIES):
         try:
             filtered_urls = [
-                url for url in current_item["get_urls"] if url.get("label") != label
+                url for url in current_item[attribute] if url.get("label") != label
             ]
             segments_table.update_item(
                 Key={
                     "flow_id": current_item["flow_id"],
                     "timerange_end": current_item["timerange_end"],
                 },
-                UpdateExpression="SET get_urls = :urls",
-                ConditionExpression="get_urls = :old_urls",
+                UpdateExpression="SET #attr = :urls",
+                ConditionExpression="#attr = :old_urls",
+                ExpressionAttributeNames={"#attr": attribute},
                 ExpressionAttributeValues={
                     ":urls": filtered_urls,
-                    ":old_urls": current_item["get_urls"],
+                    ":old_urls": current_item[attribute],
                 },
             )
             break

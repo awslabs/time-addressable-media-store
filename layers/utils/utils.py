@@ -509,12 +509,16 @@ def validate_frame_rate(video_essence_parameters: dict) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def get_unique_get_urls(items: list[dict]) -> list[dict]:
-    """Extract unique GET URLs from a list of items containing get_urls arrays."""
+def get_unique_get_urls(items: list[dict], attribute: str = "get_urls") -> list[dict]:
+    """Extract unique GET URLs from a list of items containing get_urls arrays.
+
+    `attribute` selects the source list ("get_urls" for a Media Object,
+    "init_get_urls" for an init Object).
+    """
     seen = set()
     unique_get_urls = []
     for item in items:
-        for get_url in item.get("get_urls", []):
+        for get_url in item.get(attribute, []):
             key = json.dumps(get_url, sort_keys=True)
             if key not in seen:
                 seen.add(key)

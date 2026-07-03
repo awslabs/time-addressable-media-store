@@ -127,10 +127,12 @@ def get_objects_by_id(
         Key={"id": object_id}, ProjectionExpression="flow_id, timerange"
     )
     if is_init_object:
-        # An init Object's location is held in the referencing Segments'
-        # init_storage_ids; it has no uncontrolled get_urls of its own.
+        # An init Object is a first-class Object: its controlled location is
+        # held in the referencing Segments' init_storage_ids and any
+        # uncontrolled instances in init_get_urls.
         combined_item = {
             "object_id": object_id,
+            "get_urls": get_unique_get_urls(items, attribute="init_get_urls"),
             "storage_ids": list(
                 {sid for item in items for sid in item.get("init_storage_ids", [])}
             ),
@@ -164,15 +166,12 @@ def get_objects_by_id(
             None,
         )
     if init_object_id:
+        init_items = [item for item in items if "init_object_id" in item]
         init_combined = {
             "object_id": init_object_id,
+            "get_urls": get_unique_get_urls(init_items, attribute="init_get_urls"),
             "storage_ids": list(
-                {
-                    sid
-                    for item in items
-                    for sid in item.get("init_storage_ids", [])
-                    if "init_object_id" in item
-                }
+                {sid for item in init_items for sid in item.get("init_storage_ids", [])}
             ),
         }
         populate_get_urls(
@@ -239,19 +238,20 @@ def post_objects_by_id(
     object_instance: Annotated[Objectsinstancespost, Body()],
     object_id: Annotated[str, Path(alias="objectId")],
 ):
-    items, _, _ = query_segments_by_object_id(
-        object_id,
-        fetch_all=True,
-    )
+    items, is_init_object = resolve_object_segments(object_id)
     if len(items) == 0:
-        raise NotFoundError("The Media Object does not exist.")  # 404
+        raise NotFoundError("The Object does not exist.")  # 404
+    # An init Object holds its instances in the init_ fields of the Segments
+    # that reference it; a Media Object in the plain fields.
+    storage_attr = "init_storage_ids" if is_init_object else "storage_ids"
+    get_urls_attr = "init_get_urls" if is_init_object else "get_urls"
     existing_storage_ids = set(
-        storage_id for item in items for storage_id in item.get("storage_ids", [])
+        storage_id for item in items for storage_id in item.get(storage_attr, [])
     )
     if hasattr(object_instance.root, "storage_id"):
         if object_instance.root.storage_id.root in existing_storage_ids:
             raise BadRequestError(
-                "The Media Object specified is already available on this Storage Backend."
+                "The Object specified is already available on this Storage Backend."
             )  # 400
         if existing_storage_ids:
             put_message(
@@ -259,11 +259,12 @@ def post_objects_by_id(
                 {
                     "object_id": object_id,
                     "destination_storage_id": object_instance.root.storage_id.root,
+                    "is_init_object": is_init_object,
                 },
             )
         else:
             raise BadRequestError(
-                "The Media Object specified does not currently exist on controlled storage."
+                "The Object specified does not currently exist on controlled storage."
             )  # 400
     elif hasattr(object_instance.root, "url"):
         storage_backends = list_storage_backends()
@@ -282,14 +283,16 @@ def post_objects_by_id(
         existing_labels = set(
             get_url.get("label")
             for item in items
-            for get_url in item.get("get_urls", [])
+            for get_url in item.get(get_urls_attr, [])
         )
         if object_instance.root.label in existing_labels:
             raise BadRequestError(
-                "The Media Object specified already exists with this label."
+                "The Object specified already exists with this label."
             )  # 400
         for item in items:
-            append_to_segment_list(item, "get_urls", model_dump(object_instance.root))
+            append_to_segment_list(
+                item, get_urls_attr, model_dump(object_instance.root)
+            )
     else:
         raise BadRequestError("Unexpected request body content.")  # 400
     return None, HTTPStatus.CREATED.value  # 201
@@ -306,17 +309,16 @@ def delete_objects_by_id(
         raise BadRequestError(
             "One of 'label' or 'storage_id' query parameters must be specified."
         )  # 400
-    items, _, _ = query_segments_by_object_id(
-        object_id,
-        fetch_all=True,
-    )
+    items, is_init_object = resolve_object_segments(object_id)
     if len(items) == 0:
         raise NotFoundError("The requested Object ID in the path is invalid.")  # 404
+    storage_attr = "init_storage_ids" if is_init_object else "storage_ids"
+    get_urls_attr = "init_get_urls" if is_init_object else "get_urls"
 
     # Filter items based on storage_id and/or label
     if param_storage_id:
         items = [
-            item for item in items if param_storage_id in item.get("storage_ids", [])
+            item for item in items if param_storage_id in item.get(storage_attr, [])
         ]
     if param_label:
         items = [
@@ -324,7 +326,7 @@ def delete_objects_by_id(
             for item in items
             if any(
                 get_url.get("label") == param_label
-                for get_url in item.get("get_urls", [])
+                for get_url in item.get(get_urls_attr, [])
             )
         ]
 
@@ -335,9 +337,9 @@ def delete_objects_by_id(
         )  # 404
 
     storage_ids = list(
-        {storage_id for item in items for storage_id in item.get("storage_ids", [])}
+        {storage_id for item in items for storage_id in item.get(storage_attr, [])}
     )
-    get_urls = get_unique_get_urls(items)
+    get_urls = get_unique_get_urls(items, attribute=get_urls_attr)
 
     # Check if deleting last storage_id instance
     if param_storage_id and storage_ids == [param_storage_id] and not get_urls:
@@ -358,9 +360,13 @@ def delete_objects_by_id(
     # Update flow segments
     for item in items:
         if param_storage_id:
-            remove_storage_id_from_segment(item, param_storage_id)
+            remove_storage_id_from_segment(
+                item, param_storage_id, attribute=storage_attr
+            )
         if param_label:
-            remove_get_url_by_label_from_segment(item, param_label)
+            remove_get_url_by_label_from_segment(
+                item, param_label, attribute=get_urls_attr
+            )
 
     if param_storage_id:
         # Send message to S3 SQS to delete item if no longer in use
@@ -388,3 +394,18 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
     raise BadRequestError(ex.errors())  # 400
+
+
+@tracer.capture_method(capture_response=False)
+def resolve_object_segments(object_id: str) -> tuple[list, bool]:
+    """Resolve the Segments that reference an Object, from either index.
+
+    Returns (segments, is_init_object). An Object is a Media Object if any
+    Segment carries it as object_id; otherwise it is an init Object if any
+    Segment carries it as init_object_id. Empty list means it does not exist.
+    """
+    items, _, _ = query_segments_by_object_id(object_id, fetch_all=True)
+    if items:
+        return items, False
+    init_items, _, _ = query_segments_by_init_object_id(object_id, fetch_all=True)
+    return init_items, True
