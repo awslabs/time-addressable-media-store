@@ -373,7 +373,11 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
                 elif essence_params[key] == "float":
                     return_dict["essence_properties"][key] = float(value)
                 elif essence_params[key] == "bool":
-                    return_dict["essence_properties"][key] = value.lower() == "true"
+                    return_dict["essence_properties"][key] = (
+                        value
+                        if isinstance(value, bool)
+                        else str(value).lower() == "true"
+                    )
             elif key == "tag_values":
                 for tag_name, tag_value in value.items():
                     prop_name = opencypher_property_name(tag_name)

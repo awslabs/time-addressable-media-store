@@ -109,7 +109,7 @@ def get_flows(
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
     param_frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
-    param_init_segments: Annotated[Optional[str], Query(alias="init_segments")] = None,
+    param_init_segments: Annotated[Optional[bool], Query(alias="init_segments")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
