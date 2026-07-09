@@ -24,6 +24,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from dynamodb import (
     TimeRangeBoundary,
+    commit_object_claim,
     delete_flow_segments,
     get_flow_timerange,
     get_key_and_args,
@@ -342,6 +343,10 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow.",
         )
+    # All validation has passed, so it is now safe to claim the Object(s). This
+    # must happen after every check above so a rejected request never mutates
+    # (claims) an Object in storage.
+    commit_object_claim(validation.get("claim"))
     item_dict["timerange_start"] = segment_timerange.start.to_nanosec() + (
         0 if segment_timerange.includes_start() else 1
     )

@@ -300,7 +300,13 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 
 @tracer.capture_method(capture_response=False)
 def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
-    """Validate object_id can be used with flow_id, returning (valid, storage_id, init_storage_id, object_timerange, message)"""
+    """Validate object_id can be used with flow_id.
+
+    Performs NO writes. Any storage mutations required on success are returned
+    in the `claim` list for the caller to apply via commit_object_claim, and
+    only after all validation (including overlap and init_segments consistency
+    checks) has passed, so that a rejected request never claims an Object.
+    """
     get_item = storage_table.get_item(Key={"id": segment.object_id})
     storage_item = get_item.get("Item")
     # Handle case where object_id doesn't exist
@@ -322,7 +328,8 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
                 "object_timerange": None,
                 "message": "Bad request. All label value in get_urls must be unique.",
             }
-        # Add item to dynamodb so that the "first_reference_by" field in the objects endpoint reports correctly
+        # Storage record to create so the "first_referenced_by" field in the
+        # objects endpoint reports correctly. Applied by the caller on success.
         object_timerange = calculate_object_timerange(segment)
         item = {
             "id": segment.object_id,
@@ -331,7 +338,6 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
         }
         if segment.init_object_id:
             item["init_object_id"] = segment.init_object_id
-        storage_table.put_item(Item=item)
         # No matching object_id and get_urls supplied so this is valid
         return {
             "valid": True,
@@ -340,6 +346,7 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
             "init_storage_id": None,
             "object_timerange": object_timerange,
             "message": None,
+            "claim": [{"op": "put", "item": item}],
         }
     # object_id exists - get_urls not allowed when called from segments endpoint
     if segment.get_urls:
@@ -360,6 +367,7 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
     is_first_time_use = storage_item.get("expire_at") is not None
     flow_id_matches = storage_item["flow_id"] == flow_id
     stored_timerange = storage_item.get("timerange")
+    claim = []
     # First time use object_id must be used on flow_id it was created with
     if is_first_time_use and not flow_id_matches:
         return {
@@ -368,7 +376,7 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
             "object_timerange": None,
             "message": "Bad request. The object id is not valid to be used for the flow id supplied.",
         }
-    # Remove expiration on first use with matching flow_id
+    # Queue removal of expiration on first use with matching flow_id
     if is_first_time_use and flow_id_matches:
         object_timerange = calculate_object_timerange(segment)
         update_expr = "REMOVE expire_at SET timerange = :timerange"
@@ -376,10 +384,13 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
         if segment.init_object_id:
             update_expr += ", init_object_id = :init_object_id"
             expr_values[":init_object_id"] = segment.init_object_id
-        storage_table.update_item(
-            Key={"id": segment.object_id},
-            UpdateExpression=update_expr,
-            ExpressionAttributeValues=expr_values,
+        claim.append(
+            {
+                "op": "update",
+                "key": {"id": segment.object_id},
+                "UpdateExpression": update_expr,
+                "ExpressionAttributeValues": expr_values,
+            }
         )
         stored_timerange = object_timerange
     # object_timerange must not be specified on object re-use
@@ -428,10 +439,13 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
                     "object_timerange": None,
                     "message": "Bad request. The init_object_id is not valid to be used for the flow id supplied.",
                 }
-            storage_table.update_item(
-                Key={"id": segment.init_object_id},
-                UpdateExpression="REMOVE expire_at SET is_init_object = :flag",
-                ExpressionAttributeValues={":flag": True},
+            claim.append(
+                {
+                    "op": "update",
+                    "key": {"id": segment.init_object_id},
+                    "UpdateExpression": "REMOVE expire_at SET is_init_object = :flag",
+                    "ExpressionAttributeValues": {":flag": True},
+                }
             )
             init_storage_id = init_item.get("storage_id")
         else:
@@ -460,7 +474,26 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
         "init_storage_id": init_storage_id,
         "object_timerange": stored_timerange,
         "message": None,
+        "claim": claim,
     }
+
+
+@tracer.capture_method(capture_response=False)
+def commit_object_claim(claim: list | None) -> None:
+    """Apply the storage writes returned by validate_object_id.
+
+    Called only after all validation has passed, so a rejected request never
+    mutates (claims) an Object.
+    """
+    for write in claim or []:
+        if write["op"] == "put":
+            storage_table.put_item(Item=write["item"])
+        elif write["op"] == "update":
+            storage_table.update_item(
+                Key=write["key"],
+                UpdateExpression=write["UpdateExpression"],
+                ExpressionAttributeValues=write["ExpressionAttributeValues"],
+            )
 
 
 @tracer.capture_method(capture_response=False)
@@ -590,7 +623,7 @@ def page_targets_init_index(page: str) -> bool:
     """
     try:
         decoded = json.loads(base64.b64decode(page).decode("utf-8"))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return False
     return "init_object_id" in decoded
 

@@ -91,6 +91,7 @@ class TestDynamoDB:
 
         assert ("media-1", ("s-1",)) in object_ids
         assert ("init-1", ("s-init",)) in object_ids
+        assert 1 == mock_publish_event.call_count
 
     @patch("dynamodb.segments_table")
     def test_delete_segment_items_returns_exception(self, mock_segments_table):
@@ -511,8 +512,12 @@ class TestDynamoDB:
 
         result = dynamodb.validate_object_id(segment, flow_id)
 
-        assert 1 == mock_storage_table.update_item.call_count
+        # validate_object_id performs no writes; it queues a claim instead
+        assert 0 == mock_storage_table.update_item.call_count
         assert result["valid"]
+        assert 1 == len(result["claim"])
+        assert "update" == result["claim"][0]["op"]
+        assert {"id": "abc"} == result["claim"][0]["key"]
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_matched_flow_id_expire_not_present(
@@ -581,8 +586,11 @@ class TestDynamoDB:
 
         assert result["valid"]
         assert result["init_storage_id"] is None
-        put_call = mock_storage_table.put_item.call_args[1]
-        assert put_call["Item"]["init_object_id"] == "init-123"
+        # The new-object storage record is queued as a put claim, not written
+        assert 0 == mock_storage_table.put_item.call_count
+        assert 1 == len(result["claim"])
+        assert "put" == result["claim"][0]["op"]
+        assert result["claim"][0]["item"]["init_object_id"] == "init-123"
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_first_use_with_init_object_id(self, mock_storage_table):
@@ -617,8 +625,10 @@ class TestDynamoDB:
 
         assert result["valid"]
         assert result["init_storage_id"] == "init-sid"
-        update_call = mock_storage_table.update_item.call_args[1]
-        assert ":init_object_id" in update_call["ExpressionAttributeValues"]
+        # The media object claim carries the init_object_id in its update
+        assert 0 == mock_storage_table.update_item.call_count
+        media_claim = next(c for c in result["claim"] if c["key"] == {"id": "abc"})
+        assert ":init_object_id" in media_claim["ExpressionAttributeValues"]
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_is_init_object_rejected_as_media(
@@ -766,10 +776,12 @@ class TestDynamoDB:
 
         assert result["valid"]
         assert result["init_storage_id"] == "init-sid"
-        assert mock_storage_table.update_item.call_count == 2
-        init_update = mock_storage_table.update_item.call_args_list[1][1]
-        assert init_update["Key"] == {"id": "init-123"}
-        assert ":flag" in init_update["ExpressionAttributeValues"]
+        # Two claims queued (media object first-use + flag the init object),
+        # neither written by validate_object_id itself
+        assert 0 == mock_storage_table.update_item.call_count
+        assert 2 == len(result["claim"])
+        init_claim = next(c for c in result["claim"] if c["key"] == {"id": "init-123"})
+        assert ":flag" in init_claim["ExpressionAttributeValues"]
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_reuse_with_changed_init_object_id(
