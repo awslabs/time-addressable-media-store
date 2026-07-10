@@ -44,8 +44,19 @@ class TimeRangeBoundary(Enum):
 
 
 @tracer.capture_method(capture_response=False)
-def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None:
-    """Loop supplied items and delete, early return on error, append to object_ids supplied on success"""
+def delete_segment_items(
+    items: list[dict], object_ids: set[str], resources: list | None = None
+) -> dict | None:
+    """Loop supplied items and delete, early return on error, append to object_ids supplied on success.
+
+    `resources` may hold the pre-resolved flows/segments_deleted event resources
+    (source, collected-by, etc.). This is required when the Flow is being
+    deleted: by the time its segments are removed the Flow (and its
+    source/collection edges) no longer exists, so enhance_resources could not
+    resolve them here - which would defeat source_ids / source_collected_by_ids
+    / flow_collected_by_ids webhook filtering. When not supplied (segment-only
+    deletion, Flow still exists) the resources are resolved live per flow_id.
+    """
     delete_error = None
     for item in items:
         key = {
@@ -69,7 +80,11 @@ def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None
                 publish_event(
                     "flows/segments_deleted",
                     {"flow_id": item["flow_id"], "timerange": item["timerange"]},
-                    enhance_resources([f'tams:flow:{item["flow_id"]}']),
+                    (
+                        resources
+                        if resources is not None
+                        else enhance_resources([f'tams:flow:{item["flow_id"]}'])
+                    ),
                 )
         except ClientError as e:
             delete_error = {
@@ -213,8 +228,14 @@ def delete_flow_segments(
     s3_queue: str,
     del_queue: str,
     item_dict: dict | None = None,
+    resources: list | None = None,
 ) -> None:
-    """Performs the logic to delete flow segments exits gracefully if within 5 seconds of Lambda timeout"""
+    """Performs the logic to delete flow segments exits gracefully if within 5 seconds of Lambda timeout.
+
+    `resources` is forwarded to delete_segment_items for the
+    flows/segments_deleted events; see that function for why it is required when
+    the Flow is being deleted.
+    """
     delete_error = None
     args = get_key_and_args(flow_id, parameters)
     args["Limit"] = constants.DELETE_BATCH_SIZE
@@ -226,6 +247,7 @@ def delete_flow_segments(
         delete_error = delete_segment_items(
             query["Items"],
             object_ids,
+            resources,
         )
         update_flow_segments_updated(flow_id)
     # Continue with deletes if no errors, more records available and more than specified milliseconds remain of runtime
@@ -242,6 +264,7 @@ def delete_flow_segments(
             delete_error = delete_segment_items(
                 query["Items"],
                 object_ids,
+                resources,
             )
             update_flow_segments_updated(flow_id)
     # Add affected object_ids to the SQS queue for potential S3 cleanup

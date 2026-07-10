@@ -93,6 +93,55 @@ class TestDynamoDB:
         assert ("init-1", ("s-init",)) in object_ids
         assert 1 == mock_publish_event.call_count
 
+    @patch("dynamodb.enhance_resources")
+    @patch("dynamodb.publish_event")
+    @patch("dynamodb.segments_table")
+    def test_delete_segment_items_uses_supplied_resources(
+        self, mock_segments_table, mock_publish_event, mock_enhance_resources
+    ):
+        """When resources are supplied (Flow being deleted), they are used
+        verbatim for the flows/segments_deleted event and enhance_resources is
+        not called (the Flow no longer exists to resolve them from)."""
+        items = [
+            {
+                "flow_id": "1",
+                "timerange_end": "1",
+                "object_id": "media-1",
+                "timerange": "123",
+            },
+        ]
+        mock_segments_table.delete_item.return_value = {"Attributes": []}
+        resources = ["tams:flow:1", "tams:source:src-1"]
+
+        dynamodb.delete_segment_items(items, set(), resources)
+
+        assert 0 == mock_enhance_resources.call_count
+        assert resources == mock_publish_event.call_args[0][2]
+
+    @patch("dynamodb.enhance_resources")
+    @patch("dynamodb.publish_event")
+    @patch("dynamodb.segments_table")
+    def test_delete_segment_items_falls_back_to_enhance_resources(
+        self, mock_segments_table, mock_publish_event, mock_enhance_resources
+    ):
+        """When no resources are supplied (segment-only deletion, Flow still
+        exists), resources are resolved live via enhance_resources."""
+        items = [
+            {
+                "flow_id": "1",
+                "timerange_end": "1",
+                "object_id": "media-1",
+                "timerange": "123",
+            },
+        ]
+        mock_segments_table.delete_item.return_value = {"Attributes": []}
+        mock_enhance_resources.return_value = ["tams:flow:1", "tams:source:src-1"]
+
+        dynamodb.delete_segment_items(items, set())
+
+        assert 1 == mock_enhance_resources.call_count
+        assert ["tams:flow:1"] == mock_enhance_resources.call_args[0][0]
+
     @patch("dynamodb.segments_table")
     def test_delete_segment_items_returns_exception(self, mock_segments_table):
         items = [
@@ -360,6 +409,42 @@ class TestDynamoDB:
         assert mock_segments_table.query.called
         assert merge_delete_request.called
         assert merge_delete_request.call_args[0][0]["status"] == "done"
+
+    @patch("dynamodb.segments_table")
+    @patch("dynamodb.delete_segment_items")
+    @patch("dynamodb.merge_delete_request")
+    def test_delete_flow_segments_forwards_resources(
+        self,
+        _,
+        mock_delete_segment_items,
+        mock_segments_table,
+        time_range_one_day,
+    ):
+        """Pre-resolved resources are forwarded to delete_segment_items so the
+        flows/segments_deleted events carry them when the Flow is deleted."""
+        mock_segments_table.query.return_value = {
+            "Items": [
+                {
+                    "flow_id": "1",
+                    "timerange": time_range_one_day.to_sec_nsec_range(),
+                }
+            ]
+        }
+        mock_delete_segment_items.return_value = None
+        resources = ["tams:flow:1", "tams:source:src-1"]
+
+        dynamodb.delete_flow_segments(
+            flow_id="test-flow",
+            parameters={},
+            timerange_to_delete=time_range_one_day,
+            context=MagicMock(),
+            s3_queue="s3-queue",
+            del_queue="del-queue",
+            item_dict={},
+            resources=resources,
+        )
+
+        assert resources == mock_delete_segment_items.call_args[0][2]
 
     @pytest.mark.parametrize(
         "remaining_time_variance",
