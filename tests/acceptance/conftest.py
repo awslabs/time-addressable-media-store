@@ -641,15 +641,15 @@ def expect_webhooks(webhook_expectations):
                     and len(item) == 2
                     and isinstance(item[0], dict)
                 ):
-                    # (body_dict, extra_excludes)
+                    # (body_dict, extra_ignored_value_fields)
                     expectation["event_type"] = item[0]["event_type"]
                     expectation["body"] = deepcopy(item[0])
-                    expectation["extra_excludes"] = item[1]
+                    expectation["extra_ignored_value_fields"] = item[1]
                 elif isinstance(item, dict):
                     # body_dict only
                     expectation["event_type"] = item["event_type"]
                     expectation["body"] = deepcopy(item)
-                    expectation["extra_excludes"] = []
+                    expectation["extra_ignored_value_fields"] = []
 
                 webhook_expectations.append(expectation)
 
