@@ -503,6 +503,43 @@ def test_Delete_Flow_DELETE_204_MULTI(
     )
 
 
+def test_Delete_Flow_DELETE_202_INIT(
+    api_client_cognito, delete_requests, stub_init_flow, expect_webhooks
+):
+    """204 returned as stub_image_flow has no segments"""
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 202)
+    response_json = response.json()
+    delete_requests.append(response_json["id"])
+    expect_webhooks(
+        {
+            "event_type": "flows/deleted",
+            "event": {"flow_id": stub_init_flow["id"]},
+        },
+        {
+            "event_type": "sources/deleted",
+            "event": {"source_id": stub_init_flow["source_id"]},
+        },
+        *[
+            {
+                "event_type": "flows/segments_deleted",
+                "event": {
+                    "flow_id": stub_init_flow["id"],
+                    "timerange": f"[{n}:0_{n + 1}:0)",
+                },
+            }
+            for n in range(3)
+        ],
+    )
+
+
 def test_Flow_Delete_Request_Details_GET_200(api_client_cognito, delete_requests):
     """Check that all delete requests complete"""
     queue = deque(delete_requests)
@@ -619,7 +656,7 @@ def test_FlowStorage_Table_Empty(session, stack):
     # Act
     scan = storage_table.scan(ProjectionExpression="id")
     # Assert
-    assert 4 == len(scan["Items"])
+    assert 6 == len(scan["Items"])
     with storage_table.batch_writer() as batch:
         for item in scan["Items"]:
             batch.delete_item(Key=item)
@@ -654,5 +691,5 @@ def test_S3_Bucket_Empty(session, stack):
     # Act
     objects_list = bucket.objects.all()
     # Assert
-    assert 1 == len(list(objects_list))
+    assert 3 == len(list(objects_list))
     objects_list.delete()

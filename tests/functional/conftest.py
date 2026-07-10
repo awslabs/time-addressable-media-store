@@ -271,6 +271,7 @@ def segments_table():
             {"AttributeName": "flow_id", "AttributeType": "S"},
             {"AttributeName": "timerange_end", "AttributeType": "N"},
             {"AttributeName": "object_id", "AttributeType": "S"},
+            {"AttributeName": "init_object_id", "AttributeType": "S"},
         ],
         GlobalSecondaryIndexes=[
             {
@@ -280,7 +281,15 @@ def segments_table():
                     {"AttributeName": "flow_id", "KeyType": "RANGE"},
                 ],
                 "Projection": {"ProjectionType": "ALL"},
-            }
+            },
+            {
+                "IndexName": "init-object-id-index",
+                "KeySchema": [
+                    {"AttributeName": "init_object_id", "KeyType": "HASH"},
+                    {"AttributeName": "flow_id", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            },
         ],
         BillingMode="PAY_PER_REQUEST",
     )

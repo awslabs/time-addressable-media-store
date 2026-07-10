@@ -11,6 +11,7 @@ from boto3.s3.transfer import TransferConfig
 from dynamodb import (
     append_to_segment_list,
     get_storage_backend,
+    query_segments_by_init_object_id,
     query_segments_by_object_id,
 )
 
@@ -33,9 +34,16 @@ def record_handler(record: SQSRecord) -> None:
     object_id = body["object_id"]
     dst_storage_id = body["destination_storage_id"]
     dst_storage_backend = get_storage_backend(dst_storage_id)
-    items, _, _ = query_segments_by_object_id(object_id, fetch_all=True)
+    is_init_object = body.get("is_init_object", False)
+    # An init Object is referenced via init_object_id and holds its controlled
+    # locations in init_storage_ids; a Media Object uses the plain fields.
+    storage_attr = "init_storage_ids" if is_init_object else "storage_ids"
+    if is_init_object:
+        items, _, _ = query_segments_by_init_object_id(object_id, fetch_all=True)
+    else:
+        items, _, _ = query_segments_by_object_id(object_id, fetch_all=True)
     src_storage_ids = list(
-        {storage_id for item in items for storage_id in item.get("storage_ids", [])}
+        {storage_id for item in items for storage_id in item.get(storage_attr, [])}
     )
     src_storage_backend = get_storage_backend(src_storage_ids[0])
     src_metadata = s3.head_object(
@@ -55,7 +63,7 @@ def record_handler(record: SQSRecord) -> None:
         },
     )
     for item in items:
-        append_to_segment_list(item, "storage_ids", dst_storage_id)
+        append_to_segment_list(item, storage_attr, dst_storage_id)
 
 
 @logger.inject_lambda_context(log_event=True)

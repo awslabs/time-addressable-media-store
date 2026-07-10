@@ -108,6 +108,59 @@ def test_Allocate_Flow_Storage_POST_201_object_ids(api_client_cognito, stub_vide
         assert stub_video_flow["container"] == record["put_url"]["content-type"]
 
 
+def test_Allocate_Flow_Storage_POST_201_content_type(
+    api_client_cognito, init_objects, stub_init_flow
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/storage'
+    limit = 2
+    content_type = "text/plain"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"limit": limit, "content_type": content_type},
+    )
+    # Assert
+    assert_json_response(response, 201)
+    response_json = response.json()
+    init_objects.extend(response_json["media_objects"])
+    assert "media_objects" in response_json
+    assert limit == len(response_json["media_objects"])
+    for record in response_json["media_objects"]:
+        assert "object_id" in record
+        assert "put_url" in record
+        assert "url" in record["put_url"]
+        assert "content-type" in record["put_url"]
+        assert content_type == record["put_url"]["content-type"]
+
+
+def test_Allocate_Flow_Storage_POST_201_init_media_objects(
+    api_client_cognito, init_media_objects, stub_init_flow
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/storage'
+    limit = 3
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"limit": limit},
+    )
+    # Assert
+    assert_json_response(response, 201)
+    response_json = response.json()
+    init_media_objects.extend(response_json["media_objects"])
+    assert "media_objects" in response_json
+    assert limit == len(response_json["media_objects"])
+    for record in response_json["media_objects"]:
+        assert "object_id" in record
+        assert "put_url" in record
+        assert "url" in record["put_url"]
+        assert "content-type" in record["put_url"]
+        assert stub_init_flow["container"] == record["put_url"]["content-type"]
+
+
 def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito, stub_multi_flow):
     """Bad request body"""
     # Arrange
@@ -179,6 +232,32 @@ def test_Allocate_Flow_Storage_POST_404(api_client_cognito):
 def test_Presigned_PUT_URL_POST_200(media_objects):
     # Act
     for record in media_objects[:-1]:
+        put_file = requests.put(
+            record["put_url"]["url"],
+            headers={"Content-Type": record["put_url"]["content-type"]},
+            data="test file content",
+            timeout=30,
+        )
+        # Assert
+        assert 200 == put_file.status_code
+
+
+def test_Presigned_PUT_URL_POST_200_init_segments(init_objects):
+    # Act
+    for record in init_objects:
+        put_file = requests.put(
+            record["put_url"]["url"],
+            headers={"Content-Type": record["put_url"]["content-type"]},
+            data="test file content",
+            timeout=30,
+        )
+        # Assert
+        assert 200 == put_file.status_code
+
+
+def test_Presigned_PUT_URL_POST_200_init_media_segments(init_media_objects):
+    # Act
+    for record in init_media_objects:
         put_file = requests.put(
             record["put_url"]["url"],
             headers={"Content-Type": record["put_url"]["content-type"]},
@@ -1030,7 +1109,7 @@ def test_List_Flows_GET_200_timerange_never(api_client_cognito):
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 3 == len(response_json)
+    assert 4 == len(response_json)
 
 
 def test_List_Flow_Segments_GET_200(api_client_cognito, stub_video_flow):
@@ -2023,7 +2102,7 @@ def test_Get_Media_Object_Information_GET_404(api_client_cognito):
     # Assert
     assert_json_response(response, 404)
     response_json = response.json()
-    assert "The requested media object does not exist." == response_json["message"]
+    assert "The requested Object does not exist." == response_json["message"]
 
 
 def test_Register_Media_Object_Instance_POST_201(api_client_cognito, media_objects):
@@ -2116,3 +2195,387 @@ def test_Delete_Media_Object_Instance_DELETE_404(api_client_cognito):
     )
     # Assert
     assert_json_response(response, 404)
+
+
+def test_Create_Flow_Segment_POST_201_init_object_id(
+    api_client_cognito,
+    init_objects,
+    init_media_objects,
+    stub_init_flow,
+    expect_webhooks,
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_media_objects[0]["object_id"],
+            "init_object_id": init_objects[0]["object_id"],
+            "timerange": "[0:0_1:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 201)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_init_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+            # Segment-triggered flows/updated does not carry these metadata-edit
+            # fields, so they must not be required present.
+            ["event.flow.updated_by", "event.flow.metadata_updated"],
+        ),
+        (
+            {
+                "event_type": "flows/segments_added",
+                "event": {
+                    "flow_id": stub_init_flow["id"],
+                    "segments": [
+                        {
+                            "object_id": init_media_objects[0]["object_id"],
+                            "timerange": "[0:0_1:0)",
+                            "get_urls": default_get_urls(),
+                            "init_object": {
+                                "object_id": init_objects[0]["object_id"],
+                                "get_urls": default_get_urls(),
+                            },
+                        }
+                    ],
+                },
+            },
+            [
+                "event.segments[].get_urls[].url",
+                "event.segments[].init_object.get_urls[].url",
+            ],
+        ),
+    )
+
+
+def test_Create_Flow_Segment_POST_201_init_object_reuse(
+    api_client_cognito,
+    init_objects,
+    init_media_objects,
+    stub_init_flow,
+    expect_webhooks,
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_media_objects[1]["object_id"],
+            "init_object_id": init_objects[0]["object_id"],
+            "timerange": "[1:0_2:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 201)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_init_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+            # Segment-triggered flows/updated does not carry these metadata-edit
+            # fields, so they must not be required present.
+            ["event.flow.updated_by", "event.flow.metadata_updated"],
+        ),
+        (
+            {
+                "event_type": "flows/segments_added",
+                "event": {
+                    "flow_id": stub_init_flow["id"],
+                    "segments": [
+                        {
+                            "object_id": init_media_objects[1]["object_id"],
+                            "timerange": "[1:0_2:0)",
+                            "get_urls": default_get_urls(),
+                            "init_object": {
+                                "object_id": init_objects[0]["object_id"],
+                                "get_urls": default_get_urls(),
+                            },
+                        }
+                    ],
+                },
+            },
+            [
+                "event.segments[].get_urls[].url",
+                "event.segments[].init_object.get_urls[].url",
+            ],
+        ),
+    )
+
+
+def test_Create_Flow_Segment_POST_201_object_reuse_with_init(
+    api_client_cognito,
+    init_objects,
+    init_media_objects,
+    stub_init_flow,
+    expect_webhooks,
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_media_objects[0]["object_id"],
+            "timerange": "[2:0_3:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 201)
+    expect_webhooks(
+        (
+            {
+                "event_type": "flows/updated",
+                "event": {
+                    "flow": stub_init_flow,
+                },
+            },
+            ["event.flow.segments_updated"],
+            # Segment-triggered flows/updated does not carry these metadata-edit
+            # fields, so they must not be required present.
+            ["event.flow.updated_by", "event.flow.metadata_updated"],
+        ),
+        (
+            {
+                "event_type": "flows/segments_added",
+                "event": {
+                    "flow_id": stub_init_flow["id"],
+                    "segments": [
+                        {
+                            "object_id": init_media_objects[0]["object_id"],
+                            "timerange": "[2:0_3:0)",
+                            "get_urls": default_get_urls(),
+                            "init_object": {
+                                "object_id": init_objects[0]["object_id"],
+                                "get_urls": default_get_urls(),
+                            },
+                        }
+                    ],
+                },
+            },
+            [
+                "event.segments[].get_urls[].url",
+                "event.segments[].init_object.get_urls[].url",
+            ],
+        ),
+    )
+
+
+def test_Create_Flow_Segment_POST_400_init_on_non_init_flow(
+    api_client_cognito, init_media_objects, stub_video_flow
+):
+    # Arrange
+    path = f'/flows/{stub_video_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_media_objects[0]["object_id"],
+            "timerange": "[999:0_1000:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert (
+        "Bad request. init_object_id may only be set when the Flow's `init_segments` is true."
+        == response_json["message"]
+    )
+
+
+def test_Create_Flow_Segment_POST_400_missing_init_on_init_flow(
+    api_client_cognito, init_media_objects, stub_init_flow
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_media_objects[2]["object_id"],
+            "timerange": "[999:0_1000:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert (
+        "Bad request. This Flow uses initialisation segments so every Flow Segment MUST reference an init_object_id."
+        == response_json["message"]
+    )
+
+
+def test_Create_Flow_Segment_POST_400_init_object_as_media(
+    api_client_cognito, init_objects, stub_video_flow
+):
+    # Arrange
+    path = f'/flows/{stub_video_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_objects[0]["object_id"],
+            "timerange": "[999:0_1000:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert (
+        "Bad request. An initialisation segment Object cannot be used as a media segment Object."
+        == response_json["message"]
+    )
+
+
+def test_Create_Flow_Segment_POST_400_media_object_as_init(
+    api_client_cognito, init_media_objects, stub_init_flow
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_media_objects[2]["object_id"],
+            "init_object_id": init_media_objects[0]["object_id"],
+            "timerange": "[0:0_1:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert (
+        "Bad request. A media segment Object cannot be used as an initialisation segment Object."
+        == response_json["message"]
+    )
+
+
+def test_Create_Flow_Segment_POST_400_changed_init_object_id(
+    api_client_cognito, init_objects, init_media_objects, stub_init_flow
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": init_media_objects[0]["object_id"],
+            "init_object_id": init_objects[1]["object_id"],
+            "timerange": "[999:0_1000:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert (
+        "Bad request. The init_object_id must not change when Media Objects are re-used."
+        == response_json["message"]
+    )
+
+
+def test_List_Flow_Segments_GET_200_init_object(api_client_cognito, stub_init_flow):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}/segments'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 3 == len(response_json)
+    for record in response_json:
+        assert "object_id" in record
+        assert "timerange" in record
+        assert "get_urls" in record
+        assert 2 == len(record["get_urls"])
+        assert "init_object" in record
+        assert "object_id" in record["init_object"]
+        assert "get_urls" in record["init_object"]
+        assert 2 == len(record["init_object"]["get_urls"])
+
+
+def test_Get_Media_Object_Information_HEAD_200_init_object(
+    api_client_cognito, init_objects
+):
+    # Arrange
+    object_id = init_objects[0]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_Get_Media_Object_Information_GET_200_init_object(
+    api_client_cognito, init_objects, stub_init_flow
+):
+    # Arrange
+    object_id = init_objects[0]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert object_id == response_json["id"]
+    assert [stub_init_flow["id"]] == response_json["referenced_by_flows"]
+    assert stub_init_flow["id"] == response_json["first_referenced_by_flow"]
+    assert "timerange" not in response_json
+    assert "get_urls" in response_json
+    assert 2 == len(response_json["get_urls"])
+    assert "init_object" not in response_json
+
+
+def test_Get_Media_Object_Information_GET_200_media_object_shows_init(
+    api_client_cognito, init_objects, init_media_objects, stub_init_flow
+):
+    # Arrange
+    object_id = init_media_objects[0]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert object_id == response_json["id"]
+    assert [stub_init_flow["id"]] == response_json["referenced_by_flows"]
+    assert stub_init_flow["id"] == response_json["first_referenced_by_flow"]
+    assert "timerange" in response_json
+    assert "get_urls" in response_json
+    assert 2 == len(response_json["get_urls"])
+    assert "init_object" in response_json
+    assert "id" in response_json["init_object"]
+    assert init_objects[0]["object_id"] == response_json["init_object"]["id"]
+    assert "get_urls" in response_json["init_object"]
+    assert 2 == len(response_json["init_object"]["get_urls"])

@@ -153,6 +153,16 @@ def media_objects():
 
 
 @pytest.fixture(scope="session")
+def init_objects():
+    return []
+
+
+@pytest.fixture(scope="session")
+def init_media_objects():
+    return []
+
+
+@pytest.fixture(scope="session")
 def delete_requests():
     return []
 
@@ -271,6 +281,32 @@ def stub_multi_flow():
 
 
 @pytest.fixture(scope="session")
+def stub_init_flow():
+    return {
+        "id": "10000000-0000-1000-8000-000000000005",
+        "source_id": "00000000-0000-1000-8000-000000000005",
+        "format": "urn:x-nmos:format:video",
+        "generation": 0,
+        "codec": "video/h264",
+        "container": "video/mp4",
+        "avg_bit_rate": 5000000,
+        "max_bit_rate": 5000000,
+        "essence_parameters": {
+            "frame_rate": {"numerator": 50, "denominator": 1},
+            "frame_width": 1920,
+            "frame_height": 1080,
+            "bit_depth": 8,
+            "interlace_mode": "progressive",
+            "component_type": "YCbCr",
+            "horiz_chroma_subs": 2,
+            "vert_chroma_subs": 1,
+            "avc_parameters": {"profile": 122, "level": 42, "flags": 0},
+            "init_segments": True,
+        },
+    }
+
+
+@pytest.fixture(scope="session")
 def stub_video_source():
     return {
         "id": "00000000-0000-1000-8000-000000000000",
@@ -335,6 +371,14 @@ def stub_multi_source():
             {"id": "00000000-0000-1000-8000-000000000002", "role": "data"},
             {"id": "00000000-0000-1000-8000-000000000004", "role": "image"},
         ],
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_init_source():
+    return {
+        "id": "00000000-0000-1000-8000-000000000005",
+        "format": "urn:x-nmos:format:video",
     }
 
 
@@ -594,18 +638,22 @@ def expect_webhooks(webhook_expectations):
                     expectation["event_type"] = item
                 elif (
                     isinstance(item, tuple)
-                    and len(item) == 2
+                    and len(item) in (2, 3)
                     and isinstance(item[0], dict)
                 ):
-                    # (body_dict, extra_excludes)
+                    # (body_dict, extra_ignored_value_fields[, optional_fields])
                     expectation["event_type"] = item[0]["event_type"]
                     expectation["body"] = deepcopy(item[0])
-                    expectation["extra_excludes"] = item[1]
+                    expectation["extra_ignored_value_fields"] = item[1]
+                    # Optional third element: fields whose value is ignored AND
+                    # whose presence is not required (e.g. updated_by /
+                    # metadata_updated on a segment-triggered flows/updated).
+                    expectation["optional_fields"] = item[2] if len(item) == 3 else []
                 elif isinstance(item, dict):
                     # body_dict only
                     expectation["event_type"] = item["event_type"]
                     expectation["body"] = deepcopy(item)
-                    expectation["extra_excludes"] = []
+                    expectation["extra_ignored_value_fields"] = []
 
                 webhook_expectations.append(expectation)
 

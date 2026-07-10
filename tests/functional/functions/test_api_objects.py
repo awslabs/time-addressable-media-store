@@ -165,7 +165,7 @@ def test_GET_object_returns_404_when_object_id_does_not_exist(
     # Assert
     assert response["statusCode"] == HTTPStatus.NOT_FOUND.value
     assert response_headers.get("Content-Type")[0] == "application/json"
-    assert response_body.get("message") == "The requested media object does not exist."
+    assert response_body.get("message") == "The requested Object does not exist."
 
 
 # pylint: disable=redefined-outer-name

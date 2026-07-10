@@ -44,8 +44,19 @@ class TimeRangeBoundary(Enum):
 
 
 @tracer.capture_method(capture_response=False)
-def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None:
-    """Loop supplied items and delete, early return on error, append to object_ids supplied on success"""
+def delete_segment_items(
+    items: list[dict], object_ids: set[str], resources: list | None = None
+) -> dict | None:
+    """Loop supplied items and delete, early return on error, append to object_ids supplied on success.
+
+    `resources` may hold the pre-resolved flows/segments_deleted event resources
+    (source, collected-by, etc.). This is required when the Flow is being
+    deleted: by the time its segments are removed the Flow (and its
+    source/collection edges) no longer exists, so enhance_resources could not
+    resolve them here - which would defeat source_ids / source_collected_by_ids
+    / flow_collected_by_ids webhook filtering. When not supplied (segment-only
+    deletion, Flow still exists) the resources are resolved live per flow_id.
+    """
     delete_error = None
     for item in items:
         key = {
@@ -59,10 +70,21 @@ def delete_segment_items(items: list[dict], object_ids: set[str]) -> dict | None
             )
             if "Attributes" in delete_item:
                 object_ids.add((item["object_id"], tuple(item.get("storage_ids", []))))
+                if item.get("init_object_id"):
+                    object_ids.add(
+                        (
+                            item["init_object_id"],
+                            tuple(item.get("init_storage_ids", [])),
+                        )
+                    )
                 publish_event(
                     "flows/segments_deleted",
                     {"flow_id": item["flow_id"], "timerange": item["timerange"]},
-                    enhance_resources([f'tams:flow:{item["flow_id"]}']),
+                    (
+                        resources
+                        if resources is not None
+                        else enhance_resources([f'tams:flow:{item["flow_id"]}'])
+                    ),
                 )
         except ClientError as e:
             delete_error = {
@@ -206,8 +228,14 @@ def delete_flow_segments(
     s3_queue: str,
     del_queue: str,
     item_dict: dict | None = None,
+    resources: list | None = None,
 ) -> None:
-    """Performs the logic to delete flow segments exits gracefully if within 5 seconds of Lambda timeout"""
+    """Performs the logic to delete flow segments exits gracefully if within 5 seconds of Lambda timeout.
+
+    `resources` is forwarded to delete_segment_items for the
+    flows/segments_deleted events; see that function for why it is required when
+    the Flow is being deleted.
+    """
     delete_error = None
     args = get_key_and_args(flow_id, parameters)
     args["Limit"] = constants.DELETE_BATCH_SIZE
@@ -219,6 +247,7 @@ def delete_flow_segments(
         delete_error = delete_segment_items(
             query["Items"],
             object_ids,
+            resources,
         )
         update_flow_segments_updated(flow_id)
     # Continue with deletes if no errors, more records available and more than specified milliseconds remain of runtime
@@ -235,6 +264,7 @@ def delete_flow_segments(
             delete_error = delete_segment_items(
                 query["Items"],
                 object_ids,
+                resources,
             )
             update_flow_segments_updated(flow_id)
     # Add affected object_ids to the SQS queue for potential S3 cleanup
@@ -293,7 +323,13 @@ def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
 
 @tracer.capture_method(capture_response=False)
 def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
-    """Validate object_id can be used with flow_id, returning (valid, storage_id, object_timerange, message)"""
+    """Validate object_id can be used with flow_id.
+
+    Performs NO writes. Any storage mutations required on success are returned
+    in the `claim` list for the caller to apply via commit_object_claim, and
+    only after all validation (including overlap and init_segments consistency
+    checks) has passed, so that a rejected request never claims an Object.
+    """
     get_item = storage_table.get_item(Key={"id": segment.object_id})
     storage_item = get_item.get("Item")
     # Handle case where object_id doesn't exist
@@ -315,21 +351,25 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
                 "object_timerange": None,
                 "message": "Bad request. All label value in get_urls must be unique.",
             }
-        # Add item to dynamodb so that the "first_reference_by" field in the objects endpoint reports correctly
+        # Storage record to create so the "first_referenced_by" field in the
+        # objects endpoint reports correctly. Applied by the caller on success.
         object_timerange = calculate_object_timerange(segment)
-        storage_table.put_item(
-            Item={
-                "id": segment.object_id,
-                "flow_id": flow_id,
-                "timerange": object_timerange,
-            }
-        )
+        item = {
+            "id": segment.object_id,
+            "flow_id": flow_id,
+            "timerange": object_timerange,
+        }
+        if segment.init_object_id:
+            item["init_object_id"] = segment.init_object_id
         # No matching object_id and get_urls supplied so this is valid
         return {
             "valid": True,
             "storage_id": None,
+            "init_object_id": segment.init_object_id,
+            "init_storage_id": None,
             "object_timerange": object_timerange,
             "message": None,
+            "claim": [{"op": "put", "item": item}],
         }
     # object_id exists - get_urls not allowed when called from segments endpoint
     if segment.get_urls:
@@ -339,9 +379,18 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
             "object_timerange": None,
             "message": "Bad request. An unused object id is required when supplying get_urls.",
         }
+    # Reject using an init object as a media object
+    if storage_item.get("is_init_object"):
+        return {
+            "valid": False,
+            "storage_id": None,
+            "object_timerange": None,
+            "message": "Bad request. An initialisation segment Object cannot be used as a media segment Object.",
+        }
     is_first_time_use = storage_item.get("expire_at") is not None
     flow_id_matches = storage_item["flow_id"] == flow_id
     stored_timerange = storage_item.get("timerange")
+    claim = []
     # First time use object_id must be used on flow_id it was created with
     if is_first_time_use and not flow_id_matches:
         return {
@@ -350,13 +399,21 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
             "object_timerange": None,
             "message": "Bad request. The object id is not valid to be used for the flow id supplied.",
         }
-    # Remove expiration on first use with matching flow_id
+    # Queue removal of expiration on first use with matching flow_id
     if is_first_time_use and flow_id_matches:
         object_timerange = calculate_object_timerange(segment)
-        storage_table.update_item(
-            Key={"id": segment.object_id},
-            UpdateExpression="REMOVE expire_at SET timerange = :timerange",
-            ExpressionAttributeValues={":timerange": object_timerange},
+        update_expr = "REMOVE expire_at SET timerange = :timerange"
+        expr_values = {":timerange": object_timerange}
+        if segment.init_object_id:
+            update_expr += ", init_object_id = :init_object_id"
+            expr_values[":init_object_id"] = segment.init_object_id
+        claim.append(
+            {
+                "op": "update",
+                "key": {"id": segment.object_id},
+                "UpdateExpression": update_expr,
+                "ExpressionAttributeValues": expr_values,
+            }
         )
         stored_timerange = object_timerange
     # object_timerange must not be specified on object re-use
@@ -367,24 +424,115 @@ def validate_object_id(segment: Flowsegmentpost, flow_id: str) -> dict:
             "object_timerange": None,
             "message": "Bad request. The object_timerange should not be specified when Media Objects are re-used.",
         }
+    # init_object_id must not change on object re-use
+    if not is_first_time_use and segment.init_object_id is not None:
+        stored_init_object_id = storage_item.get("init_object_id")
+        if (
+            stored_init_object_id is not None
+            and stored_init_object_id != segment.init_object_id
+        ):
+            return {
+                "valid": False,
+                "storage_id": None,
+                "object_timerange": None,
+                "message": "Bad request. The init_object_id must not change when Media Objects are re-used.",
+            }
+    init_storage_id = None
+    effective_init_object_id = segment.init_object_id
+    # Validate init_object_id if provided
+    if segment.init_object_id:
+        init_item = storage_table.get_item(Key={"id": segment.init_object_id}).get(
+            "Item"
+        )
+        if init_item is None:
+            return {
+                "valid": False,
+                "storage_id": None,
+                "object_timerange": None,
+                "message": "Bad request. The init_object_id does not exist.",
+            }
+        if init_item.get("is_init_object"):
+            init_storage_id = init_item.get("storage_id")
+        elif init_item.get("expire_at"):
+            # First time use as init object - check flow_id matches
+            if init_item["flow_id"] != flow_id:
+                return {
+                    "valid": False,
+                    "storage_id": None,
+                    "object_timerange": None,
+                    "message": "Bad request. The init_object_id is not valid to be used for the flow id supplied.",
+                }
+            claim.append(
+                {
+                    "op": "update",
+                    "key": {"id": segment.init_object_id},
+                    "UpdateExpression": "REMOVE expire_at SET is_init_object = :flag",
+                    "ExpressionAttributeValues": {":flag": True},
+                }
+            )
+            init_storage_id = init_item.get("storage_id")
+        else:
+            # No expire_at, no is_init_object → already used as media object
+            return {
+                "valid": False,
+                "storage_id": None,
+                "object_timerange": None,
+                "message": "Bad request. A media segment Object cannot be used as an initialisation segment Object.",
+            }
+    elif not is_first_time_use and storage_item.get("init_object_id"):
+        # Object re-use with init_object_id omitted (as recommended by the spec).
+        # Recover the init reference from the stored Media Object so the new
+        # Segment still reports init_object on read.
+        effective_init_object_id = storage_item["init_object_id"]
+        init_item = storage_table.get_item(Key={"id": effective_init_object_id}).get(
+            "Item"
+        )
+        if init_item:
+            init_storage_id = init_item.get("storage_id")
     # Valid: either flow_id matches or object_id is reusable
     return {
         "valid": True,
         "storage_id": storage_item.get("storage_id"),
+        "init_object_id": effective_init_object_id,
+        "init_storage_id": init_storage_id,
         "object_timerange": stored_timerange,
         "message": None,
+        "claim": claim,
     }
+
+
+@tracer.capture_method(capture_response=False)
+def commit_object_claim(claim: list | None) -> None:
+    """Apply the storage writes returned by validate_object_id.
+
+    Called only after all validation has passed, so a rejected request never
+    mutates (claims) an Object.
+    """
+    for write in claim or []:
+        if write["op"] == "put":
+            storage_table.put_item(Item=write["item"])
+        elif write["op"] == "update":
+            storage_table.update_item(
+                Key=write["key"],
+                UpdateExpression=write["UpdateExpression"],
+                ExpressionAttributeValues=write["ExpressionAttributeValues"],
+            )
 
 
 @tracer.capture_method(capture_response=False)
 def delete_flow_storage_record(object_id: str, storage_id: str | None = None) -> None:
     """Remove storage_id from object's DDB record, or delete the record entirely if no segments reference it"""
-    query = segments_table.query(
+    object_id_refs = segments_table.query(
         IndexName="object-id-index",
         KeyConditionExpression=Key("object_id").eq(object_id),
         Select="COUNT",
     )
-    if query["Count"] == 0:
+    init_object_id_refs = segments_table.query(
+        IndexName="init-object-id-index",
+        KeyConditionExpression=Key("init_object_id").eq(object_id),
+        Select="COUNT",
+    )
+    if object_id_refs["Count"] == 0 and init_object_id_refs["Count"] == 0:
         storage_table.delete_item(
             Key={"id": object_id},
         )
@@ -404,7 +552,9 @@ def delete_flow_storage_record(object_id: str, storage_id: str | None = None) ->
 
 
 @tracer.capture_method(capture_response=False)
-def decode_and_validate_page(page: str, object_id: str) -> dict:
+def decode_and_validate_page(
+    page: str, object_id: str, key_name: str = "object_id"
+) -> dict:
     """Decode and validate base64 encoded pagination key"""
     try:
         decoded_page = base64.b64decode(page).decode("utf-8")
@@ -412,10 +562,10 @@ def decode_and_validate_page(page: str, object_id: str) -> dict:
     except Exception as ex:
         raise BadRequestError("Invalid page parameter value") from ex
     if any(
-        f not in exclusive_start_key for f in ["flow_id", "object_id", "timerange_end"]
+        f not in exclusive_start_key for f in ["flow_id", key_name, "timerange_end"]
     ):
         raise BadRequestError("Invalid page parameter value")
-    if exclusive_start_key["object_id"] != object_id:
+    if exclusive_start_key[key_name] != object_id:
         raise BadRequestError("Invalid page parameter value")
     return exclusive_start_key
 
@@ -451,6 +601,54 @@ def query_segments_by_object_id(
         query = segments_table.query(**kwargs)
         items.extend(query["Items"])
     return items, query.get("LastEvaluatedKey"), kwargs.get("Limit")
+
+
+@tracer.capture_method(capture_response=False)
+def query_segments_by_init_object_id(
+    init_object_id: str,
+    projection: str | None = None,
+    limit: int | None = None,
+    page: str | None = None,
+    fetch_all: bool = False,
+) -> tuple[list, dict | None, int | None]:
+    """Query segments by init_object_id using init-object-id-index"""
+    kwargs = {
+        "IndexName": "init-object-id-index",
+        "KeyConditionExpression": Key("init_object_id").eq(init_object_id),
+    }
+    if projection:
+        kwargs["ProjectionExpression"] = projection
+    if not fetch_all:
+        kwargs["Limit"] = (
+            min(limit, constants.MAX_PAGE_LIMIT)
+            if limit
+            else constants.DEFAULT_PAGE_LIMIT
+        )
+        if page:
+            kwargs["ExclusiveStartKey"] = decode_and_validate_page(
+                page, init_object_id, key_name="init_object_id"
+            )
+    query = segments_table.query(**kwargs)
+    items = query["Items"]
+    while "LastEvaluatedKey" in query and (fetch_all or len(items) < kwargs["Limit"]):
+        kwargs["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+        query = segments_table.query(**kwargs)
+        items.extend(query["Items"])
+    return items, query.get("LastEvaluatedKey"), kwargs.get("Limit")
+
+
+@tracer.capture_method(capture_response=False)
+def page_targets_init_index(page: str) -> bool:
+    """Return True if a pagination token belongs to the init-object-id-index.
+
+    A malformed token returns False so the caller's primary (media) query path
+    raises the canonical 'Invalid page parameter value' error.
+    """
+    try:
+        decoded = json.loads(base64.b64decode(page).decode("utf-8"))
+    except ValueError, TypeError:
+        return False
+    return "init_object_id" in decoded
 
 
 @lru_cache()
@@ -538,24 +736,29 @@ def append_to_segment_list(item: dict, attribute: str, value: dict | str) -> Non
 
 
 @tracer.capture_method(capture_response=False)
-def remove_storage_id_from_segment(item: dict, storage_id: str) -> None:
-    """Remove a storage_id from a segment's storage_ids list with optimistic locking."""
+def remove_storage_id_from_segment(
+    item: dict, storage_id: str, attribute: str = "storage_ids"
+) -> None:
+    """Remove a storage_id from a segment's storage_ids list with optimistic locking.
+
+    `attribute` selects which list to mutate ("storage_ids" for the Media
+    Object, "init_storage_ids" for the init Object).
+    """
     current_item = item
     for attempt in range(constants.DDB_MAX_RETRIES):
         try:
-            filtered_ids = [
-                sid for sid in current_item["storage_ids"] if sid != storage_id
-            ]
+            filtered_ids = [sid for sid in current_item[attribute] if sid != storage_id]
             segments_table.update_item(
                 Key={
                     "flow_id": current_item["flow_id"],
                     "timerange_end": current_item["timerange_end"],
                 },
-                UpdateExpression="SET storage_ids = :ids",
-                ConditionExpression="storage_ids = :old_ids",
+                UpdateExpression="SET #attr = :ids",
+                ConditionExpression="#attr = :old_ids",
+                ExpressionAttributeNames={"#attr": attribute},
                 ExpressionAttributeValues={
                     ":ids": filtered_ids,
-                    ":old_ids": current_item["storage_ids"],
+                    ":old_ids": current_item[attribute],
                 },
             )
             break
@@ -575,24 +778,32 @@ def remove_storage_id_from_segment(item: dict, storage_id: str) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def remove_get_url_by_label_from_segment(item: dict, label: str) -> None:
-    """Remove a get_url dictionary with matching label from a segment's get_urls list with optimistic locking."""
+def remove_get_url_by_label_from_segment(
+    item: dict, label: str, attribute: str = "get_urls"
+) -> None:
+    """Remove a get_url dictionary with matching label from a segment's get_urls
+    list with optimistic locking.
+
+    `attribute` selects which list to mutate ("get_urls" for the Media Object,
+    "init_get_urls" for the init Object).
+    """
     current_item = item
     for attempt in range(constants.DDB_MAX_RETRIES):
         try:
             filtered_urls = [
-                url for url in current_item["get_urls"] if url.get("label") != label
+                url for url in current_item[attribute] if url.get("label") != label
             ]
             segments_table.update_item(
                 Key={
                     "flow_id": current_item["flow_id"],
                     "timerange_end": current_item["timerange_end"],
                 },
-                UpdateExpression="SET get_urls = :urls",
-                ConditionExpression="get_urls = :old_urls",
+                UpdateExpression="SET #attr = :urls",
+                ConditionExpression="#attr = :old_urls",
+                ExpressionAttributeNames={"#attr": attribute},
                 ExpressionAttributeValues={
                     ":urls": filtered_urls,
-                    ":old_urls": current_item["get_urls"],
+                    ":old_urls": current_item[attribute],
                 },
             )
             break

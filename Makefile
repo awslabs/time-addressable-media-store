@@ -6,14 +6,18 @@ TAMS_REPO_PATH=https://github.com/bbc/tams
 STACK_NAME ?= tams
 OUTPUT_DIR ?= .aws-sam
 
-ifndef TAMS_TAG
-TAMS_SPEC_ZIP_URL := $(TAMS_REPO_PATH)/archive/refs/heads/main.zip
-TAMS_SPEC_ZIP_FILE := api/build/tams-repo-main.zip
-TAMS_SPEC_ZIP_PATH := tams-main
-else
+ifdef TAMS_TAG
 TAMS_SPEC_ZIP_URL := $(TAMS_REPO_PATH)/archive/refs/tags/$(TAMS_TAG).zip
 TAMS_SPEC_ZIP_FILE := api/build/tams-repo-$(TAMS_TAG).zip
 TAMS_SPEC_ZIP_PATH := tams-$(TAMS_TAG)
+else ifdef TAMS_BRANCH
+TAMS_SPEC_ZIP_URL := $(TAMS_REPO_PATH)/archive/refs/heads/$(TAMS_BRANCH).zip
+TAMS_SPEC_ZIP_FILE := api/build/tams-repo-$(TAMS_BRANCH).zip
+TAMS_SPEC_ZIP_PATH := tams-$(TAMS_BRANCH)
+else
+TAMS_SPEC_ZIP_URL := $(TAMS_REPO_PATH)/archive/refs/heads/main.zip
+TAMS_SPEC_ZIP_FILE := api/build/tams-repo-main.zip
+TAMS_SPEC_ZIP_PATH := tams-main
 endif
 
 # Default target

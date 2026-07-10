@@ -431,6 +431,7 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
                 "tag_exists",
                 "frame_width",
                 "frame_height",
+                "init_segments",
             ]
         }
     )
@@ -659,7 +660,14 @@ def merge_delete_request(delete_request_dict: dict) -> None:
         .node(ref_name="e", labels="error")
         .set(
             serialise_neptune_obj(
-                filter_dict(delete_request_dict, {"id", "error"}), "d."
+                # segments_deleted_resources is internal transport carried on
+                # the SQS message (see sqs_delete_requests) and MUST NOT be
+                # persisted onto the spec-defined Delete Request record.
+                filter_dict(
+                    delete_request_dict,
+                    {"id", "error", "segments_deleted_resources"},
+                ),
+                "d.",
             )
         )
     )

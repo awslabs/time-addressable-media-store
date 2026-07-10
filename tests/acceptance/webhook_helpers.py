@@ -8,9 +8,11 @@ from deepdiff import DeepDiff
 
 logger = logging.getLogger(__name__)
 
-# Standard exclude fields for each webhook event type
-# event_timestamp is always excluded as it's dynamically generated
-WEBHOOK_EXCLUDE_FIELDS = {
+# Standard fields whose VALUE is ignored in comparison for each webhook event
+# type. These fields MUST still be present in the delivered webhook (their
+# presence is asserted); only their (dynamic/unpredictable) value is not
+# compared. event_timestamp is always ignored as it's dynamically generated.
+WEBHOOK_IGNORED_VALUE_FIELDS = {
     "flows/created": [
         "event_timestamp",
         "event.flow.created_by",
@@ -158,15 +160,26 @@ def validate_webhook_body_matches(body_expectations, actual_webhooks):
     for expectation in body_expectations:
         # Extract expectation details
         expected_body = expectation["body"]
-        extra_excludes = expectation.get("extra_excludes", [])
+        extra_ignored_value_fields = expectation.get("extra_ignored_value_fields", [])
+        # optional_fields: value ignored AND presence NOT required (unlike
+        # ignored-value fields, which must be present). Use for fields a given
+        # event legitimately may omit, e.g. updated_by/metadata_updated on a
+        # segment-triggered flows/updated event.
+        optional_fields = expectation.get("optional_fields", [])
         test_name = expectation.get("test_name", "unknown")
         event_type = expectation["event_type"]
 
-        # Get exclude fields from dictionary based on event type
-        exclude_fields = WEBHOOK_EXCLUDE_FIELDS.get(event_type, [])
+        # Get ignored-value fields for this event type
+        ignored_value_fields = WEBHOOK_IGNORED_VALUE_FIELDS.get(event_type, [])
 
-        # Merge with any extra excludes from the test
-        exclude_fields = list(set(exclude_fields + extra_excludes))
+        # Merge with any extra ignored-value fields from the test, then subtract
+        # optional_fields: an optional field's VALUE is still ignored, but its
+        # presence is NOT required, so it must not remain in the present-required
+        # ignored_value_fields set (even if it appears in the standard list).
+        ignored_value_fields = list(
+            set(ignored_value_fields + extra_ignored_value_fields)
+            - set(optional_fields)
+        )
 
         # Extract resource ID from expected body for filtering
         expected_resource_id = get_resource_id(expected_body, event_type)
@@ -202,9 +215,10 @@ def validate_webhook_body_matches(body_expectations, actual_webhooks):
             expected_copy = copy.deepcopy(expected_body)
             actual_copy = copy.deepcopy(actual_body)
 
-            # Check excluded fields exist in actual body before removing
+            # Ignored-value fields MUST be present; a missing one disqualifies
+            # this candidate. optional_fields are exempt from this check.
             missing_fields = []
-            for field_path in exclude_fields:
+            for field_path in ignored_value_fields:
                 if not _field_exists(actual_copy, field_path):
                     missing_fields.append(field_path)
 
@@ -212,8 +226,10 @@ def validate_webhook_body_matches(body_expectations, actual_webhooks):
                 # Field is missing - this candidate doesn't match
                 continue
 
-            # All excluded fields present, remove them and compare
-            for field_path in exclude_fields:
+            # Remove ignored-value fields (presence asserted above) and
+            # optional_fields (presence not required) so neither's value is
+            # compared.
+            for field_path in ignored_value_fields + optional_fields:
                 _remove_nested_field(expected_copy, field_path)
                 _remove_nested_field(actual_copy, field_path)
 
@@ -250,17 +266,17 @@ def validate_webhook_body_matches(body_expectations, actual_webhooks):
 
                 # Check if excluded fields exist
                 missing_fields = []
-                for field_path in exclude_fields:
+                for field_path in ignored_value_fields:
                     if not _field_exists(actual_copy, field_path):
                         missing_fields.append(field_path)
 
                 if missing_fields:
-                    logger.error(f"  ❌ Missing excluded fields: {missing_fields}")
+                    logger.error(f"  ❌ Missing ignored-value fields: {missing_fields}")
                 else:
-                    logger.error("  ✅ All excluded fields present")
+                    logger.error("  ✅ All ignored-value fields present")
 
-                # Remove excluded fields and show diff
-                for field_path in exclude_fields:
+                # Remove ignored-value and optional fields and show diff
+                for field_path in ignored_value_fields + optional_fields:
                     _remove_nested_field(expected_copy, field_path)
                     _remove_nested_field(actual_copy, field_path)
 

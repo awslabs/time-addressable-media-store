@@ -19,16 +19,58 @@ store_name = get_store_name()
 
 
 @tracer.capture_method(capture_response=False)
-def post_event(event, item, get_urls=None, include_object_timerange=False):
+def post_event(
+    event, item, get_urls=None, init_get_urls=None, include_object_timerange=False
+):
     put_message(
         webhooks_queue,
         {
             "event": event.raw_event,
             "item": model_dump(item),
             "get_urls": get_urls,
+            "init_get_urls": init_get_urls,
             "include_object_timerange": include_object_timerange,
         },
     )
+
+
+@tracer.capture_method(capture_response=False)
+def filter_webhook_get_urls(get_urls, item, storage_mapping):
+    """Apply a webhook's get_urls filters (accept_get_urls, accept_storage_ids,
+    presigned, verbose_storage) to a list of get_urls, mirroring the
+    /flows/{flowId}/segments query parameter behaviour. Used for both the Flow
+    Segment `get_urls` and the `init_object.get_urls`."""
+    # Filter by label
+    if item.accept_get_urls:
+        get_urls = [
+            get_url for get_url in get_urls if get_url["label"] in item.accept_get_urls
+        ]
+    # Filter by storage_id
+    if item.accept_storage_ids:
+        accept_storage_ids = [storage_id.root for storage_id in item.accept_storage_ids]
+        get_urls = [
+            get_url
+            for get_url in get_urls
+            if get_url.get("storage_id") in accept_storage_ids
+        ]
+    # Filter by presigned
+    if item.presigned is not None:
+        get_urls = [
+            get_url
+            for get_url in get_urls
+            if get_url.get("presigned", False) == item.presigned
+        ]
+    # Add verbose storage, or remove storage_id if verbose_storage not requested
+    if item.verbose_storage:
+        return [
+            {
+                **get_url,
+                **storage_mapping.get(get_url.get("storage_id"), {}),
+                **({"controlled": True} if get_url.get("storage_id") else {}),
+            }
+            for get_url in get_urls
+        ]
+    return [filter_dict(get_url, {"storage_id"}) for get_url in get_urls]
 
 
 @logger.inject_lambda_context(log_event=True)
@@ -38,6 +80,7 @@ def post_event(event, item, get_urls=None, include_object_timerange=False):
 def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
     event = EventBridgeEvent(event)
     schema_items = get_matching_webhooks(event)
+    storage_mapping = {}
     if event.detail_type == "flows/segments_added":
         default_storage_backend = get_default_storage_backend()
         # Add default storage_id if not present when get_urls also not present
@@ -71,7 +114,12 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
         if event.detail_type != "flows/segments_added":
             post_event(event, item)
             continue
-        get_urls = [*event.detail["segments"][0].get("get_urls", [])]
+        segment = event.detail["segments"][0]
+        get_urls = [*segment.get("get_urls", [])]
+        # init_object.get_urls (if present) are filtered identically to the
+        # Segment's own get_urls; None when the Segment has no init Object.
+        init_object = segment.get("init_object")
+        init_get_urls = [*init_object.get("get_urls", [])] if init_object else None
         # No filtering of the get_urls has been requested so send event with all get_urls
         if (
             item.accept_get_urls is None
@@ -84,48 +132,32 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
                 event,
                 item,
                 [filter_dict(get_url, {"storage_id"}) for get_url in get_urls],
+                (
+                    [filter_dict(get_url, {"storage_id"}) for get_url in init_get_urls]
+                    if init_get_urls is not None
+                    else None
+                ),
                 bool(item.include_object_timerange),
             )
             continue
         # No get_urls are requested so send event with no get_urls
         if item.accept_get_urls is not None and len(item.accept_get_urls) == 0:
-            post_event(event, item, [], bool(item.include_object_timerange))
+            post_event(
+                event,
+                item,
+                [],
+                [] if init_get_urls is not None else None,
+                bool(item.include_object_timerange),
+            )
             continue
-        # Filter by label
-        if item.accept_get_urls:
-            get_urls = [
-                get_url
-                for get_url in get_urls
-                if get_url["label"] in item.accept_get_urls
-            ]
-        # Filter by storage_id
-        if item.accept_storage_ids:
-            accept_storage_ids = [
-                storage_id.root for storage_id in item.accept_storage_ids
-            ]
-            get_urls = [
-                get_url
-                for get_url in get_urls
-                if get_url.get("storage_id") in accept_storage_ids
-            ]
-        # Filter by presigned
-        if item.presigned is not None:
-            get_urls = [
-                get_url
-                for get_url in get_urls
-                if get_url.get("presigned", False) == item.presigned
-            ]
-        # Add verbose storage
-        if item.verbose_storage:
-            get_urls = [
-                {
-                    **get_url,
-                    **storage_mapping.get(get_url.get("storage_id"), {}),
-                    **({"controlled": True} if get_url.get("storage_id") else {}),
-                }
-                for get_url in get_urls
-            ]
-        # Remove storage_id if verbose_storage not requested
-        else:
-            get_urls = [filter_dict(get_url, {"storage_id"}) for get_url in get_urls]
-        post_event(event, item, get_urls, bool(item.include_object_timerange))
+        post_event(
+            event,
+            item,
+            filter_webhook_get_urls(get_urls, item, storage_mapping),
+            (
+                filter_webhook_get_urls(init_get_urls, item, storage_mapping)
+                if init_get_urls is not None
+                else None
+            ),
+            bool(item.include_object_timerange),
+        )

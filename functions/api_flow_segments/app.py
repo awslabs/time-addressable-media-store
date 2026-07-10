@@ -24,6 +24,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from dynamodb import (
     TimeRangeBoundary,
+    commit_object_claim,
     delete_flow_segments,
     get_flow_timerange,
     get_key_and_args,
@@ -318,6 +319,23 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             validation["message"],
         )
+    # Enforce consistency between the Flow's init_segments flag and whether
+    # the Segment resolves to an init Object (init_object_id may be recovered
+    # by validate_object_id on Media Object re-use).
+    flow_init_segments = bool(flow.get("essence_parameters", {}).get("init_segments"))
+    segment_has_init = bool(validation.get("init_object_id"))
+    if segment_has_init and not flow_init_segments:
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. init_object_id may only be set when the Flow's `init_segments` is true.",
+        )
+    if flow_init_segments and not segment_has_init:
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. This Flow uses initialisation segments so every Flow Segment MUST reference an init_object_id.",
+        )
     segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
         return generate_failed_segment(
@@ -325,6 +343,10 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             "Bad request. The timerange of the segment MUST NOT overlap any other segment in the same Flow.",
         )
+    # All validation has passed, so it is now safe to claim the Object(s). This
+    # must happen after every check above so a rejected request never mutates
+    # (claims) an Object in storage.
+    commit_object_claim(validation.get("claim"))
     item_dict["timerange_start"] = segment_timerange.start.to_nanosec() + (
         0 if segment_timerange.includes_start() else 1
     )
@@ -333,6 +355,10 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     )
     if validation["storage_id"]:
         item_dict["storage_ids"] = [validation["storage_id"]]
+    if validation.get("init_object_id"):
+        item_dict["init_object_id"] = validation["init_object_id"]
+    if validation["init_storage_id"]:
+        item_dict["init_storage_ids"] = [validation["init_storage_id"]]
     if (
         validation["object_timerange"]
         and validation["object_timerange"] != item_dict["timerange"]
