@@ -153,6 +153,16 @@ def media_objects():
 
 
 @pytest.fixture(scope="session")
+def init_objects():
+    return []
+
+
+@pytest.fixture(scope="session")
+def init_media_objects():
+    return []
+
+
+@pytest.fixture(scope="session")
 def delete_requests():
     return []
 
@@ -271,6 +281,32 @@ def stub_multi_flow():
 
 
 @pytest.fixture(scope="session")
+def stub_init_flow():
+    return {
+        "id": "10000000-0000-1000-8000-000000000005",
+        "source_id": "00000000-0000-1000-8000-000000000005",
+        "format": "urn:x-nmos:format:video",
+        "generation": 0,
+        "codec": "video/h264",
+        "container": "video/mp4",
+        "avg_bit_rate": 5000000,
+        "max_bit_rate": 5000000,
+        "essence_parameters": {
+            "frame_rate": {"numerator": 50, "denominator": 1},
+            "frame_width": 1920,
+            "frame_height": 1080,
+            "bit_depth": 8,
+            "interlace_mode": "progressive",
+            "component_type": "YCbCr",
+            "horiz_chroma_subs": 2,
+            "vert_chroma_subs": 1,
+            "avc_parameters": {"profile": 122, "level": 42, "flags": 0},
+            "init_segments": True,
+        },
+    }
+
+
+@pytest.fixture(scope="session")
 def stub_video_source():
     return {
         "id": "00000000-0000-1000-8000-000000000000",
@@ -335,6 +371,14 @@ def stub_multi_source():
             {"id": "00000000-0000-1000-8000-000000000002", "role": "data"},
             {"id": "00000000-0000-1000-8000-000000000004", "role": "image"},
         ],
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_init_source():
+    return {
+        "id": "00000000-0000-1000-8000-000000000005",
+        "format": "urn:x-nmos:format:video",
     }
 
 

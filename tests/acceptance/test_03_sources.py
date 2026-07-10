@@ -213,6 +213,7 @@ def test_List_Sources_GET_200(
     stub_data_source,
     stub_image_source,
     stub_multi_source,
+    stub_init_source,
 ):
     # Arrange
     path = "/sources"
@@ -224,7 +225,7 @@ def test_List_Sources_GET_200(
     # Assert
     assert_json_response(response, 200)
     response_json = remove_dynamic_props(response.json())
-    assert 5 == len(response_json)
+    assert 6 == len(response_json)
     assert_equal_unordered(
         [
             stub_multi_source,
@@ -232,6 +233,7 @@ def test_List_Sources_GET_200(
             stub_audio_source,
             stub_data_source,
             stub_image_source,
+            stub_init_source,
         ],
         response_json,
     )
@@ -301,7 +303,7 @@ def test_List_Sources_GET_200_page(api_client_cognito):
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 4 == len(response_json)
+    assert 5 == len(response_json)
 
 
 def test_List_Sources_GET_200_tag_name(api_client_cognito, stub_multi_source):
@@ -334,7 +336,7 @@ def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 4 == len(response_json)
+    assert 5 == len(response_json)
 
 
 def test_List_Sources_GET_400(api_client_cognito):

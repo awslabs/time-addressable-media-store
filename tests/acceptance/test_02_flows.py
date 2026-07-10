@@ -241,6 +241,36 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(
     )
 
 
+def test_Create_or_Replace_Flow_PUT_201_INIT(
+    api_client_cognito,
+    stub_init_flow,
+    expect_webhooks,
+    stub_init_source,
+):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=stub_init_flow,
+    )
+    # Assert
+    assert_json_response(response, 201)
+    response_json = remove_dynamic_props(response.json())
+    assert_equal_unordered(stub_init_flow, response_json)
+    expect_webhooks(
+        {
+            "event_type": "sources/created",
+            "event": {"source": remove_fields(stub_init_source)},
+        },
+        {
+            "event_type": "flows/created",
+            "event": {"flow": remove_fields(stub_init_flow)},
+        },
+    )
+
+
 def test_Create_or_Replace_Flow_PUT_204(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
@@ -364,6 +394,17 @@ def test_List_Flows_HEAD_200_frame_width(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"frame_width": "1920"})
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_List_Flows_HEAD_200_init__segments(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"init_segments": "true"}
+    )
     # Assert
     assert_json_response(response, 200, empty_body=True)
 
@@ -495,6 +536,15 @@ def test_List_Flows_HEAD_400_frame_width(api_client_cognito):
     assert_json_response(response, 400, empty_body=True)
 
 
+def test_List_Flows_HEAD_400_init_segments(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("HEAD", path, params={"init_segments": "bad"})
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
 def test_List_Flows_HEAD_400_label(api_client_cognito):
     # Arrange
     path = "/flows"
@@ -581,6 +631,7 @@ def test_List_Flows_GET_200(
     stub_data_flow,
     stub_image_flow,
     stub_multi_flow,
+    stub_init_flow,
 ):
     # Arrange
     path = "/flows"
@@ -592,7 +643,7 @@ def test_List_Flows_GET_200(
     # Assert
     assert_json_response(response, 200)
     response_json = remove_dynamic_props(response.json())
-    assert 5 == len(response_json)
+    assert 6 == len(response_json)
     assert_equal_unordered(
         [
             stub_multi_flow,
@@ -600,6 +651,7 @@ def test_List_Flows_GET_200(
             stub_audio_flow,
             stub_data_flow,
             stub_image_flow,
+            stub_init_flow,
         ],
         response_json,
     )
@@ -633,7 +685,9 @@ def test_List_Flows_GET_200_format(api_client_cognito, stub_data_flow):
     assert_equal_unordered([stub_data_flow], response_json)
 
 
-def test_List_Flows_GET_200_frame_height(api_client_cognito, stub_video_flow):
+def test_List_Flows_GET_200_frame_height(
+    api_client_cognito, stub_video_flow, stub_init_flow
+):
     """List flows with frame_height query specified"""
     # Arrange
     path = "/flows"
@@ -642,11 +696,13 @@ def test_List_Flows_GET_200_frame_height(api_client_cognito, stub_video_flow):
     # Assert
     assert_json_response(response, 200)
     response_json = remove_dynamic_props(response.json())
-    assert 1 == len(response_json)
-    assert_equal_unordered([stub_video_flow], response_json)
+    assert 2 == len(response_json)
+    assert_equal_unordered([stub_video_flow, stub_init_flow], response_json)
 
 
-def test_List_Flows_GET_200_frame_width(api_client_cognito, stub_video_flow):
+def test_List_Flows_GET_200_frame_width(
+    api_client_cognito, stub_video_flow, stub_init_flow
+):
     """List flows with frame_width query specified"""
     # Arrange
     path = "/flows"
@@ -655,8 +711,21 @@ def test_List_Flows_GET_200_frame_width(api_client_cognito, stub_video_flow):
     # Assert
     assert_json_response(response, 200)
     response_json = remove_dynamic_props(response.json())
+    assert 2 == len(response_json)
+    assert_equal_unordered([stub_video_flow, stub_init_flow], response_json)
+
+
+def test_List_Flows_GET_200_init_segments(api_client_cognito, stub_init_flow):
+    """List flows with label query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"init_segments": "true"})
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
     assert 1 == len(response_json)
-    assert_equal_unordered([stub_video_flow], response_json)
+    assert_equal_unordered([stub_init_flow], response_json)
 
 
 def test_List_Flows_GET_200_label(api_client_cognito, stub_multi_flow):
@@ -694,7 +763,7 @@ def test_List_Flows_GET_200_page(api_client_cognito):
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 4 == len(response_json)
+    assert 5 == len(response_json)
 
 
 def test_List_Flows_GET_200_source_id(api_client_cognito, stub_data_flow):
@@ -736,7 +805,7 @@ def test_List_Flows_GET_200_tag_exists_name(api_client_cognito):
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 4 == len(response_json)
+    assert 5 == len(response_json)
 
 
 def test_List_Flows_GET_200_timerange(api_client_cognito):
@@ -748,7 +817,7 @@ def test_List_Flows_GET_200_timerange(api_client_cognito):
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 5 == len(response_json)
+    assert 6 == len(response_json)
 
 
 def test_List_Flows_GET_400(api_client_cognito):
@@ -816,6 +885,19 @@ def test_List_Flows_GET_400_frame_width(api_client_cognito):
     response = api_client_cognito.request(
         "GET", path, params={"frame_width": "1920", "timerange": "bad"}
     )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_List_Flows_GET_400_init_segments(api_client_cognito):
+    """List flows with frame_width query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"init_segments": "bad"})
     # Assert
     assert_json_response(response, 400)
     response_json = response.json()
@@ -1037,6 +1119,21 @@ def test_Flow_Details_GET_200(api_client_cognito, stub_data_flow):
     assert_json_response(response, 200)
     response_json = remove_dynamic_props(response.json())
     assert_equal_unordered(stub_data_flow, response_json)
+
+
+def test_Flow_Details_GET_200_init_segments(api_client_cognito, stub_init_flow):
+    # Arrange
+    path = f'/flows/{stub_init_flow["id"]}'
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert "init_segments" in response_json["essence_parameters"]
+    assert_equal_unordered(stub_init_flow, response_json)
 
 
 def test_Flow_Details_GET_400(api_client_cognito, stub_data_flow):
@@ -2417,71 +2514,3 @@ def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
     assert_json_response(response, 404)
     response_json = response.json()
     assert "The requested flow does not exist." == response_json["message"]
-
-
-###############################################################################
-# INIT SEGMENTS - FLOW FIELD (TODO STUBS)
-#
-# These validate the flow-level `init_segments` essence parameter added by the
-# init_segments feature. They are intentionally left as stubs to populate later.
-#
-# NOTES FOR WHOEVER FILLS THESE IN:
-#
-# 1. `init_segments` is an essence_parameters field present on video, coded
-#    audio, data AND multi flows (schema.py EssenceParameters/1/3/4). Assert it
-#    round-trips: PUT a flow with essence_parameters.init_segments = true, then
-#    GET it and assert the field is returned. Mirror
-#    test_Create_or_Replace_Flow_PUT_201_VIDEO / _MULTI.
-#
-# 2. This will likely reuse the SAME stub_init_flow fixture that the segment
-#    init stubs need (see test_04_segments.py). If you add stub_init_flow to
-#    conftest.py, PUT it here (with its source) BEFORE the segment tests run so
-#    the flow exists for the segment write path. A multi variant
-#    (stub_init_multi_flow) is also worth covering since multi flows gained an
-#    essence_parameters object solely for init_segments.
-#
-# 3. The `/flows?init_segments=true|false` LIST FILTER mirrors the existing
-#    frame_width/frame_height filter tests (test_List_Flows_GET_200_frame_width
-#    etc.). Assert GET /flows?init_segments=true returns the init flow(s) and
-#    HEAD returns 200. Consider a init_segments=false case too. Exact expected
-#    result set depends on which flows the suite has created by then.
-###############################################################################
-
-
-def test_Create_or_Replace_Flow_PUT_201_init_segments():
-    """PUT a video flow whose essence_parameters.init_segments is true; assert
-    201 and that the response echoes init_segments. (Consider using/creating
-    stub_init_flow so later segment tests can reuse it.)"""
-    pytest.skip("TODO: assert init_segments round-trips on flow PUT")
-
-
-def test_Create_or_Replace_Flow_PUT_201_init_segments_multi():
-    """PUT a MULTI flow with essence_parameters.init_segments = true; assert
-    201 and the field is returned. Multi flows gained an essence_parameters
-    object specifically to carry init_segments (schema EssenceParameters3)."""
-    pytest.skip("TODO: assert init_segments round-trips on multi flow PUT")
-
-
-def test_Get_Flow_GET_200_init_segments():
-    """GET /flows/{id} for a flow created with init_segments = true; assert the
-    essence_parameters.init_segments field is present and true in the body."""
-    pytest.skip("TODO: assert init_segments returned on flow GET")
-
-
-def test_List_Flows_GET_200_init_segments():
-    """GET /flows?init_segments=true; assert 200 and that the returned set is
-    exactly the flow(s) with init_segments true (mirror
-    test_List_Flows_GET_200_frame_width)."""
-    pytest.skip("TODO: assert /flows?init_segments=true filter")
-
-
-def test_List_Flows_GET_200_init_segments_false():
-    """GET /flows?init_segments=false; assert 200 and that flows with
-    init_segments true are excluded."""
-    pytest.skip("TODO: assert /flows?init_segments=false filter")
-
-
-def test_List_Flows_HEAD_200_init_segments():
-    """HEAD /flows?init_segments=true; assert 200 with empty body (mirror
-    test_List_Flows_HEAD_200_frame_width)."""
-    pytest.skip("TODO: assert HEAD /flows?init_segments=true")
