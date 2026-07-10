@@ -638,13 +638,17 @@ def expect_webhooks(webhook_expectations):
                     expectation["event_type"] = item
                 elif (
                     isinstance(item, tuple)
-                    and len(item) == 2
+                    and len(item) in (2, 3)
                     and isinstance(item[0], dict)
                 ):
-                    # (body_dict, extra_ignored_value_fields)
+                    # (body_dict, extra_ignored_value_fields[, optional_fields])
                     expectation["event_type"] = item[0]["event_type"]
                     expectation["body"] = deepcopy(item[0])
                     expectation["extra_ignored_value_fields"] = item[1]
+                    # Optional third element: fields whose value is ignored AND
+                    # whose presence is not required (e.g. updated_by /
+                    # metadata_updated on a segment-triggered flows/updated).
+                    expectation["optional_fields"] = item[2] if len(item) == 3 else []
                 elif isinstance(item, dict):
                     # body_dict only
                     expectation["event_type"] = item["event_type"]

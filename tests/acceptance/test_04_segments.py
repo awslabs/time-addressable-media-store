@@ -2227,6 +2227,9 @@ def test_Create_Flow_Segment_POST_201_init_object_id(
                 },
             },
             ["event.flow.segments_updated"],
+            # Segment-triggered flows/updated does not carry these metadata-edit
+            # fields, so they must not be required present.
+            ["event.flow.updated_by", "event.flow.metadata_updated"],
         ),
         (
             {
@@ -2246,7 +2249,10 @@ def test_Create_Flow_Segment_POST_201_init_object_id(
                     ],
                 },
             },
-            ["event.segments[].get_urls[].url"],
+            [
+                "event.segments[].get_urls[].url",
+                "event.segments[].init_object.get_urls[].url",
+            ],
         ),
     )
 
@@ -2281,6 +2287,9 @@ def test_Create_Flow_Segment_POST_201_init_object_reuse(
                 },
             },
             ["event.flow.segments_updated"],
+            # Segment-triggered flows/updated does not carry these metadata-edit
+            # fields, so they must not be required present.
+            ["event.flow.updated_by", "event.flow.metadata_updated"],
         ),
         (
             {
@@ -2300,7 +2309,10 @@ def test_Create_Flow_Segment_POST_201_init_object_reuse(
                     ],
                 },
             },
-            ["event.segments[].get_urls[].url"],
+            [
+                "event.segments[].get_urls[].url",
+                "event.segments[].init_object.get_urls[].url",
+            ],
         ),
     )
 
@@ -2334,6 +2346,9 @@ def test_Create_Flow_Segment_POST_201_object_reuse_with_init(
                 },
             },
             ["event.flow.segments_updated"],
+            # Segment-triggered flows/updated does not carry these metadata-edit
+            # fields, so they must not be required present.
+            ["event.flow.updated_by", "event.flow.metadata_updated"],
         ),
         (
             {
@@ -2353,7 +2368,10 @@ def test_Create_Flow_Segment_POST_201_object_reuse_with_init(
                     ],
                 },
             },
-            ["event.segments[].get_urls[].url"],
+            [
+                "event.segments[].get_urls[].url",
+                "event.segments[].init_object.get_urls[].url",
+            ],
         ),
     )
 
