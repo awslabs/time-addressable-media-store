@@ -503,7 +503,7 @@ def webhook_verification_lifecycle(
 
         # Register all webhooks
         for webhook_def in webhooks_config:
-            url = f'{base_webhook_url}/{webhook_def["identifier"]}'
+            url = f"{base_webhook_url}/{webhook_def['identifier']}"
             logger.info(f"Registering webhook: {url}...")
             response = api_client_cognito.request(
                 "POST",
@@ -524,7 +524,7 @@ def webhook_verification_lifecycle(
                 "config": webhook_def["config"],
             }
             logger.info(
-                f'✅ Webhook {webhook_def["identifier"]} registered: {webhook_id}'
+                f"✅ Webhook {webhook_def['identifier']} registered: {webhook_id}"
             )
 
         logger.info("🧪 Running tests with webhook verification enabled...")

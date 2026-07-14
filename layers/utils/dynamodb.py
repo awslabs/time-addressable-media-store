@@ -83,7 +83,7 @@ def delete_segment_items(
                     (
                         resources
                         if resources is not None
-                        else enhance_resources([f'tams:flow:{item["flow_id"]}'])
+                        else enhance_resources([f"tams:flow:{item['flow_id']}"])
                     ),
                 )
         except ClientError as e:
@@ -670,7 +670,7 @@ def get_storage_backend_dict(item: dict, store_name: str) -> dict:
     """Transform storage backend item into standardized dictionary format with label."""
     return {
         "storage_id": item["id"],
-        "label": f'aws.{item["region"]}:s3:{store_name}',
+        "label": f"aws.{item['region']}:s3:{store_name}",
         **item,
     }
 

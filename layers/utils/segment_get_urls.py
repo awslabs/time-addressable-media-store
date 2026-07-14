@@ -44,7 +44,7 @@ def create_direct_s3_get_url(
     """
     get_url = {
         "label": storage_backend["label"],
-        "url": f'https://{storage_backend["bucket_name"]}.s3.{storage_backend["region"]}.amazonaws.com/{object_id}',
+        "url": f"https://{storage_backend['bucket_name']}.s3.{storage_backend['region']}.amazonaws.com/{object_id}",
     }
     if include_storage_id:
         get_url["storage_id"] = storage_backend["id"]

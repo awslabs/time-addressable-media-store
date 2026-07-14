@@ -347,6 +347,6 @@ def test_scope_authorization_403(api_client_factory, path, method, scopes):
     response = client.request(method, path)
 
     # Assert
-    assert (
-        response.status_code == 403
-    ), f"Expected 403 for {method} {path} with scopes {scopes}, got {response.status_code}"
+    assert response.status_code == 403, (
+        f"Expected 403 for {method} {path} with scopes {scopes}, got {response.status_code}"
+    )

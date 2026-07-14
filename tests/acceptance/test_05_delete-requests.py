@@ -36,7 +36,7 @@ def test_Delete_Flow_Segment_DELETE_202(
     api_client_cognito, delete_requests, api_endpoint, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -47,7 +47,7 @@ def test_Delete_Flow_Segment_DELETE_202(
     response_json = response.json()
     delete_requests.append(response_json["id"])
     assert (
-        f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
+        f"{api_endpoint}/flow-delete-requests/{response_json['id']}"
         == response.headers.get("Location", "")
     )
     assert "id" in response_json
@@ -98,7 +98,7 @@ def test_Delete_Flow_Segment_DELETE_202_object_id():
 def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito, stub_video_flow):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -114,7 +114,7 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
 ):
     """Delete segments with timerange query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -126,7 +126,7 @@ def test_Delete_Flow_Segment_DELETE_202_timerange(
     response_json = response.json()
     delete_requests.append(response_json["id"])
     assert (
-        f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
+        f"{api_endpoint}/flow-delete-requests/{response_json['id']}"
         == response.headers.get("Location", "")
     )
     assert "id" in response_json
@@ -168,7 +168,7 @@ def test_Delete_Flow_Segment_DELETE_204_timerange():
 
 def test_Delete_Flow_Segment_DELETE_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -184,7 +184,7 @@ def test_Delete_Flow_Segment_DELETE_400(api_client_cognito, stub_multi_flow):
 
 def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -203,7 +203,7 @@ def test_Delete_Flow_Segment_DELETE_400_object_id(api_client_cognito, stub_video
 
 def test_Delete_Flow_Segment_DELETE_403(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/segments'
+    path = f"/flows/{stub_audio_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -220,7 +220,7 @@ def test_Delete_Flow_Segment_DELETE_403(api_client_cognito, stub_audio_flow):
 
 def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/segments'
+    path = f"/flows/{stub_audio_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -238,7 +238,7 @@ def test_Delete_Flow_Segment_DELETE_403_object_id(api_client_cognito, stub_audio
 
 def test_Delete_Flow_Segment_DELETE_403_timerange(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/segments'
+    path = f"/flows/{stub_audio_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -307,7 +307,7 @@ def test_Delete_Flow_DELETE_202_VIDEO(
     media_objects,
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}'
+    path = f"/flows/{stub_video_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -318,7 +318,7 @@ def test_Delete_Flow_DELETE_202_VIDEO(
     response_json = response.json()
     delete_requests.append(response_json["id"])
     assert (
-        f'{api_endpoint}/flow-delete-requests/{response_json["id"]}'
+        f"{api_endpoint}/flow-delete-requests/{response_json['id']}"
         == response.headers.get("Location", "")
     )
     assert "id" in response_json
@@ -355,7 +355,7 @@ def test_Delete_Flow_DELETE_202_VIDEO(
 
 def test_Delete_Flow_DELETE_403(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}'
+    path = f"/flows/{stub_audio_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -391,12 +391,12 @@ def test_Delete_Flow_DELETE_204_AUDIO(
     # Need to set read_only to false prior to delete request
     api_client_cognito.request(
         "PUT",
-        f'/flows/{stub_audio_flow["id"]}/read_only',
+        f"/flows/{stub_audio_flow['id']}/read_only",
         json=False,
     )
     stub_audio_flow["read_only"] = False
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}'
+    path = f"/flows/{stub_audio_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -427,7 +427,7 @@ def test_Delete_Flow_DELETE_204_DATA(
 ):
     """204 returned as stub_data_flow has no segments"""
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
+    path = f"/flows/{stub_data_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -452,7 +452,7 @@ def test_Delete_Flow_DELETE_204_IMAGE(
 ):
     """204 returned as stub_image_flow has no segments"""
     # Arrange
-    path = f'/flows/{stub_image_flow["id"]}'
+    path = f"/flows/{stub_image_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -476,7 +476,7 @@ def test_Delete_Flow_DELETE_204_MULTI(
     api_client_cognito, delete_requests, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -508,7 +508,7 @@ def test_Delete_Flow_DELETE_202_INIT(
 ):
     """204 returned as stub_image_flow has no segments"""
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}'
+    path = f"/flows/{stub_init_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "DELETE",

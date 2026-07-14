@@ -268,7 +268,7 @@ def delete_flow_segments_by_id(
             content_type=content_types.APPLICATION_JSON,
             body=model_dump(Deletionrequest(**deletion_request_dict)),
             headers={
-                "Location": f'https://{app.current_event.request_context.domain_name}{app.current_event.request_context.path.split("/flows/")[0]}/flow-delete-requests/{deletion_request_dict["id"]}'
+                "Location": f"https://{app.current_event.request_context.domain_name}{app.current_event.request_context.path.split('/flows/')[0]}/flow-delete-requests/{deletion_request_dict['id']}"
             },
         )
     return None, HTTPStatus.NO_CONTENT.value  # 204
@@ -373,8 +373,8 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
         {"flow_id": flow["id"], "segments": [item_dict]},
         enhance_resources(
             [
-                f'tams:flow:{flow["id"]}',
-                f'tams:source:{flow["source_id"]}',
+                f"tams:flow:{flow['id']}",
+                f"tams:source:{flow['source_id']}",
                 *set(
                     f"tams:flow-collected-by:{c_id}"
                     for c_id in flow.get("collected_by", [])

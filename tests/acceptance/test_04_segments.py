@@ -46,7 +46,7 @@ def test_Allocate_Flow_Storage_POST_201_default(
     api_client_cognito, media_objects, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/storage'
+    path = f"/flows/{stub_video_flow['id']}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -65,7 +65,7 @@ def test_Allocate_Flow_Storage_POST_201(
     api_client_cognito, media_objects, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/storage'
+    path = f"/flows/{stub_video_flow['id']}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -88,7 +88,7 @@ def test_Allocate_Flow_Storage_POST_201(
 
 def test_Allocate_Flow_Storage_POST_201_object_ids(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/storage'
+    path = f"/flows/{stub_video_flow['id']}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -112,7 +112,7 @@ def test_Allocate_Flow_Storage_POST_201_content_type(
     api_client_cognito, init_objects, stub_init_flow
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/storage'
+    path = f"/flows/{stub_init_flow['id']}/storage"
     limit = 2
     content_type = "text/plain"
     # Act
@@ -139,7 +139,7 @@ def test_Allocate_Flow_Storage_POST_201_init_media_objects(
     api_client_cognito, init_media_objects, stub_init_flow
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/storage'
+    path = f"/flows/{stub_init_flow['id']}/storage"
     limit = 3
     # Act
     response = api_client_cognito.request(
@@ -164,7 +164,7 @@ def test_Allocate_Flow_Storage_POST_201_init_media_objects(
 def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito, stub_multi_flow):
     """Bad request body"""
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/storage'
+    path = f"/flows/{stub_multi_flow['id']}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -180,7 +180,7 @@ def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito, stub_multi_f
 def test_Allocate_Flow_Storage_POST_400_container(api_client_cognito, stub_data_flow):
     """Flow missing container"""
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}/storage'
+    path = f"/flows/{stub_data_flow['id']}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -198,7 +198,7 @@ def test_Allocate_Flow_Storage_POST_400_container(api_client_cognito, stub_data_
 
 def test_Allocate_Flow_Storage_POST_403(api_client_cognito, stub_audio_flow):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/storage'
+    path = f"/flows/{stub_audio_flow['id']}/storage"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -272,7 +272,7 @@ def test_Create_Flow_Segment_POST_201_VIDEO_media_objects(
     api_client_cognito, media_objects, stub_video_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     for n, record in enumerate(media_objects[:-2]):
         response = api_client_cognito.request(
@@ -321,7 +321,7 @@ def test_Create_Flow_Segment_POST_201_MULTI(
     api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -366,7 +366,7 @@ def test_Create_Flow_Segment_POST_201_negative(
     api_client_cognito, media_objects, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -415,7 +415,7 @@ def test_Create_Flow_Segment_POST_201_list_ok(
         (media_objects[6]["object_id"], "[1:0_2:0)"),
         (media_objects[7]["object_id"], "[2:0_3:0)"),
     ]
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -470,7 +470,7 @@ def test_Create_Flow_Segment_POST_200_list_partial(
         (media_objects[8]["object_id"], "[2:0_3:0)"),
         (media_objects[9]["object_id"], "[3:0_4:0)"),
     ]
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -518,7 +518,7 @@ def test_Create_Flow_Segment_POST_200_list_failed(
     api_client_cognito, media_objects, stub_multi_flow
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -544,7 +544,7 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
     api_client_cognito, stack, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     bucket_name = stack["outputs"]["MediaStorageBucket"]
     object_id = "test-123"
     segment = {
@@ -589,7 +589,7 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     object_id = "test-456"
     segment = {
         "object_id": object_id,
@@ -633,7 +633,7 @@ def test_List_Flow_Segments_GET_200_with_get_urls_same_store(
     api_client_cognito, stub_multi_flow
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -653,7 +653,7 @@ def test_List_Flow_Segments_GET_200_with_get_urls_external(
     api_client_cognito, stub_multi_flow
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -673,7 +673,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -705,7 +705,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -735,7 +735,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
 
 def test_List_Flow_Segments_HEAD_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -750,7 +750,7 @@ def test_List_Flow_Segments_HEAD_200_accept_get_urls(
 ):
     """List segments with accept_get_urls query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -772,7 +772,7 @@ def test_List_Flow_Segments_HEAD_200_accept_get_urls(
 def test_List_Flow_Segments_HEAD_200_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -796,7 +796,7 @@ def test_List_Flow_Segments_HEAD_200_object_id(
 ):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -810,7 +810,7 @@ def test_List_Flow_Segments_HEAD_200_object_id(
 def test_List_Flow_Segments_HEAD_200_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -824,7 +824,7 @@ def test_List_Flow_Segments_HEAD_200_page(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_HEAD_200_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -838,7 +838,7 @@ def test_List_Flow_Segments_HEAD_200_reverse_order(api_client_cognito, stub_vide
 def test_List_Flow_Segments_HEAD_200_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -851,7 +851,7 @@ def test_List_Flow_Segments_HEAD_200_timerange(api_client_cognito, stub_video_fl
 
 def test_List_Flow_Segments_HEAD_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -867,7 +867,7 @@ def test_List_Flow_Segments_HEAD_400_accept_get_urls(
 ):
     """List segments with accept_get_urls query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -881,7 +881,7 @@ def test_List_Flow_Segments_HEAD_400_accept_get_urls(
 def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -897,7 +897,7 @@ def test_List_Flow_Segments_HEAD_400_object_id(
 ):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -914,7 +914,7 @@ def test_List_Flow_Segments_HEAD_400_object_id(
 def test_List_Flow_Segments_HEAD_400_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -928,7 +928,7 @@ def test_List_Flow_Segments_HEAD_400_page(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -942,7 +942,7 @@ def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito, stub_vide
 def test_List_Flow_Segments_HEAD_400_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1051,7 +1051,7 @@ def test_List_Flow_Segments_HEAD_404_timerange(api_client_cognito):
 
 def test_Flow_Details_GET_200_include_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true"}
@@ -1065,7 +1065,7 @@ def test_Flow_Details_GET_200_include_timerange(api_client_cognito, stub_multi_f
 
 def test_Flow_Details_GET_200_timerange(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}'
+    path = f"/flows/{stub_video_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true", "timerange": "[1:0_3:0)"}
@@ -1114,7 +1114,7 @@ def test_List_Flows_GET_200_timerange_never(api_client_cognito):
 
 def test_List_Flow_Segments_GET_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1157,7 +1157,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_empty(
     api_client_cognito, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1178,7 +1178,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_single(
     api_client_cognito, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1200,13 +1200,13 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
     api_client_cognito, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
         path,
         params={
-            "accept_get_urls": f"{create_storage_label()},{create_storage_label("presigned")}"
+            "accept_get_urls": f"{create_storage_label()},{create_storage_label('presigned')}"
         },
     )
     # Assert
@@ -1223,7 +1223,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
 def test_List_Flow_Segments_GET_200_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1250,7 +1250,7 @@ def test_List_Flow_Segments_GET_200_object_id(
     """List segments with object_id query specified"""
     # Arrange
     object_id = media_objects[5]["object_id"]
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1267,7 +1267,7 @@ def test_List_Flow_Segments_GET_200_object_id(
 def test_List_Flow_Segments_GET_200_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1283,7 +1283,7 @@ def test_List_Flow_Segments_GET_200_page(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_GET_200_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1306,7 +1306,7 @@ def test_List_Flow_Segments_GET_200_reverse_order(api_client_cognito, stub_video
 def test_List_Flow_Segments_GET_200_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1324,7 +1324,7 @@ def test_List_Flow_Segments_GET_200_include_object_timerange(
 ):
     """List segment including object_timerange"""
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1341,7 +1341,7 @@ def test_List_Flow_Segments_GET_200_include_object_timerange(
 
 def test_List_Flow_Segments_GET_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1358,7 +1358,7 @@ def test_List_Flow_Segments_GET_400(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_GET_400_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1377,7 +1377,7 @@ def test_List_Flow_Segments_GET_400_object_id(
 ):
     """List segments with object_id query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1397,7 +1397,7 @@ def test_List_Flow_Segments_GET_400_object_id(
 def test_List_Flow_Segments_GET_400_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1414,7 +1414,7 @@ def test_List_Flow_Segments_GET_400_page(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1431,7 +1431,7 @@ def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito, stub_video
 def test_List_Flow_Segments_GET_400_timerange(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1542,7 +1542,7 @@ def test_List_Flow_Segments_GET_404_timerange(api_client_cognito):
 def test_Create_Flow_Segment_POST_400_request(api_client_cognito, stub_multi_flow):
     """Bad request body"""
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1561,7 +1561,7 @@ def test_Create_Flow_Segment_POST_400_container(
 ):
     """Flow missing container"""
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}/segments'
+    path = f"/flows/{stub_data_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1582,7 +1582,7 @@ def test_Create_Flow_Segment_POST_400_overlap(
 ):
     """Timerange overlaps with existing segment"""
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1606,7 +1606,7 @@ def test_Create_Flow_Segment_POST_400_incorrect_flow(
 ):
     """Object must already exist in S3"""
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/segments'
+    path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -1629,7 +1629,7 @@ def test_Create_Flow_Segment_POST_403(
     api_client_cognito, media_objects, stub_audio_flow
 ):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/segments'
+    path = f"/flows/{stub_audio_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2205,7 +2205,7 @@ def test_Create_Flow_Segment_POST_201_init_object_id(
     expect_webhooks,
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/segments'
+    path = f"/flows/{stub_init_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2265,7 +2265,7 @@ def test_Create_Flow_Segment_POST_201_init_object_reuse(
     expect_webhooks,
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/segments'
+    path = f"/flows/{stub_init_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2325,7 +2325,7 @@ def test_Create_Flow_Segment_POST_201_object_reuse_with_init(
     expect_webhooks,
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/segments'
+    path = f"/flows/{stub_init_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2380,7 +2380,7 @@ def test_Create_Flow_Segment_POST_400_init_on_non_init_flow(
     api_client_cognito, init_media_objects, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2403,7 +2403,7 @@ def test_Create_Flow_Segment_POST_400_missing_init_on_init_flow(
     api_client_cognito, init_media_objects, stub_init_flow
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/segments'
+    path = f"/flows/{stub_init_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2426,7 +2426,7 @@ def test_Create_Flow_Segment_POST_400_init_object_as_media(
     api_client_cognito, init_objects, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/segments'
+    path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2449,7 +2449,7 @@ def test_Create_Flow_Segment_POST_400_media_object_as_init(
     api_client_cognito, init_media_objects, stub_init_flow
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/segments'
+    path = f"/flows/{stub_init_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2473,7 +2473,7 @@ def test_Create_Flow_Segment_POST_400_changed_init_object_id(
     api_client_cognito, init_objects, init_media_objects, stub_init_flow
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/segments'
+    path = f"/flows/{stub_init_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "POST",
@@ -2495,7 +2495,7 @@ def test_Create_Flow_Segment_POST_400_changed_init_object_id(
 
 def test_List_Flow_Segments_GET_200_init_object(api_client_cognito, stub_init_flow):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}/segments'
+    path = f"/flows/{stub_init_flow['id']}/segments"
     # Act
     response = api_client_cognito.request(
         "GET",

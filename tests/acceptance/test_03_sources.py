@@ -459,7 +459,7 @@ def test_List_Sources_GET_400_tag_exists_name(api_client_cognito):
 
 def test_Source_Details_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}'
+    path = f"/sources/{stub_multi_source['id']}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -483,7 +483,7 @@ def test_Source_Details_HEAD_404(api_client_cognito):
 
 def test_Source_Details_GET_200(api_client_cognito, stub_data_source):
     # Arrange
-    path = f'/sources/{stub_data_source["id"]}'
+    path = f"/sources/{stub_data_source['id']}"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -511,7 +511,7 @@ def test_Source_Details_GET_404(api_client_cognito):
 
 def test_List_Source_Tags_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags'
+    path = f"/sources/{stub_multi_source['id']}/tags"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -535,7 +535,7 @@ def test_List_Source_Tags_HEAD_404(api_client_cognito):
 
 def test_List_Source_Tags_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags'
+    path = f"/sources/{stub_multi_source['id']}/tags"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -563,7 +563,7 @@ def test_List_Source_Tags_GET_404(api_client_cognito):
 
 def test_Source_Tag_Value_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/flow_status'
+    path = f"/sources/{stub_multi_source['id']}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -575,7 +575,7 @@ def test_Source_Tag_Value_HEAD_200(api_client_cognito, stub_multi_source):
 
 def test_Source_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/does_not_exist'
+    path = f"/sources/{stub_multi_source['id']}/tags/does_not_exist"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -599,7 +599,7 @@ def test_Source_Tag_Value_HEAD_404_bad_source_id(api_client_cognito):
 
 def test_Source_Tag_Value_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/flow_status'
+    path = f"/sources/{stub_multi_source['id']}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -613,7 +613,7 @@ def test_Source_Tag_Value_GET_200(api_client_cognito, stub_multi_source):
 
 def test_Source_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/does_not_exist'
+    path = f"/sources/{stub_multi_source['id']}/tags/does_not_exist"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -645,7 +645,7 @@ def test_Create_or_Update_Source_Tag_PUT_204_create(
     # Arrange
     tag_name = "pytest"
     tag_value = "test"
-    path = f'/sources/{stub_multi_source["id"]}/tags/{tag_name}'
+    path = f"/sources/{stub_multi_source['id']}/tags/{tag_name}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -669,7 +669,7 @@ def test_Create_or_Update_Source_Tag_PUT_204_update(
     # Arrange
     tag_name = "test"
     tag_value = "something else"
-    path = f'/sources/{stub_multi_source["id"]}/tags/{tag_name}'
+    path = f"/sources/{stub_multi_source['id']}/tags/{tag_name}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -689,7 +689,7 @@ def test_Create_or_Update_Source_Tag_PUT_204_update(
 
 def test_Create_or_Update_Source_Tag_PUT_400(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/tags/pytest'
+    path = f"/sources/{stub_multi_source['id']}/tags/pytest"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -726,7 +726,7 @@ def test_Delete_Source_Tag_DELETE_204(
 ):
     # Arrange
     tag_name = "pytest"
-    path = f'/sources/{stub_multi_source["id"]}/tags/{tag_name}'
+    path = f"/sources/{stub_multi_source['id']}/tags/{tag_name}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -762,7 +762,7 @@ def test_Delete_Source_Tag_DELETE_404(api_client_cognito):
 
 def test_Source_Description_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/description'
+    path = f"/sources/{stub_multi_source['id']}/description"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -786,7 +786,7 @@ def test_Source_Description_HEAD_404(api_client_cognito):
 
 def test_Source_Description_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/description'
+    path = f"/sources/{stub_multi_source['id']}/description"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -817,7 +817,7 @@ def test_Create_or_Update_Source_Description_PUT_204_create(
 ):
     # Arrange
     value = "pytest - audio"
-    path = f'/sources/{stub_audio_source["id"]}/description'
+    path = f"/sources/{stub_audio_source['id']}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -840,7 +840,7 @@ def test_Create_or_Update_Source_Description_PUT_204_update(
 ):
     # Arrange
     value = "pytest"
-    path = f'/sources/{stub_video_source["id"]}/description'
+    path = f"/sources/{stub_video_source['id']}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -862,7 +862,7 @@ def test_Create_or_Update_Source_Description_PUT_400(
     api_client_cognito, stub_video_source
 ):
     # Arrange
-    path = f'/sources/{stub_video_source["id"]}/description'
+    path = f"/sources/{stub_video_source['id']}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -895,7 +895,7 @@ def test_Delete_Source_Description_DELETE_204(
     api_client_cognito, stub_audio_source, expect_webhooks
 ):
     # Arrange
-    path = f'/sources/{stub_audio_source["id"]}/description'
+    path = f"/sources/{stub_audio_source['id']}/description"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -928,7 +928,7 @@ def test_Delete_Source_Description_DELETE_404(api_client_cognito):
 
 def test_Source_Label_HEAD_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/label'
+    path = f"/sources/{stub_multi_source['id']}/label"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -952,7 +952,7 @@ def test_Source_Label_HEAD_404(api_client_cognito):
 
 def test_Source_Label_GET_200(api_client_cognito, stub_multi_source):
     # Arrange
-    path = f'/sources/{stub_multi_source["id"]}/label'
+    path = f"/sources/{stub_multi_source['id']}/label"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -983,7 +983,7 @@ def test_Create_or_Update_Source_Label_PUT_204_create(
 ):
     # Arrange
     value = "pytest - audio"
-    path = f'/sources/{stub_audio_source["id"]}/label'
+    path = f"/sources/{stub_audio_source['id']}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1006,7 +1006,7 @@ def test_Create_or_Update_Source_Label_PUT_204_update(
 ):
     # Arrange
     value = "pytest"
-    path = f'/sources/{stub_video_source["id"]}/label'
+    path = f"/sources/{stub_video_source['id']}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1026,7 +1026,7 @@ def test_Create_or_Update_Source_Label_PUT_204_update(
 
 def test_Create_or_Update_Source_Label_PUT_400(api_client_cognito, stub_video_source):
     # Arrange
-    path = f'/sources/{stub_video_source["id"]}/label'
+    path = f"/sources/{stub_video_source['id']}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1059,7 +1059,7 @@ def test_Delete_Source_Label_DELETE_204(
     api_client_cognito, stub_audio_source, expect_webhooks
 ):
     # Arrange
-    path = f'/sources/{stub_audio_source["id"]}/label'
+    path = f"/sources/{stub_audio_source['id']}/label"
     # Act
     response = api_client_cognito.request(
         "DELETE",
