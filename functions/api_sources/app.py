@@ -328,7 +328,7 @@ def get_event_resources(obj: dict) -> list:
     """Generate a list of event resources for the given source object."""
     return enhance_resources(
         [
-            f'tams:source:{obj["id"]}',
+            f"tams:source:{obj['id']}",
             *set(
                 f"tams:source-collected-by:{c_id}"
                 for c_id in obj.get("collected_by", [])

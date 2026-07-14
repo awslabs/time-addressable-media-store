@@ -37,7 +37,7 @@ tracer = Tracer()
 neptune = boto3.client(
     "neptunedata",
     region_name=os.environ["AWS_REGION"],
-    endpoint_url=f'https://{os.environ.get("NEPTUNE_ENDPOINT", "localhost")}:8182',
+    endpoint_url=f"https://{os.environ.get('NEPTUNE_ENDPOINT', 'localhost')}:8182",
 )
 qb = QueryBuilder()
 
@@ -639,7 +639,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
             publish_event(
                 "sources/deleted",
                 {"source_id": existing_dict["source_id"]},
-                enhance_resources([f'tams:source:{existing_dict["source_id"]}']),
+                enhance_resources([f"tams:source:{existing_dict['source_id']}"]),
             )
     # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
     return query_node("flow", flow_dict["id"])
@@ -801,7 +801,7 @@ def set_node_property(
     """Performs an OpenCypher Set operation on the specified Node and properties with the addition of updated and updated_by properties"""
     meta_props = {
         **props,
-        f"{record_type}.{"metadata_" if record_type == "flow" else ""}updated": datetime.now()
+        f"{record_type}.{'metadata_' if record_type == 'flow' else ''}updated": datetime.now()
         .astimezone(timezone.utc)
         .strftime(constants.DATETIME_FORMAT),
         f"{record_type}.updated_by": username,
@@ -857,8 +857,8 @@ def update_flow_segments_updated(flow_id: str) -> None:
             {"flow": item_dict},
             enhance_resources(
                 [
-                    f'tams:flow:{item_dict["id"]}',
-                    f'tams:source:{item_dict["source_id"]}',
+                    f"tams:flow:{item_dict['id']}",
+                    f"tams:source:{item_dict['source_id']}",
                     *set(
                         f"tams:flow-collected-by:{c_id}"
                         for c_id in item_dict.get("collected_by", [])
@@ -943,7 +943,7 @@ def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
         publish_event(
             "sources/created",
             {"source": source_dict},
-            enhance_resources([f'tams:source:{source_dict["id"]}']),
+            enhance_resources([f"tams:source:{source_dict['id']}"]),
         )
     # Create Flow
     return merge_flow(flow_dict, existing_dict)

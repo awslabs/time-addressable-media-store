@@ -299,7 +299,7 @@ def delete_flow_by_id(
         content_type=content_types.APPLICATION_JSON,
         body=model_dump(Deletionrequest(**item_dict)),
         headers={
-            "Location": f'https://{app.current_event.request_context.domain_name}{app.current_event.request_context.path.split("/flows/")[0]}/flow-delete-requests/{item_dict["id"]}'
+            "Location": f"https://{app.current_event.request_context.domain_name}{app.current_event.request_context.path.split('/flows/')[0]}/flow-delete-requests/{item_dict['id']}"
         },
     )
 
@@ -875,8 +875,8 @@ def get_event_resources(obj: dict) -> list:
     """Generate a list of event resources for the given flow object."""
     return enhance_resources(
         [
-            f'tams:flow:{obj["id"]}',
-            f'tams:source:{obj["source_id"]}',
+            f"tams:flow:{obj['id']}",
+            f"tams:source:{obj['source_id']}",
             *set(
                 f"tams:flow-collected-by:{c_id}" for c_id in obj.get("collected_by", [])
             ),

@@ -46,7 +46,7 @@ def record_handler(
         # flow_collected_by_ids webhook filtering. Stripped before persistence
         # in merge_delete_request so it never touches the Delete Request record.
         body["segments_deleted_resources"] = enhance_resources(
-            [f'tams:flow:{body["flow_id"]}']
+            [f"tams:flow:{body['flow_id']}"]
         )
         # Delete the flow
         source_id = delete_flow(body["flow_id"])
@@ -55,7 +55,7 @@ def record_handler(
                 "flows/deleted",
                 {"flow_id": body["flow_id"]},
                 enhance_resources(
-                    [f'tams:flow:{body["flow_id"]}', f"tams:source:{source_id}"]
+                    [f"tams:flow:{body['flow_id']}", f"tams:source:{source_id}"]
                 ),
             )
         # Delete source if no longer referenced by any other flows

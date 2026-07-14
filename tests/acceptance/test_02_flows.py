@@ -80,7 +80,7 @@ def test_Create_or_Replace_Flow_PUT_201_VIDEO(
     stub_video_source,
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}'
+    path = f"/flows/{stub_video_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -112,7 +112,7 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(
     stub_audio_source,
 ):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}'
+    path = f"/flows/{stub_audio_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -147,7 +147,7 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(
     stub_data_source,
 ):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
+    path = f"/flows/{stub_data_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -180,7 +180,7 @@ def test_Create_or_Replace_Flow_PUT_201_IMAGE(
     stub_image_source,
 ):
     # Arrange
-    path = f'/flows/{stub_image_flow["id"]}'
+    path = f"/flows/{stub_image_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -215,7 +215,7 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(
     expect_webhooks,
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -248,7 +248,7 @@ def test_Create_or_Replace_Flow_PUT_201_INIT(
     stub_init_source,
 ):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}'
+    path = f"/flows/{stub_init_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -275,7 +275,7 @@ def test_Create_or_Replace_Flow_PUT_204(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -316,7 +316,7 @@ def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
 def test_Create_or_Replace_Flow_PUT_403(api_client_cognito, stub_data_flow):
     """Attempt to update a flow that is marked as read-only"""
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
+    path = f"/flows/{stub_data_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1014,7 +1014,7 @@ def test_List_Flows_GET_400_timerange(api_client_cognito):
 
 def test_Flow_Details_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1026,7 +1026,7 @@ def test_Flow_Details_HEAD_200(api_client_cognito, stub_multi_flow):
 
 def test_Flow_Details_HEAD_200_include_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true"}
@@ -1037,7 +1037,7 @@ def test_Flow_Details_HEAD_200_include_timerange(api_client_cognito, stub_multi_
 
 def test_Flow_Details_HEAD_200_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"timerange": "()"})
     # Assert
@@ -1046,7 +1046,7 @@ def test_Flow_Details_HEAD_200_timerange(api_client_cognito, stub_multi_flow):
 
 def test_Flow_Details_HEAD_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request("HEAD", path, params={"timerange": "bad"})
     # Assert
@@ -1055,7 +1055,7 @@ def test_Flow_Details_HEAD_400(api_client_cognito, stub_multi_flow):
 
 def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "bad"}
@@ -1066,7 +1066,7 @@ def test_Flow_Details_HEAD_400_include_timerange(api_client_cognito, stub_multi_
 
 def test_Flow_Details_HEAD_400_timerange(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}'
+    path = f"/flows/{stub_multi_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"include_timerange": "true", "timerange": "bad"}
@@ -1109,7 +1109,7 @@ def test_Flow_Details_HEAD_404_timerange(api_client_cognito):
 
 def test_Flow_Details_GET_200(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
+    path = f"/flows/{stub_data_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1123,7 +1123,7 @@ def test_Flow_Details_GET_200(api_client_cognito, stub_data_flow):
 
 def test_Flow_Details_GET_200_init_segments(api_client_cognito, stub_init_flow):
     # Arrange
-    path = f'/flows/{stub_init_flow["id"]}'
+    path = f"/flows/{stub_init_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1138,7 +1138,7 @@ def test_Flow_Details_GET_200_init_segments(api_client_cognito, stub_init_flow):
 
 def test_Flow_Details_GET_400(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
+    path = f"/flows/{stub_data_flow['id']}"
     # Act
     response = api_client_cognito.request("GET", path, params={"timerange": "bad"})
     # Assert
@@ -1150,7 +1150,7 @@ def test_Flow_Details_GET_400(api_client_cognito, stub_data_flow):
 
 def test_Flow_Details_GET_400_include_timerange(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
+    path = f"/flows/{stub_data_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "bad"}
@@ -1164,7 +1164,7 @@ def test_Flow_Details_GET_400_include_timerange(api_client_cognito, stub_data_fl
 
 def test_Flow_Details_GET_400_timerange(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}'
+    path = f"/flows/{stub_data_flow['id']}"
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"include_timerange": "true", "timerange": "bad"}
@@ -1216,7 +1216,7 @@ def test_Flow_Details_GET_404_timerange(api_client_cognito):
 
 def test_List_Flow_Tags_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags'
+    path = f"/flows/{stub_multi_flow['id']}/tags"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1240,7 +1240,7 @@ def test_List_Flow_Tags_HEAD_404(api_client_cognito):
 
 def test_List_Flow_Tags_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags'
+    path = f"/flows/{stub_multi_flow['id']}/tags"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1268,7 +1268,7 @@ def test_List_Flow_Tags_GET_404(api_client_cognito):
 
 def test_Flow_Tag_Value_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/flow_status'
+    path = f"/flows/{stub_multi_flow['id']}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1280,7 +1280,7 @@ def test_Flow_Tag_Value_HEAD_200(api_client_cognito, stub_multi_flow):
 
 def test_Flow_Tag_Value_HEAD_404_bad_tag(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/does_not_exist'
+    path = f"/flows/{stub_multi_flow['id']}/tags/does_not_exist"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1304,7 +1304,7 @@ def test_Flow_Tag_Value_HEAD_404_bad_flow_id(api_client_cognito):
 
 def test_Flow_Tag_Value_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/flow_status'
+    path = f"/flows/{stub_multi_flow['id']}/tags/flow_status"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1318,7 +1318,7 @@ def test_Flow_Tag_Value_GET_200(api_client_cognito, stub_multi_flow):
 
 def test_Flow_Tag_Value_GET_404_bad_tag(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/does_not_exist'
+    path = f"/flows/{stub_multi_flow['id']}/tags/does_not_exist"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1350,7 +1350,7 @@ def test_Create_or_Update_Flow_Tag_PUT_204_create(
     # Arrange
     tag_name = "pytest"
     tag_value = "test"
-    path = f'/flows/{stub_multi_flow["id"]}/tags/{tag_name}'
+    path = f"/flows/{stub_multi_flow['id']}/tags/{tag_name}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1374,7 +1374,7 @@ def test_Create_or_Update_Flow_Tag_PUT_204_update(
     # Arrange
     tag_name = "test"
     tag_value = "something else"
-    path = f'/flows/{stub_multi_flow["id"]}/tags/{tag_name}'
+    path = f"/flows/{stub_multi_flow['id']}/tags/{tag_name}"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1396,7 +1396,7 @@ def test_Create_or_Update_Flow_Tag_PUT_204_update(
 
 def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/tags/pytest'
+    path = f"/flows/{stub_multi_flow['id']}/tags/pytest"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1412,7 +1412,7 @@ def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
 
 def test_Create_or_Update_Flow_Tag_PUT_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}/tags/pytest'
+    path = f"/flows/{stub_data_flow['id']}/tags/pytest"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1448,7 +1448,7 @@ def test_Delete_Flow_Tag_DELETE_204(
 ):
     # Arrange
     tag_name = "pytest"
-    path = f'/flows/{stub_multi_flow["id"]}/tags/{tag_name}'
+    path = f"/flows/{stub_multi_flow['id']}/tags/{tag_name}"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1469,7 +1469,7 @@ def test_Delete_Flow_Tag_DELETE_204(
 
 def test_Delete_Flow_Tag_DELETE_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}/tags/test'
+    path = f"/flows/{stub_data_flow['id']}/tags/test"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1500,7 +1500,7 @@ def test_Delete_Flow_Tag_DELETE_404(api_client_cognito):
 
 def test_Flow_Description_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/description'
+    path = f"/flows/{stub_multi_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1524,7 +1524,7 @@ def test_Flow_Description_HEAD_404(api_client_cognito):
 
 def test_Flow_Description_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/description'
+    path = f"/flows/{stub_multi_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1555,7 +1555,7 @@ def test_Create_or_Update_Flow_Description_PUT_204_create(
 ):
     # Arrange
     value = "pytest - audio"
-    path = f'/flows/{stub_audio_flow["id"]}/description'
+    path = f"/flows/{stub_audio_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1580,7 +1580,7 @@ def test_Create_or_Update_Flow_Description_PUT_204_update(
 ):
     # Arrange
     value = "pytest"
-    path = f'/flows/{stub_video_flow["id"]}/description'
+    path = f"/flows/{stub_video_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1602,7 +1602,7 @@ def test_Create_or_Update_Flow_Description_PUT_204_update(
 
 def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/description'
+    path = f"/flows/{stub_video_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1618,7 +1618,7 @@ def test_Create_or_Update_Flow_Description_PUT_400(api_client_cognito, stub_vide
 
 def test_Create_or_Update_Flow_Description_PUT_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}/description'
+    path = f"/flows/{stub_data_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1653,7 +1653,7 @@ def test_Delete_Flow_Description_DELETE_204(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/description'
+    path = f"/flows/{stub_audio_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1674,7 +1674,7 @@ def test_Delete_Flow_Description_DELETE_204(
 
 def test_Delete_Flow_Description_DELETE_403(api_client_cognito, stub_data_flow):
     # Arrange
-    path = f'/flows/{stub_data_flow["id"]}/description'
+    path = f"/flows/{stub_data_flow['id']}/description"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1705,7 +1705,7 @@ def test_Delete_Flow_Description_DELETE_404(api_client_cognito):
 
 def test_Flow_Label_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/label'
+    path = f"/flows/{stub_multi_flow['id']}/label"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1729,7 +1729,7 @@ def test_Flow_Label_HEAD_404(api_client_cognito):
 
 def test_Flow_Label_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/label'
+    path = f"/flows/{stub_multi_flow['id']}/label"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1760,7 +1760,7 @@ def test_Create_or_Update_Flow_Label_PUT_204_create(
 ):
     # Arrange
     value = "pytest - audio"
-    path = f'/flows/{stub_audio_flow["id"]}/label'
+    path = f"/flows/{stub_audio_flow['id']}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1785,7 +1785,7 @@ def test_Create_or_Update_Flow_Label_PUT_204_update(
 ):
     # Arrange
     value = "pytest"
-    path = f'/flows/{stub_video_flow["id"]}/label'
+    path = f"/flows/{stub_video_flow['id']}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1807,7 +1807,7 @@ def test_Create_or_Update_Flow_Label_PUT_204_update(
 
 def test_Create_or_Update_Flow_Label_PUT_400(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/label'
+    path = f"/flows/{stub_video_flow['id']}/label"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1840,7 +1840,7 @@ def test_Delete_Flow_Label_DELETE_204(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/label'
+    path = f"/flows/{stub_audio_flow['id']}/label"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1875,7 +1875,7 @@ def test_Delete_Flow_Label_DELETE_404(api_client_cognito):
 
 def test_Flow_Flow_Collection_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
+    path = f"/flows/{stub_multi_flow['id']}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -1899,7 +1899,7 @@ def test_Flow_Flow_Collection_HEAD_404(api_client_cognito):
 
 def test_Flow_Flow_Collection_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
+    path = f"/flows/{stub_multi_flow['id']}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -1929,7 +1929,7 @@ def test_Delete_Flow_Flow_Collection_DELETE_204(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
+    path = f"/flows/{stub_multi_flow['id']}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -1963,7 +1963,7 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_create(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
+    path = f"/flows/{stub_multi_flow['id']}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -1989,7 +1989,7 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
     api_client_cognito, stub_multi_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/flow_collection'
+    path = f"/flows/{stub_multi_flow['id']}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2010,7 +2010,7 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_400(
     api_client_cognito, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/flow_collection'
+    path = f"/flows/{stub_video_flow['id']}/flow_collection"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2041,7 +2041,7 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_404(api_client_cognito):
 
 def test_Flow_Max_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2065,7 +2065,7 @@ def test_Flow_Max_Bit_Rate_HEAD_404(api_client_cognito):
 
 def test_Flow_Max_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2096,7 +2096,7 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_create(
 ):
     # Arrange
     value = 6000000
-    path = f'/flows/{stub_audio_flow["id"]}/max_bit_rate'
+    path = f"/flows/{stub_audio_flow['id']}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2121,7 +2121,7 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_204_update(
 ):
     # Arrange
     value = 6000000
-    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2145,7 +2145,7 @@ def test_Create_or_Update_Flow_Max_Bit_Rate_PUT_400(
     api_client_cognito, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/max_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2178,7 +2178,7 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_204(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/max_bit_rate'
+    path = f"/flows/{stub_audio_flow['id']}/max_bit_rate"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2213,7 +2213,7 @@ def test_Delete_Flow_Max_Bit_Rate_DELETE_404(api_client_cognito):
 
 def test_Flow_Avg_Bit_Rate_HEAD_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2237,7 +2237,7 @@ def test_Flow_Avg_Bit_Rate_HEAD_404(api_client_cognito):
 
 def test_Flow_Avg_Bit_Rate_GET_200(api_client_cognito, stub_video_flow):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2268,7 +2268,7 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_create(
 ):
     # Arrange
     value = 6000000
-    path = f'/flows/{stub_audio_flow["id"]}/avg_bit_rate'
+    path = f"/flows/{stub_audio_flow['id']}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2293,7 +2293,7 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_204_update(
 ):
     # Arrange
     value = 6000000
-    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2317,7 +2317,7 @@ def test_Create_or_Update_Flow_Avg_Bit_Rate_PUT_400(
     api_client_cognito, stub_video_flow
 ):
     # Arrange
-    path = f'/flows/{stub_video_flow["id"]}/avg_bit_rate'
+    path = f"/flows/{stub_video_flow['id']}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2350,7 +2350,7 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_204(
     api_client_cognito, stub_audio_flow, expect_webhooks
 ):
     # Arrange
-    path = f'/flows/{stub_audio_flow["id"]}/avg_bit_rate'
+    path = f"/flows/{stub_audio_flow['id']}/avg_bit_rate"
     # Act
     response = api_client_cognito.request(
         "DELETE",
@@ -2385,7 +2385,7 @@ def test_Delete_Flow_Avg_Bit_Rate_DELETE_404(api_client_cognito):
 
 def test_Flow_Read_Only_HEAD_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/read_only'
+    path = f"/flows/{stub_multi_flow['id']}/read_only"
     # Act
     response = api_client_cognito.request(
         "HEAD",
@@ -2409,7 +2409,7 @@ def test_Flow_Read_Only_HEAD_404(api_client_cognito):
 
 def test_Flow_Read_Only_GET_200(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/read_only'
+    path = f"/flows/{stub_multi_flow['id']}/read_only"
     # Act
     response = api_client_cognito.request(
         "GET",
@@ -2440,7 +2440,7 @@ def test_Set_Flow_Read_Only_PUT_204_DATA(
 ):
     # Arrange
     value = False
-    path = f'/flows/{stub_data_flow["id"]}/read_only'
+    path = f"/flows/{stub_data_flow['id']}/read_only"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2465,7 +2465,7 @@ def test_Set_Flow_Read_Only_PUT_204_AUDIO(
 ):
     # Arrange
     value = True
-    path = f'/flows/{stub_audio_flow["id"]}/read_only'
+    path = f"/flows/{stub_audio_flow['id']}/read_only"
     # Act
     response = api_client_cognito.request(
         "PUT",
@@ -2487,7 +2487,7 @@ def test_Set_Flow_Read_Only_PUT_204_AUDIO(
 
 def test_Set_Flow_Read_Only_PUT_400(api_client_cognito, stub_multi_flow):
     # Arrange
-    path = f'/flows/{stub_multi_flow["id"]}/read_only'
+    path = f"/flows/{stub_multi_flow['id']}/read_only"
     # Act
     response = api_client_cognito.request(
         "PUT",

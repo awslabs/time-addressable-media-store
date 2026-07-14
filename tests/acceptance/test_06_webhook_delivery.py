@@ -72,15 +72,15 @@ def test_flow_filter_webhook(webhook_test_data):
         # Check flow_id matches for Flow and Flow Segment events only
         if event_type.startswith("flows/"):
             actual_flow_id = get_resource_id(body, event_type)
-            assert (
-                actual_flow_id == expected_flow_id
-            ), f"{event_type}: Expected flow_id {expected_flow_id}, got {actual_flow_id}"
+            assert actual_flow_id == expected_flow_id, (
+                f"{event_type}: Expected flow_id {expected_flow_id}, got {actual_flow_id}"
+            )
         # Check accept_get_urls: [] worked (no get_urls in segments)
         if event_type == "flows/segments_added":
             for segment in body["event"]["segments"]:
-                assert (
-                    "get_urls" not in segment
-                ), "segments should not have get_urls with accept_get_urls: []"
+                assert "get_urls" not in segment, (
+                    "segments should not have get_urls with accept_get_urls: []"
+                )
     logger.info(f"All {len(events)} events match flow_id filter and have no get_urls")
 
 
@@ -98,15 +98,15 @@ def test_source_filter_webhook(webhook_test_data):
         event_type = body["event_type"]
         # Check source_id matches (source_ids filter applies to all event types)
         actual_source_id = get_source_id_from_event(body, event_type)
-        assert (
-            actual_source_id == expected_source_id
-        ), f"{event_type}: Expected source_id {expected_source_id}, got {actual_source_id}"
+        assert actual_source_id == expected_source_id, (
+            f"{event_type}: Expected source_id {expected_source_id}, got {actual_source_id}"
+        )
         # Check accept_storage_ids filter with non-existent ID means no get_urls
         if event_type == "flows/segments_added":
             for segment in body["event"]["segments"]:
-                assert (
-                    "get_urls" not in segment
-                ), "Expected no get_urls with non-existent accept_storage_ids"
+                assert "get_urls" not in segment, (
+                    "Expected no get_urls with non-existent accept_storage_ids"
+                )
     logger.info(f"All {len(events)} events match source_id filter")
 
 
@@ -123,17 +123,17 @@ def test_collected_flow_webhook(webhook_test_data, stub_multi_flow):
         event_type = body["event_type"]
         if event_type.startswith("flows/"):
             actual_flow_id = get_resource_id(body, event_type)
-            assert (
-                actual_flow_id != stub_multi_flow["id"]
-            ), f'{event_type}: Flow is not collected by flow_id {stub_multi_flow["id"]}'
+            assert actual_flow_id != stub_multi_flow["id"], (
+                f"{event_type}: Flow is not collected by flow_id {stub_multi_flow['id']}"
+            )
         # Check presigned: true means only presigned URLs
         if event_type == "flows/segments_added":
             for segment in body["event"]["segments"]:
                 if "get_urls" in segment:
                     for get_url in segment["get_urls"]:
-                        assert (
-                            get_url.get("presigned") is True
-                        ), f"Expected presigned=true, got {get_url.get('presigned')}"
+                        assert get_url.get("presigned") is True, (
+                            f"Expected presigned=true, got {get_url.get('presigned')}"
+                        )
     logger.info(f"All {len(events)} events are collected flows with presigned URLs")
 
 
@@ -150,9 +150,9 @@ def test_collected_source_webhook(webhook_test_data, stub_multi_source):
         event_type = body["event_type"]
         # Check source_id for all event types (source_collected_by_ids applies to all)
         actual_source_id = get_source_id_from_event(body, event_type)
-        assert (
-            actual_source_id != stub_multi_source["id"]
-        ), f'{event_type}: Source is not collected by source_id {stub_multi_source["id"]}'
+        assert actual_source_id != stub_multi_source["id"], (
+            f"{event_type}: Source is not collected by source_id {stub_multi_source['id']}"
+        )
         # Check verbose_storage: true means storage metadata included
         if event_type == "flows/segments_added":
             for segment in body["event"]["segments"]:
@@ -169,7 +169,7 @@ def test_collected_source_webhook(webhook_test_data, stub_multi_source):
                         has_verbose_field = any(
                             field in get_url for field in verbose_fields
                         )
-                        assert (
-                            has_verbose_field
-                        ), f"Expected verbose storage fields (one of {verbose_fields}), got {get_url.keys()}"
+                        assert has_verbose_field, (
+                            f"Expected verbose storage fields (one of {verbose_fields}), got {get_url.keys()}"
+                        )
     logger.info(f"All {len(events)} events are collected sources with verbose storage")

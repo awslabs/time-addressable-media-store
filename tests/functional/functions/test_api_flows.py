@@ -5,6 +5,8 @@ from http import HTTPStatus
 
 import constants
 import pytest
+
+# pylint: disable=no-name-in-module
 from conftest import ALTERNATIVE_STORAGE_ID, DEFAULT_STORAGE_ID
 
 pytestmark = [
@@ -150,7 +152,7 @@ def test_POST_storage_returns_201_with_default_storage_objects_when_flow_exists(
         assert put_url
         assert isinstance(put_url, dict)
         assert put_url.get("url")
-        assert put_url["url"].startswith(f"https://{os.environ["BUCKET"]}.s3.")
+        assert put_url["url"].startswith(f"https://{os.environ['BUCKET']}.s3.")
         assert "x-amz-security-token=" in put_url["url"]
         assert put_url.get("content-type")
         assert media_object.get("object_id")
