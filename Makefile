@@ -67,8 +67,8 @@ api/build/tams: $(TAMS_SPEC_ZIP_FILE) | api/build
 
 api-spec: api/build/tams
 	@echo "Generating API schema..."
-	poetry run python ./api/build/generate_spec.py
-	poetry run datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel  --disable-timestamp --target-python-version 3.14 --use-schema-description --use-double-quotes
+	uv run python ./api/build/generate_spec.py
+	uv run datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel  --disable-timestamp --target-python-version 3.14 --use-schema-description --use-double-quotes
 	rm -rf ./api/build/tams
 
 build: api-spec
@@ -105,15 +105,15 @@ local-invoke: build
 
 test-unit:
 	@echo "Running unit tests..."
-	poetry run pytest tests/unit -v
+	uv run pytest tests/unit -v
 
 test-functional:
 	@echo "Running functional tests..."
-	poetry run pytest tests/functional -v
+	uv run pytest tests/functional -v
 
 test-acceptance:
 	@echo "Running acceptance tests..."
-	poetry run pytest tests/acceptance -v
+	uv run --env-file .env pytest tests/acceptance -v
 
 test-all: test-unit test-functional test-acceptance
 	@echo "All tests completed"
@@ -136,16 +136,16 @@ cfn-format:
 
 format:
 	@echo "Formatting code..."
-	poetry run black .
-	poetry run isort --profile black .
+	uv run ruff format .
+	uv run ruff check --fix .
 
 lint-pylint:
 	@echo "Running pylint..."
-	poetry run pylint --errors-only --disable=E0401 functions/ layers/
+	uv run pylint --errors-only --disable=E0401 functions/ layers/
 
 lint-bandit:
 	@echo "Running bandit..."
-	poetry run bandit -c pyproject.toml -r .
+	uv run bandit -c pyproject.toml -r .
 
 lint: cfn-lint cfn-nag lint-pylint lint-bandit
 	@echo "Running Python linting checks..."
