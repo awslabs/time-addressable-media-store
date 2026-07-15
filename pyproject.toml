@@ -1,35 +1,29 @@
-# FILE: pyproject.toml
 [tool.bandit]
 exclude_dirs = ["tests"]
 
-[tool.poetry]
-package-mode = false
-
-[tool.poetry.group.dev.dependencies]
-requests = "^2.34.2"
-pytest = "^9.0.3"
-boto3 = "^1.43.11"
-pyaml = "^26.2.1"
-aws-lambda-powertools = "^3.29.0"
-pydantic = "^2.13.4"
-aws-xray-sdk = "^2.15.0"
-undecorated = "^0.3.0"
-deepdiff = "^9.1.0"
-mediatimestamp = "^5.2.0"
-cymple = "^0.12.0"
-moto = "^5.2.1"
-datamodel-code-generator = "^0.57.0"
-pytest-lazy-fixtures = "^1.4.0"
-pyjwt = "^2.13.0"
-responses = "^0.26.0"
-
 [project]
 name = "time-addressable-media-store"
+version = "0.0.0"
 readme = "README.md"
 requires-python = ">=3.14,<4.0.0"
-dependencies = [
-]
+dependencies = []
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "requests>=2.34.2",
+    "pytest>=9.0.3",
+    "boto3>=1.43.11",
+    "pyaml>=26.2.1",
+    "aws-lambda-powertools>=3.29.0",
+    "pydantic>=2.13.4",
+    "aws-xray-sdk>=2.15.0",
+    "undecorated>=0.3.0",
+    "deepdiff>=9.1.0",
+    "mediatimestamp>=5.2.0",
+    "cymple>=0.12.0",
+    "moto>=5.2.1",
+    "datamodel-code-generator>=0.57.0",
+    "pytest-lazy-fixtures>=1.4.0",
+    "pyjwt>=2.13.0",
+    "responses>=0.26.0",
+]

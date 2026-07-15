@@ -9,6 +9,7 @@ Metadata:
         - I3011
         - E3031
         - E3033
+        - W1030
 
 Parameters:
   VpcId:
