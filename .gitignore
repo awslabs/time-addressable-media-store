@@ -176,8 +176,8 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# pyenv
-.python-version
+# pyenv / uv - .python-version is committed to pin the interpreter
+!.python-version
 
 # celery beat schedule file
 celerybeat-schedule.*

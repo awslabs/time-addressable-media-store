@@ -9,8 +9,8 @@ The following dependencies must be installed. Please refer to your operating sys
 > **Note:** For Windows, we recommend enabling Windows Subsystem for Linux (WSL) and installing a Linux distribution of your choice,
 > for example, here are the instructions on how to install [Ubuntu](https://ubuntu.com/tutorials/ubuntu-on-windows).
 
-- Python ~= 3.14.0 and pip
-- [poetry](https://python-poetry.org/) - Python dependency management
+- Python ~= 3.14.0
+- [uv](https://docs.astral.sh/uv/) - Python package and dependency management
 - [pre-commit](https://pre-commit.com/#install) - Git hooks manager
 - [cfn-lint](https://github.com/aws-cloudformation/cfn-lint) - CloudFormation linting
 - [cfn-nag](https://github.com/stelligent/cfn_nag) - CloudFormation security scanning
@@ -30,7 +30,7 @@ cd time-addressable-media-store
 ### 2. Install Python Dependencies
 
 ```bash
-poetry install
+uv sync
 ```
 
 ### 3. Set Up Pre-commit Hooks
@@ -62,7 +62,7 @@ make test
 ### Code Formatting and Linting
 
 ```bash
-# Format code with black and isort
+# Format code with ruff
 make format
 
 # Run linting checks
