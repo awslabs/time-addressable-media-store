@@ -153,14 +153,81 @@ def test_POST_storage_returns_201_with_default_storage_objects_when_flow_exists(
         assert isinstance(put_url, dict)
         assert put_url.get("url")
         assert put_url["url"].startswith(f"https://{os.environ['BUCKET']}.s3.")
-        assert "x-amz-security-token=" in put_url["url"]
+        assert "x-amz-signature=" in put_url["url"].lower()
         assert put_url.get("content-type")
+        # presigned defaults to True when not requested and is flagged in the response
+        assert media_object.get("presigned") is True
         assert media_object.get("object_id")
         # Check expected items are present in the storage_table
         item = storage_table.get_item(Key={"id": media_object["object_id"]})["Item"]
         assert item is not None
         assert item.get("expire_at")
         assert item["storage_id"] == DEFAULT_STORAGE_ID
+
+
+@pytest.mark.parametrize(
+    "presigned",
+    [True, False],
+)
+# pylint: disable=redefined-outer-name
+def test_POST_storage_returns_201_with_expected_presigned_urls_when_requested(
+    lambda_context,
+    api_event_factory,
+    api_flows,
+    mock_neptune_client,
+    sample_flow_id,
+    presigned,
+):
+    """
+    Verifies that a POST request to the storage endpoint honours the requested
+    `presigned` mode: presigned URLs carry an `x-amz-signature` and are
+    flagged with `presigned: true`, while non-presigned URLs are direct S3 URLs
+    (identical in syntax to the GET-side direct URLs) with no `presigned` flag.
+    """
+    # Arrange
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [
+            {
+                "flow": {
+                    "id": sample_flow_id,
+                    "source_id": str(uuid.uuid4()),
+                    "format": "urn:x-nmos:format:multi",
+                    "container": "video/mp2t",
+                }
+            }
+        ]
+    }
+    event = api_event_factory(
+        "POST",
+        f"/flows/{sample_flow_id}/storage",
+        query_params=None,
+        json_body={"limit": 3, "presigned": presigned},
+    )
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+    response_body = json.loads(response["body"])
+    media_objects = response_body["media_objects"]
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.CREATED.value
+    assert len(media_objects) == 3
+    for media_object in media_objects:
+        put_url = media_object.get("put_url")
+        assert put_url
+        assert put_url["url"].startswith(f"https://{os.environ['BUCKET']}.s3.")
+        assert put_url.get("content-type")
+        if presigned:
+            assert "x-amz-signature=" in put_url["url"].lower()
+            assert media_object.get("presigned") is True
+        else:
+            # Direct URL matches the GET-side syntax: no query string / signing
+            assert put_url["url"] == (
+                f"https://{os.environ['BUCKET']}.s3."
+                f"{os.environ['BUCKET_REGION']}.amazonaws.com/"
+                f"{media_object['object_id']}"
+            )
+            assert "presigned" not in media_object
 
 
 # pylint: disable=redefined-outer-name

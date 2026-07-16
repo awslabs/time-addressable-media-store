@@ -656,7 +656,7 @@ def test_FlowStorage_Table_Empty(session, stack):
     # Act
     scan = storage_table.scan(ProjectionExpression="id")
     # Assert
-    assert 6 == len(scan["Items"])
+    assert 12 == len(scan["Items"])
     with storage_table.batch_writer() as batch:
         for item in scan["Items"]:
             batch.delete_item(Key=item)

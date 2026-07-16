@@ -33,8 +33,13 @@ sqs = boto3.client("sqs")
 lmda = boto3.client("lambda")
 s3 = boto3.client(
     "s3",
-    config=Config(s3={"addressing_style": "virtual"}),
+    config=Config(
+        signature_version="s3v4",
+        s3={"addressing_style": "virtual"},
+    ),
     # Addressing style is required to ensure pre-signed URLs work as soon as the bucket is created.
+    # SigV4 is pinned so pre-signed URLs are consistent across regions (some regions,
+    # e.g. eu-west-1, otherwise default to the deprecated SigV2).
 )
 
 
@@ -445,6 +450,12 @@ def generate_presigned_url(
         ExpiresIn=constants.MIN_PRESIGNED_URL_TIMEOUT_SECS,
     )
     return url
+
+
+@tracer.capture_method(capture_response=False)
+def direct_s3_url(bucket_name: str, region: str, object_id: str) -> str:
+    """Builds a direct (non-presigned) S3 object URL."""
+    return f"https://{bucket_name}.s3.{region}.amazonaws.com/{object_id}"
 
 
 @tracer.capture_method(capture_response=False)

@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from aws_lambda_powertools import Tracer
 from dynamodb import list_storage_backends
 from schema import Storagebackend
-from utils import generate_presigned_url, model_dump
+from utils import direct_s3_url, generate_presigned_url, model_dump
 
 tracer = Tracer()
 
@@ -44,7 +44,9 @@ def create_direct_s3_get_url(
     """
     get_url = {
         "label": storage_backend["label"],
-        "url": f"https://{storage_backend['bucket_name']}.s3.{storage_backend['region']}.amazonaws.com/{object_id}",
+        "url": direct_s3_url(
+            storage_backend["bucket_name"], storage_backend["region"], object_id
+        ),
     }
     if include_storage_id:
         get_url["storage_id"] = storage_backend["id"]

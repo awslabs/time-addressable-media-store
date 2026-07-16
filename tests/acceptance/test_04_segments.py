@@ -12,6 +12,7 @@ from conftest import (
     assert_json_response,
     create_storage_label,
     default_get_urls,
+    is_presigned_url,
     remove_dynamic_props,
 )
 
@@ -61,7 +62,7 @@ def test_Allocate_Flow_Storage_POST_201_default(
     assert 100 == len(response_json["media_objects"])
 
 
-def test_Allocate_Flow_Storage_POST_201(
+def test_Allocate_Flow_Storage_POST_201_limit(
     api_client_cognito, media_objects, stub_video_flow
 ):
     # Arrange
@@ -84,6 +85,9 @@ def test_Allocate_Flow_Storage_POST_201(
         assert "url" in record["put_url"]
         assert "content-type" in record["put_url"]
         assert stub_video_flow["container"] == record["put_url"]["content-type"]
+        # presigned defaults to True and is flagged in the response
+        assert record.get("presigned") is True
+        assert is_presigned_url(record["put_url"]["url"])
 
 
 def test_Allocate_Flow_Storage_POST_201_object_ids(api_client_cognito, stub_video_flow):
@@ -159,6 +163,59 @@ def test_Allocate_Flow_Storage_POST_201_init_media_objects(
         assert "url" in record["put_url"]
         assert "content-type" in record["put_url"]
         assert stub_init_flow["container"] == record["put_url"]["content-type"]
+
+
+def test_Allocate_Flow_Storage_POST_201_presigned_true(
+    api_client_cognito, stub_video_flow
+):
+    """Explicitly requesting presigned put_urls returns signed URLs flagged
+    with presigned: true."""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/storage"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"limit": 3, "presigned": True},
+    )
+    # Assert
+    assert_json_response(response, 201)
+    response_json = response.json()
+    assert "media_objects" in response_json
+    assert 3 == len(response_json["media_objects"])
+    for record in response_json["media_objects"]:
+        assert "object_id" in record
+        assert "url" in record["put_url"]
+        assert record.get("presigned") is True
+        assert is_presigned_url(record["put_url"]["url"])
+
+
+def test_Allocate_Flow_Storage_POST_201_presigned_false(
+    api_client_cognito, stub_video_flow
+):
+    """Requesting non-presigned put_urls returns direct S3 URLs with no
+    signing query parameters and no presigned flag."""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/storage"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"limit": 3, "presigned": False},
+    )
+    # Assert
+    assert_json_response(response, 201)
+    response_json = response.json()
+    assert "media_objects" in response_json
+    assert 3 == len(response_json["media_objects"])
+    for record in response_json["media_objects"]:
+        assert "object_id" in record
+        assert "url" in record["put_url"]
+        assert stub_video_flow["container"] == record["put_url"]["content-type"]
+        # Non-presigned URLs are not flagged and carry no signing query string
+        assert "presigned" not in record
+        assert not is_presigned_url(record["put_url"]["url"])
+        assert "?" not in record["put_url"]["url"]
 
 
 def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito, stub_multi_flow):
