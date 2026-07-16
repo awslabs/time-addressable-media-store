@@ -154,6 +154,7 @@ def get_flows(
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200

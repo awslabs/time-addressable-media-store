@@ -309,7 +309,9 @@ def test_List_Webhook_URLs_HEAD_200_limit(api_client_cognito):
     response = api_client_cognito.request("HEAD", path, params={"limit": "1"})
     # Assert
     assert_json_response(response, 200, empty_body=True)
-    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
+    assert_headers_present(
+        response, "link", "x-paging-limit", "x-paging-nextkey", "x-paging-count"
+    )
 
 
 def test_List_Webhook_URLs_HEAD_200_page(api_client_cognito):
@@ -463,7 +465,9 @@ def test_List_Webhook_URLs_GET_200_limit(api_client_cognito):
     response = api_client_cognito.request("GET", path, params={"limit": "1"})
     # Assert
     assert_json_response(response, 200)
-    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
+    assert_headers_present(
+        response, "link", "x-paging-limit", "x-paging-nextkey", "x-paging-count"
+    )
     response_json = response.json()
     assert 1 == len(response_json)
 

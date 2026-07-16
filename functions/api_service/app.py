@@ -142,6 +142,7 @@ def get_webhooks(
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
@@ -245,14 +246,39 @@ def delete_webhook_by_id(
 @app.head("/service/storage-backends")
 @app.get("/service/storage-backends")
 @tracer.capture_method(capture_response=False)
-def get_storage_backends():
+def get_storage_backends(
+    param_page: Annotated[Optional[str], Query(alias="page")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
+):
     storage_backends = list_storage_backends()
+    page = int(param_page) if param_page else 0
+    limit_used = min(
+        param_limit if param_limit else constants.DEFAULT_PAGE_LIMIT,
+        constants.MAX_PAGE_LIMIT,
+    )
+    items = storage_backends[page : page + limit_used]
+    next_page = page + limit_used if page + limit_used < len(storage_backends) else None
+    custom_headers = {}
+    if next_page:
+        custom_headers["X-Paging-NextKey"] = str(next_page)
+        custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
+    if next_page or limit_used != param_limit:
+        custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
     if app.current_event.request_context.http_method == "HEAD":
-        return None, HTTPStatus.OK.value  # 200
-    return model_dump(
-        Storagebackendslist(
-            [StoragebackendslistItem(**item) for item in storage_backends]
+        return Response(
+            status_code=HTTPStatus.OK.value,  # 200
+            content_type=content_types.APPLICATION_JSON,
+            body=None,
+            headers=custom_headers,
         )
+    return Response(
+        status_code=HTTPStatus.OK.value,  # 200
+        content_type=content_types.APPLICATION_JSON,
+        body=model_dump(
+            Storagebackendslist([StoragebackendslistItem(**item) for item in items])
+        ),
+        headers=custom_headers,
     )
 
 

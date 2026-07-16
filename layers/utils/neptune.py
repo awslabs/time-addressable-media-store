@@ -470,12 +470,23 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
 
 
 @tracer.capture_method(capture_response=False)
-def query_delete_requests() -> list:
+def query_delete_requests(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Delete Request from the Neptune Database"""
+    page = int(parameters.get("page") or 0)
+    limit = min(
+        (
+            parameters["limit"]
+            if parameters.get("limit")
+            else constants.DEFAULT_PAGE_LIMIT
+        ),
+        constants.MAX_PAGE_LIMIT,
+    )
     query = generate_delete_request_query({})
     query = (
         query.return_literal(constants.RETURN_LITERAL["delete_request"])
         .order_by("delete_request.id")
+        .skip(page)
+        .limit(limit)
         .get()
     )
     results = execute_open_cypher_query(query)
@@ -483,7 +494,8 @@ def query_delete_requests() -> list:
         deserialise_neptune_obj(result["delete_request"])
         for result in results["results"]
     ]
-    return deserialised_results
+    next_page = page + limit if len(deserialised_results) == limit else None
+    return deserialised_results, next_page, limit
 
 
 @tracer.capture_method(capture_response=False)

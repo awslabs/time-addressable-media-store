@@ -777,6 +777,7 @@ def test_List_Webhook_URLs_200_limit(
         assert "Link" in response_headers
         assert "X-Paging-Limit" in response_headers
         assert "X-Paging-NextKey" in response_headers
+        assert "X-Paging-Count" in response_headers
         assert len(response_body) == 1
 
 
@@ -1164,6 +1165,7 @@ def test_Service_StorageBackends(
         response_headers = response["multiValueHeaders"]
         response_body = json.loads(response["body"])
         assert response_headers.get("Content-Type")[0] == "application/json"
+        assert "X-Paging-Count" in response_headers
         assert isinstance(response_body, list)
         assert len(response_body) == 2
         for backend in response_body:
