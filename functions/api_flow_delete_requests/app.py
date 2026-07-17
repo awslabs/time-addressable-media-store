@@ -20,6 +20,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from neptune import query_delete_requests, query_node
 from schema import Deletionrequest
+from schema_extra import DeleteRequestsSortBy
 from typing_extensions import Annotated
 from utils import generate_link_url, model_dump
 
@@ -36,12 +37,19 @@ record_type = "delete_request"
 @app.get("/flow-delete-requests")
 @tracer.capture_method(capture_response=False)
 def get_flow_delete_requests(
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    param_sort_by: Annotated[
+        Optional[DeleteRequestsSortBy], Query(alias="sort_by")
+    ] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
+    reverse_order = bool(param_reverse_order)
     custom_headers = {}
     items, next_page, limit_used = query_delete_requests(
         {
+            "reverse_order": reverse_order,
+            "sort_by": param_sort_by.value if param_sort_by else None,
             "page": param_page,
             "limit": param_limit,
         }
@@ -52,6 +60,7 @@ def get_flow_delete_requests(
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
     custom_headers["X-Paging-Count"] = str(len(items))
+    custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200

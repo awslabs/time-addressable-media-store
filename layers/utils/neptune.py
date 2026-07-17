@@ -370,6 +370,36 @@ def query_flow_collection(flow_id: str) -> list:
 
 
 @tracer.capture_method(capture_response=False)
+def build_order_by(
+    ref_name: str,
+    sort_by: str | None,
+    reverse_order: bool,
+    datetime_cols: set[str],
+    default_col: str = "created",
+) -> tuple[list[str], bool]:
+    """Build cymple order_by arguments for a sorted, paginated listing.
+
+    Applies the spec default directions (datetime keys newest-first, string keys
+    ascending) and flips them when `reverse_order` is set. `id` is always appended
+    as a unique secondary sort key so that offset pagination remains deterministic
+    when the primary key has ties.
+
+    Returns `(columns, ascending)` for `order_by`. Note cymple's `order_by`
+    applies the ASC/DESC keyword only to the LAST column, so the primary column
+    carries its direction inline and the `id` tie-breaker takes the `ascending`
+    flag (both resolve to the same direction). See the cymple-order-by-multicolumn
+    limitation.
+    """
+    col = sort_by or default_col
+    # Datetime keys default newest-first (DESC); string keys default ascending (ASC)
+    ascending = col not in datetime_cols
+    if reverse_order:
+        ascending = not ascending
+    direction = "ASC" if ascending else "DESC"
+    return [f"{ref_name}.{col} {direction}", f"{ref_name}.id"], ascending
+
+
+@tracer.capture_method(capture_response=False)
 def query_sources(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Sources from the Neptune Database"""
     props, where_literals = parse_api_gw_parameters(
@@ -394,6 +424,12 @@ def query_sources(parameters: dict) -> tuple[list, int, int]:
         ),
         constants.MAX_PAGE_LIMIT,
     )
+    order_cols, ascending = build_order_by(
+        "source",
+        parameters.get("sort_by"),
+        parameters.get("reverse_order", False),
+        datetime_cols={"created", "updated"},
+    )
     query = generate_source_query(
         {
             "source": props["properties"],
@@ -402,7 +438,7 @@ def query_sources(parameters: dict) -> tuple[list, int, int]:
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["source"])
-        .order_by("source.id")
+        .order_by(order_cols, ascending=ascending)
         .skip(page)
         .limit(limit)
         .get()
@@ -446,6 +482,12 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
         ),
         constants.MAX_PAGE_LIMIT,
     )
+    order_cols, ascending = build_order_by(
+        "flow",
+        parameters.get("sort_by"),
+        parameters.get("reverse_order", False),
+        datetime_cols={"created", "metadata_updated"},
+    )
     query = generate_flow_query(
         {
             "flow": props["properties"],
@@ -456,7 +498,7 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["flow"])
-        .order_by("flow.id")
+        .order_by(order_cols, ascending=ascending)
         .skip(page)
         .limit(limit)
         .get()
@@ -481,10 +523,16 @@ def query_delete_requests(parameters: dict) -> tuple[list, int, int]:
         ),
         constants.MAX_PAGE_LIMIT,
     )
+    order_cols, ascending = build_order_by(
+        "delete_request",
+        parameters.get("sort_by"),
+        parameters.get("reverse_order", False),
+        datetime_cols={"created", "expiry"},
+    )
     query = generate_delete_request_query({})
     query = (
         query.return_literal(constants.RETURN_LITERAL["delete_request"])
-        .order_by("delete_request.id")
+        .order_by(order_cols, ascending=ascending)
         .skip(page)
         .limit(limit)
         .get()
@@ -513,6 +561,13 @@ def query_webhooks(parameters: dict) -> tuple[list, int, int]:
         ),
         constants.MAX_PAGE_LIMIT,
     )
+    order_cols, ascending = build_order_by(
+        "webhook",
+        None,
+        parameters.get("reverse_order", False),
+        datetime_cols=set(),
+        default_col="url",
+    )
     query = generate_webhook_query(
         {
             "webhook": props["properties"],
@@ -521,7 +576,7 @@ def query_webhooks(parameters: dict) -> tuple[list, int, int]:
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["webhook"])
-        .order_by("webhook.id")
+        .order_by(order_cols, ascending=ascending)
         .skip(page)
         .limit(limit)
         .get()

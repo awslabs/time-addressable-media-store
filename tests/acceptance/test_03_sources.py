@@ -310,6 +310,81 @@ def test_List_Sources_GET_200_page(api_client_cognito):
     assert 5 == len(response_json)
 
 
+def test_List_Sources_GET_200_sort_by_label(api_client_cognito):
+    """List sources sorted by label (ascending alphabetical by default)"""
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"sort_by": "label"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "False" == response.headers["X-Paging-Reverse-Order"]
+    # label is optional; filtering absent labels preserves the relative order of
+    # those present, so a correct ascending sort still holds for this subset.
+    labels = [
+        source["label"] for source in response.json() if source.get("label") is not None
+    ]
+    assert labels == sorted(labels)
+
+
+def test_List_Sources_GET_200_sort_by_label_reverse_order(api_client_cognito):
+    """List sources sorted by label in reverse (descending alphabetical)"""
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"sort_by": "label", "reverse_order": "true"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "True" == response.headers["X-Paging-Reverse-Order"]
+    # label is optional; filtering absent labels preserves the relative order of
+    # those present, so a correct descending sort still holds for this subset.
+    labels = [
+        source["label"] for source in response.json() if source.get("label") is not None
+    ]
+    assert labels == sorted(labels, reverse=True)
+
+
+def test_List_Sources_GET_200_sort_by_created(api_client_cognito):
+    """List sources sorted by created (most recent first by default)"""
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"sort_by": "created"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    created = [source["created"] for source in response.json()]
+    assert created == sorted(created, reverse=True)
+
+
+def test_List_Sources_GET_400_sort_by(api_client_cognito):
+    """List sources with an invalid sort_by value returns 400"""
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"sort_by": "invalid"},
+    )
+    # Assert
+    assert_json_response(response, 400)
+
+
 def test_List_Sources_GET_200_tag_name(api_client_cognito, stub_multi_source):
     """List sources with tag.{name} query specified"""
     # Arrange

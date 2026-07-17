@@ -122,17 +122,20 @@ def post_service(service_post: Annotated[Servicepost, Body()]):
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def get_webhooks(
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
     )
+    reverse_order = bool(param_reverse_order)
     custom_headers = {}
     items, next_page, limit_used = query_webhooks(
         {
             "tag_values": param_tag_values,
             "tag_exists": param_tag_exists,
+            "reverse_order": reverse_order,
             "page": param_page,
             "limit": param_limit,
         }
@@ -143,6 +146,7 @@ def get_webhooks(
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
     custom_headers["X-Paging-Count"] = str(len(items))
+    custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
@@ -247,10 +251,19 @@ def delete_webhook_by_id(
 @app.get("/service/storage-backends")
 @tracer.capture_method(capture_response=False)
 def get_storage_backends(
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
-    storage_backends = list_storage_backends()
+    reverse_order = bool(param_reverse_order)
+    # list_storage_backends is lru_cached, so sort a copy rather than in place.
+    # Storage Backends sort alphabetically by label by default; id is a unique
+    # secondary key so pagination is deterministic when labels collide.
+    storage_backends = sorted(
+        list_storage_backends(),
+        key=lambda backend: (backend["label"], backend["id"]),
+        reverse=reverse_order,
+    )
     page = int(param_page) if param_page else 0
     limit_used = min(
         param_limit if param_limit else constants.DEFAULT_PAGE_LIMIT,
@@ -265,6 +278,7 @@ def get_storage_backends(
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
     custom_headers["X-Paging-Count"] = str(len(items))
+    custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
