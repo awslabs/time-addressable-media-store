@@ -966,7 +966,10 @@ class Flowdata(Flowcore):
         description="Describes the parameters of the essence inside this data Flow",
         title="Data Flow Essence Parameters",
     )
-    codec: Mimetype
+    codec: Mimetype = Field(
+        ...,
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
 
 
 class Flowimage(Flowcore):
@@ -982,7 +985,10 @@ class Flowimage(Flowcore):
         description="Describes the parameters of the essence inside this image Flow",
         title="Image Flow Essence Parameters",
     )
-    codec: Mimetype
+    codec: Mimetype = Field(
+        ...,
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
 
 
 class Flowmulti(Flowcore):
@@ -1139,7 +1145,10 @@ class Flowvideo(Flowcore):
         description="Describes the parameters of the essence inside this video Flow",
         title="Video Flow Essence Parameters",
     )
-    codec: Mimetype
+    codec: Mimetype = Field(
+        ...,
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
 
 
 class GetUrl1(Storagebackend):
@@ -1353,7 +1362,10 @@ class Flowaudio(Flowcore):
         description="Describes the parameters of the essence inside this audio Flow",
         title="Audio Flow Essence Parameters",
     )
-    codec: Mimetype
+    codec: Mimetype = Field(
+        ...,
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
 
 
 class InitObject(Objectcore):
