@@ -1,4 +1,12 @@
+# On Windows, force recipes through Git Bash using its absolute path.
+# A stock PowerShell/cmd terminal has no /bin/bash on PATH, so make would
+# otherwise fall back to cmd.exe and every unzip/rm/mv/find recipe fails.
+ifeq ($(OS),Windows_NT)
+SHELL := C:/Program Files/Git/bin/bash.exe
+.SHELLFLAGS := -c
+else
 SHELL := /bin/bash
+endif
 
 .PHONY: help api-spec fetch-tams-repo clean test test-unit test-functional test-acceptance test-all lint format cfn-lint cfn-nag cfn-format build deploy package validate local-api local-invoke
 
@@ -55,10 +63,10 @@ api/build:
 	mkdir -p api/build
 
 api/build/tams-repo-%.zip: | api/build
-	wget -O "$@" "$(TAMS_SPEC_ZIP_URL)"
+	curl -fL -o "$@" "$(TAMS_SPEC_ZIP_URL)"
 
 api/build/tams: $(TAMS_SPEC_ZIP_FILE) | api/build
-	unzip -o "$(TAMS_SPEC_ZIP_FILE)" "$(TAMS_SPEC_ZIP_PATH)/api/*" -d api/build
+	unzip -o "$(TAMS_SPEC_ZIP_FILE)" "$(TAMS_SPEC_ZIP_PATH)/api/**" -d api/build
 	@# Delete spec directory if it already exists, so it can be replaced in the following step
 	if [ -d "$@" ]; then \
 		rm -rf "$@"; \
