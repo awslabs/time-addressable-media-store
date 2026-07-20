@@ -324,12 +324,15 @@ def test_List_Sources_GET_200_sort_by_label(api_client_cognito):
     assert_json_response(response, 200)
     assert_headers_present(response, "x-paging-reverse-order")
     assert "False" == response.headers["X-Paging-Reverse-Order"]
+    has_label = [source.get("label") is not None for source in response.json()]
     # label is optional; filtering absent labels preserves the relative order of
     # those present, so a correct ascending sort still holds for this subset.
     labels = [
         source["label"] for source in response.json() if source.get("label") is not None
     ]
     assert labels == sorted(labels)
+    # Sources with an unset label sort after those with one by default.
+    assert has_label == sorted(has_label, reverse=True)
 
 
 def test_List_Sources_GET_200_sort_by_label_reverse_order(api_client_cognito):
@@ -346,12 +349,15 @@ def test_List_Sources_GET_200_sort_by_label_reverse_order(api_client_cognito):
     assert_json_response(response, 200)
     assert_headers_present(response, "x-paging-reverse-order")
     assert "True" == response.headers["X-Paging-Reverse-Order"]
+    has_label = [source.get("label") is not None for source in response.json()]
     # label is optional; filtering absent labels preserves the relative order of
     # those present, so a correct descending sort still holds for this subset.
     labels = [
         source["label"] for source in response.json() if source.get("label") is not None
     ]
     assert labels == sorted(labels, reverse=True)
+    # Sources with an unset label sort before those with one when reversed.
+    assert has_label == sorted(has_label)
 
 
 def test_List_Sources_GET_200_sort_by_created(api_client_cognito):

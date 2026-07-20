@@ -384,11 +384,16 @@ def build_order_by(
     as a unique secondary sort key so that offset pagination remains deterministic
     when the primary key has ties.
 
+    Records whose sort value is unset (NULL) sort after those with a value by
+    default, and before them when `reverse_order` is set (per the spec fallback
+    rule). This is achieved with a leading `(col IS NULL)` term whose direction
+    depends only on `reverse_order`, independent of the value direction; within
+    the NULL group the `id` tie-breaker then provides a total order.
+
     Returns `(columns, ascending)` for `order_by`. Note cymple's `order_by`
-    applies the ASC/DESC keyword only to the LAST column, so the primary column
-    carries its direction inline and the `id` tie-breaker takes the `ascending`
-    flag (both resolve to the same direction). See the cymple-order-by-multicolumn
-    limitation.
+    applies the ASC/DESC keyword only to the LAST column, so every column except
+    the `id` tie-breaker carries its direction inline and `id` takes the
+    `ascending` flag. See the cymple-order-by-multicolumn limitation.
     """
     col = sort_by or default_col
     # Datetime keys default newest-first (DESC); string keys default ascending (ASC)
@@ -396,7 +401,14 @@ def build_order_by(
     if reverse_order:
         ascending = not ascending
     direction = "ASC" if ascending else "DESC"
-    return [f"{ref_name}.{col} {direction}", f"{ref_name}.id"], ascending
+    # (col IS NULL) is False(0) for values, True(1) for NULLs: ASC puts NULLs
+    # last (default), DESC puts them first (reverse_order).
+    null_direction = "DESC" if reverse_order else "ASC"
+    return [
+        f"({ref_name}.{col} IS NULL) {null_direction}",
+        f"{ref_name}.{col} {direction}",
+        f"{ref_name}.id",
+    ], ascending
 
 
 @tracer.capture_method(capture_response=False)

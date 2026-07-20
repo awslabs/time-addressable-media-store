@@ -153,6 +153,8 @@ paths:
         These are populated on deployment of the service instance.
 
         Storage Backends are sorted in alphabetical order of their `label` by default.
+        For resources where `label` is unset, `id` shall be used.
+        Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
       operationId: GET_storage-backends
       tags:
       - Service
@@ -481,6 +483,8 @@ paths:
           `label` sorts alphabetically by default.
           Sorting may be reversed using the `reverse_order` query parameter.
           Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
         schema:
           type: string
           enum:
@@ -570,6 +574,8 @@ paths:
           `label` sorts alphabetically by default.
           Sorting may be reversed using the `reverse_order` query parameter.
           Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
         schema:
           type: string
           enum:
@@ -985,6 +991,8 @@ paths:
           `label` sorts alphabetically by default.
           Sorting may be reversed using the `reverse_order` query parameter.
           Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
         schema:
           type: string
           enum:
@@ -1105,6 +1113,8 @@ paths:
           `label` sorts alphabetically by default.
           Sorting may be reversed using the `reverse_order` query parameter.
           Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
         schema:
           type: string
           enum:
@@ -2699,6 +2709,8 @@ paths:
           `created` and `expiry` sort most recent first by default.
           Sorting may be reversed using the `reverse_order` query parameter.
           Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
         schema:
           type: string
           enum:
@@ -2753,6 +2765,8 @@ paths:
           `created` and `expiry` sort most recent first by default.
           Sorting may be reversed using the `reverse_order` query parameter.
           Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
         schema:
           type: string
           enum:

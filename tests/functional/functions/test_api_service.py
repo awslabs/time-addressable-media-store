@@ -789,7 +789,7 @@ def test_List_Webhook_URLs_200_limit(
         ("true", "DESC", "True"),
     ],
 )
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name, too-many-arguments
 def test_List_Webhook_URLs_GET_200_reverse_order(
     lambda_context,
     api_event_factory,
@@ -830,7 +830,12 @@ def test_List_Webhook_URLs_GET_200_reverse_order(
     query = mock_neptune_client.execute_open_cypher_query.call_args.kwargs[
         "openCypherQuery"
     ]
-    assert f"ORDER BY webhook.url {expected_direction}, webhook.id" in query
+    # NULL-group direction depends only on reverse_order (nulls last by default,
+    # first when reversed); url and id follow the value direction.
+    assert (
+        f"ORDER BY (webhook.url IS NULL) {expected_direction}, "
+        f"webhook.url {expected_direction}, webhook.id" in query
+    )
 
 
 @pytest.mark.parametrize(

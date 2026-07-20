@@ -258,10 +258,17 @@ def get_storage_backends(
     reverse_order = bool(param_reverse_order)
     # list_storage_backends is lru_cached, so sort a copy rather than in place.
     # Storage Backends sort alphabetically by label by default; id is a unique
-    # secondary key so pagination is deterministic when labels collide.
+    # secondary key so pagination is deterministic when labels collide. Backends
+    # with an unset label sort after those with one by default (and before when
+    # reverse_order is set); the leading `label is None` flag separates the
+    # groups so None is never compared against a str.
     storage_backends = sorted(
         list_storage_backends(),
-        key=lambda backend: (backend["label"], backend["id"]),
+        key=lambda backend: (
+            backend.get("label") is None,
+            backend.get("label"),
+            backend["id"],
+        ),
         reverse=reverse_order,
     )
     page = int(param_page) if param_page else 0
