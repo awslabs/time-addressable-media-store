@@ -15,7 +15,7 @@ from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from boto3.dynamodb.conditions import And, Attr, Key
 from botocore.exceptions import ClientError
-from mediatimestamp.immutable import TimeRange
+from mediatimestamp.immutable import TimeRange, Timestamp
 from neptune import (
     enhance_resources,
     merge_delete_request,
@@ -186,13 +186,63 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
         timerange_filter = None
     # Update Key Expression
     if parameters.get("object_id"):
+        # Query the object-id-index, whose sort key is flow_id (not
+        # timerange_end), so a timerange filter cannot be applied to the key and
+        # is instead applied entirely as a FilterExpression below.
         args["IndexName"] = "object-id-index"
         args["KeyConditionExpression"] = And(
             args["KeyConditionExpression"],
             Key("object_id").eq(parameters["object_id"]),
         )
+        filter_conditions = []
+        if timerange_filter:
+            if timerange_filter.start:
+                filter_conditions.append(
+                    get_timerange_expression(
+                        Attr, TimeRangeBoundary.END, timerange_filter
+                    )
+                )
+            if timerange_filter.end:
+                filter_conditions.append(
+                    get_timerange_expression(
+                        Attr, TimeRangeBoundary.START, timerange_filter
+                    )
+                )
+        if len(filter_conditions) == 2:
+            args["FilterExpression"] = And(*filter_conditions)
+        elif filter_conditions:
+            args["FilterExpression"] = filter_conditions[0]
     elif timerange_filter:
-        if timerange_filter.start:
+        if timerange_filter.start and timerange_filter.end:
+            # Bound the sort key on BOTH sides so pagination cannot scan past the
+            # requested range. Segments in a Flow never overlap, so the first
+            # segment with timerange_end >= the filter end is the only one above
+            # the range that could still overlap it; every later segment starts
+            # after the filter end and would be dropped by the FilterExpression
+            # anyway. BETWEEN is inclusive, so fold the start boundary's
+            # inclusivity into the lower bound the same way timerange_start is
+            # stored on write (see process_single_segment).
+            lower = timerange_filter.start.to_nanosec() + (
+                0 if timerange_filter.includes_start() else 1
+            )
+            upper = get_exact_timerange_end(flow_id, timerange_filter.end.to_nanosec())
+            # A non-empty range always has lower <= upper. An empty range (e.g.
+            # "()" or "[5:0_5:0)") normalises to start == end yet is not eternity,
+            # so it reaches here with lower > upper. DynamoDB rejects BETWEEN when
+            # lower > upper with a ValidationException, so clamp upper up to lower:
+            # the retained FilterExpression drops every candidate anyway, leaving
+            # the empty result an empty range must produce.
+            upper = max(upper, lower)
+            args["KeyConditionExpression"] = And(
+                args["KeyConditionExpression"],
+                Key("timerange_end").between(lower, upper),
+            )
+            # Retain the end filter to drop the boundary segment when it starts
+            # after the requested range (i.e. does not actually overlap it).
+            args["FilterExpression"] = get_timerange_expression(
+                Attr, TimeRangeBoundary.START, timerange_filter
+            )
+        elif timerange_filter.start:
             args["KeyConditionExpression"] = And(
                 args["KeyConditionExpression"],
                 get_timerange_expression(Key, TimeRangeBoundary.END, timerange_filter),
@@ -205,16 +255,6 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
             args["KeyConditionExpression"] = And(
                 args["KeyConditionExpression"],
                 Key("timerange_end").lte(exact_timerange_end),
-            )
-    # Build Filter expression
-    if timerange_filter:
-        if timerange_filter.start and parameters.get("object_id"):
-            args["FilterExpression"] = get_timerange_expression(
-                Attr, TimeRangeBoundary.END, timerange_filter
-            )
-        if timerange_filter.start and timerange_filter.end:
-            args["FilterExpression"] = get_timerange_expression(
-                Attr, TimeRangeBoundary.START, timerange_filter
             )
     return args
 
@@ -293,10 +333,20 @@ def delete_flow_segments(
             }
         )
         return
-    last_timerange = TimeRange.from_str(query["Items"][-1]["timerange"])
-    timerange_remaining = timerange_to_delete.intersect_with(
-        last_timerange.timerange_after()
-    )
+    if query["Items"]:
+        resume_after = TimeRange.from_str(
+            query["Items"][-1]["timerange"]
+        ).timerange_after()
+    else:
+        # The final scanned page held no deletable items (all filtered out or
+        # popped as partial-overlap outliers) yet more records remain. Resume
+        # from just after the last scanned key so the next invocation does not
+        # re-scan this same tail. timerange_end is stored inclusive, so the next
+        # unscanned segment starts at cursor + 1 nanosecond.
+        resume_after = TimeRange.from_start(
+            Timestamp.from_nanosec(int(query["LastEvaluatedKey"]["timerange_end"]) + 1)
+        )
+    timerange_remaining = timerange_to_delete.intersect_with(resume_after)
     item_dict["timerange_remaining"] = str(timerange_remaining)
     item_dict["updated"] = datetime.now().strftime(constants.DATETIME_FORMAT)
     put_message(del_queue, item_dict)

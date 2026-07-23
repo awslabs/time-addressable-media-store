@@ -363,10 +363,15 @@ class TestDynamoDB:
             sorted(actual_values.values())
         )
 
-    def test_get_key_and_args_with_timerange(self):
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_with_timerange(self, mock_segments_table):
         flow_id = "test-flow"
 
         now = datetime.now()
+        end_ns = Timestamp.from_datetime(now + timedelta(hours=2)).to_nanosec()
+        # The both-bounds path probes get_exact_timerange_end for the upper key
+        # bound; return an exact-match so upper == end_ns.
+        mock_segments_table.query.return_value = {"Items": [{"timerange_end": end_ns}]}
         time_range = TimeRange(
             start=Timestamp.from_datetime(now + timedelta(hours=1)),
             end=Timestamp.from_datetime(now + timedelta(hours=2)),
@@ -388,6 +393,166 @@ class TestDynamoDB:
         result = dynamodb.get_key_and_args(flow_id, parameters)
 
         assert "FilterExpression" not in result
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_both_bounds_bounds_key_window(self, mock_segments_table):
+        """A timerange with both a start and an end bounds the sort key on both
+        sides (BETWEEN) so pagination cannot scan past the requested range, and
+        retains the end boundary as a FilterExpression."""
+        flow_id = "test-flow"
+        start_ns = 1 * 3600 * 1_000_000_000  # 1h
+        end_ns = 2 * 3600 * 1_000_000_000  # 2h
+        # get_exact_timerange_end probes the first segment with
+        # timerange_end >= end_ns; return an exact-match so upper == end_ns.
+        mock_segments_table.query.return_value = {"Items": [{"timerange_end": end_ns}]}
+        time_range = TimeRange(
+            start=Timestamp.from_nanosec(start_ns),
+            end=Timestamp.from_nanosec(end_ns),
+        )
+        parameters = {"timerange": time_range.to_sec_nsec_range()}
+
+        result = dynamodb.get_key_and_args(flow_id, parameters)
+
+        # Key condition is flow_id = X AND timerange_end BETWEEN start AND end.
+        key_expr, key_names, key_values = parse_dynamo_expression(
+            result["KeyConditionExpression"]
+        )
+        assert "BETWEEN" in key_expr
+        assert set(["flow_id", "timerange_end"]) == set(key_names.values())
+        # start is inclusive so lower == start_ns; upper == end_ns from the probe.
+        assert start_ns in key_values.values()
+        assert end_ns in key_values.values()
+        # The end boundary is retained as a filter on timerange_start.
+        _, filter_names, _ = parse_dynamo_expression(result["FilterExpression"])
+        assert set(filter_names.values()) == {"timerange_start"}
+        assert "IndexName" not in result
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_both_bounds_exclusive_start(self, mock_segments_table):
+        """An exclusive start boundary is folded into the BETWEEN lower bound as
+        start + 1ns, mirroring how timerange_start is stored on write."""
+        flow_id = "test-flow"
+        start_ns = 1 * 3600 * 1_000_000_000
+        end_ns = 2 * 3600 * 1_000_000_000
+        mock_segments_table.query.return_value = {"Items": [{"timerange_end": end_ns}]}
+        time_range = TimeRange(
+            start=Timestamp.from_nanosec(start_ns),
+            end=Timestamp.from_nanosec(end_ns),
+            inclusivity=TimeRange.INCLUDE_END,  # exclusive start, inclusive end
+        )
+        parameters = {"timerange": time_range.to_sec_nsec_range()}
+
+        result = dynamodb.get_key_and_args(flow_id, parameters)
+
+        _, _, key_values = parse_dynamo_expression(result["KeyConditionExpression"])
+        assert (start_ns + 1) in key_values.values()
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_empty_range_clamps_between_bounds(
+        self, mock_segments_table
+    ):
+        """An empty range (e.g. "[5:0_5:0)") normalises to () with start == end ==
+        0 yet is not eternity, so it reaches the both-bounds branch. The
+        exclusive-start fold makes lower = 1 while the empty flow yields upper =
+        0, so lower > upper. DynamoDB rejects BETWEEN when lower > upper, so upper
+        is clamped up to lower; the retained FilterExpression then yields the
+        empty result an empty range must produce (regression test)."""
+        instant_ns = 5 * 3600 * 1_000_000_000  # 5h
+        # An empty flow: get_exact_timerange_end finds no segment and echoes the
+        # requested end back. The empty range normalises to end == 0, so the raw
+        # upper is 0 while the folded lower is 1.
+        mock_segments_table.query.return_value = {"Items": []}
+        time_range = TimeRange(
+            start=Timestamp.from_nanosec(instant_ns),
+            end=Timestamp.from_nanosec(instant_ns),
+            inclusivity=TimeRange.INCLUDE_START,  # empty half-open range "[5:0_5:0)"
+        )
+        parameters = {"timerange": time_range.to_sec_nsec_range()}
+
+        result = dynamodb.get_key_and_args("test-flow", parameters)
+
+        _, _, key_values = parse_dynamo_expression(result["KeyConditionExpression"])
+        between_values = [v for v in key_values.values() if isinstance(v, int)]
+        # Both BETWEEN operands collapse to the same clamped value: lower == upper,
+        # never lower > upper (which DynamoDB would reject as invalid).
+        assert len(between_values) == 2
+        assert between_values[0] == between_values[1] == 1
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_object_id_and_timerange_ands_filters(
+        self, mock_segments_table
+    ):
+        """object_id + a both-bounded timerange applies BOTH timerange
+        conditions as a single ANDed FilterExpression on the object-id-index
+        (regression test: the second condition must not overwrite the first)."""
+        flow_id = "test-flow"
+        now = datetime.now()
+        time_range = TimeRange(
+            start=Timestamp.from_datetime(now + timedelta(hours=1)),
+            end=Timestamp.from_datetime(now + timedelta(hours=2)),
+        )
+        parameters = {
+            "object_id": "test-object",
+            "timerange": time_range.to_sec_nsec_range(),
+        }
+
+        result = dynamodb.get_key_and_args(flow_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        # The object-id-index sort key is flow_id, so no timerange goes on the key.
+        _, key_names, _ = parse_dynamo_expression(result["KeyConditionExpression"])
+        assert set(key_names.values()) == {"flow_id", "object_id"}
+        # Both timerange conditions survive as a single ANDed filter.
+        assert isinstance(result["FilterExpression"], boto3.dynamodb.conditions.And)
+        _, filter_names, _ = parse_dynamo_expression(result["FilterExpression"])
+        assert set(filter_names.values()) == {"timerange_start", "timerange_end"}
+        # get_exact_timerange_end must NOT be called on the object_id path.
+        assert not mock_segments_table.query.called
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_object_id_and_start_only_timerange(
+        self, mock_segments_table
+    ):
+        """object_id + a start-only timerange applies a single timerange_end
+        filter (not wrapped in an And)."""
+        flow_id = "test-flow"
+        now = datetime.now()
+        time_range = TimeRange.from_start(
+            Timestamp.from_datetime(now + timedelta(hours=1))
+        )
+        parameters = {
+            "object_id": "test-object",
+            "timerange": time_range.to_sec_nsec_range(),
+        }
+
+        result = dynamodb.get_key_and_args(flow_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        _, filter_names, _ = parse_dynamo_expression(result["FilterExpression"])
+        assert set(filter_names.values()) == {"timerange_end"}
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_object_id_and_end_only_timerange(
+        self, mock_segments_table
+    ):
+        """object_id + an end-only timerange applies a single timerange_start
+        filter (regression: previously the timerange was silently ignored)."""
+        flow_id = "test-flow"
+        now = datetime.now()
+        time_range = TimeRange.from_end(
+            Timestamp.from_datetime(now + timedelta(hours=2))
+        )
+        parameters = {
+            "object_id": "test-object",
+            "timerange": time_range.to_sec_nsec_range(),
+        }
+
+        result = dynamodb.get_key_and_args(flow_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        assert "FilterExpression" in result
+        _, filter_names, _ = parse_dynamo_expression(result["FilterExpression"])
+        assert set(filter_names.values()) == {"timerange_start"}
 
     @patch("dynamodb.segments_table")
     @patch("dynamodb.merge_delete_request")
@@ -503,6 +668,64 @@ class TestDynamoDB:
             assert mock_segments_table.query.call_count == 1
         else:
             assert mock_segments_table.query.call_count == 2
+
+    @patch("dynamodb.put_message")
+    @patch("dynamodb.delete_segment_items")
+    @patch("dynamodb.segments_table")
+    @patch("dynamodb.merge_delete_request")
+    def test_delete_flow_segments_empty_final_page_resumes_from_cursor(
+        self,
+        mock_merge_delete_request,
+        mock_segments_table,
+        mock_delete_segment_items,
+        mock_put_message,
+    ):
+        """When the final scanned page holds no deletable items but a
+        LastEvaluatedKey remains, the continuation must resume from just after
+        the last scanned key instead of raising IndexError on an empty page."""
+        timerange_to_delete = TimeRange.from_str("[0:0_1000:0)")
+        cursor_end = 500 * 1_000_000_000  # last scanned timerange_end (inclusive)
+        mock_segments_table.query.side_effect = [
+            # First page: has deletable items and a LastEvaluatedKey.
+            {
+                "Items": [{"flow_id": "1", "timerange": "[0:0_1:0)"}],
+                "LastEvaluatedKey": {"flow_id": "1", "timerange_end": 1},
+            },
+            # Final page: all items filtered/popped out, but more data remains.
+            {
+                "Items": [],
+                "LastEvaluatedKey": {"flow_id": "1", "timerange_end": cursor_end},
+            },
+        ]
+        mock_delete_segment_items.return_value = None
+        mock_context = MagicMock()
+        # Enter the loop once (time remaining), then exit on the time check so
+        # the loop stops on the empty final page while a LastEvaluatedKey is
+        # still present (the tail-scan-times-out scenario).
+        mock_context.get_remaining_time_in_millis.side_effect = [
+            constants.LAMBDA_TIME_REMAINING + 10000,
+            constants.LAMBDA_TIME_REMAINING - 1,
+        ]
+        item_dict = {"id": "dr-1"}
+
+        # Must not raise.
+        dynamodb.delete_flow_segments(
+            flow_id="test-flow",
+            parameters={},
+            timerange_to_delete=timerange_to_delete,
+            context=mock_context,
+            s3_queue="s3-queue",
+            del_queue="del-queue",
+            item_dict=item_dict,
+        )
+
+        # Continuation is queued to resume from cursor + 1ns, not marked done.
+        assert mock_put_message.called
+        queued = mock_put_message.call_args[0][1]
+        expected_remaining = timerange_to_delete.intersect_with(
+            TimeRange.from_start(Timestamp.from_nanosec(cursor_end + 1))
+        )
+        assert queued["timerange_remaining"] == str(expected_remaining)
 
     @patch("dynamodb.delete_segment_items")
     @patch("dynamodb.segments_table")
