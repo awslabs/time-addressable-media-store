@@ -777,7 +777,65 @@ def test_List_Webhook_URLs_200_limit(
         assert "Link" in response_headers
         assert "X-Paging-Limit" in response_headers
         assert "X-Paging-NextKey" in response_headers
+        assert "X-Paging-Count" in response_headers
+        assert "X-Paging-Reverse-Order" in response_headers
         assert len(response_body) == 1
+
+
+@pytest.mark.parametrize(
+    "reverse_order,expected_direction,expected_header",
+    [
+        (None, "ASC", "False"),
+        ("true", "DESC", "True"),
+    ],
+)
+# pylint: disable=redefined-outer-name, too-many-arguments
+def test_List_Webhook_URLs_GET_200_reverse_order(
+    lambda_context,
+    api_event_factory,
+    api_service,
+    mock_neptune_client,
+    webhook_ids,
+    stub_webhook_basic,
+    reverse_order,
+    expected_direction,
+    expected_header,
+):
+    """
+    Verifies Webhooks are ordered by url (ascending by default, descending when
+    reverse_order is set) and that the X-Paging-Reverse-Order header reflects it.
+    """
+    # Arrange
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [
+            {
+                "webhook": {
+                    **stub_webhook_basic,
+                    "id": webhook_ids[0],
+                    "status": "created",
+                }
+            }
+        ]
+    }
+    query_params = {"reverse_order": reverse_order} if reverse_order else None
+    event = api_event_factory("GET", "/service/webhooks", query_params=query_params)
+
+    # Act
+    response = api_service.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    response_headers = response["multiValueHeaders"]
+    assert response_headers.get("X-Paging-Reverse-Order")[0] == expected_header
+    query = mock_neptune_client.execute_open_cypher_query.call_args.kwargs[
+        "openCypherQuery"
+    ]
+    # NULL-group direction depends only on reverse_order (nulls last by default,
+    # first when reversed); url and id follow the value direction.
+    assert (
+        f"ORDER BY (webhook.url IS NULL) {expected_direction}, "
+        f"webhook.url {expected_direction}, webhook.id" in query
+    )
 
 
 @pytest.mark.parametrize(
@@ -1164,6 +1222,8 @@ def test_Service_StorageBackends(
         response_headers = response["multiValueHeaders"]
         response_body = json.loads(response["body"])
         assert response_headers.get("Content-Type")[0] == "application/json"
+        assert "X-Paging-Count" in response_headers
+        assert "X-Paging-Reverse-Order" in response_headers
         assert isinstance(response_body, list)
         assert len(response_body) == 2
         for backend in response_body:
@@ -1173,3 +1233,36 @@ def test_Service_StorageBackends(
             assert backend.get("region") is not None
             assert backend.get("store_product") is not None
             assert backend.get("store_type") is not None
+
+
+@pytest.mark.parametrize(
+    "reverse_order,expected_header",
+    [
+        (None, "False"),
+        ("true", "True"),
+    ],
+)
+# pylint: disable=redefined-outer-name
+def test_Service_StorageBackends_reverse_order(
+    lambda_context, api_event_factory, api_service, reverse_order, expected_header
+):
+    """
+    Verifies Storage Backends are sorted alphabetically by label (reversed when
+    reverse_order is set) and that X-Paging-Reverse-Order reflects the request.
+    """
+    # Arrange
+    query_params = {"reverse_order": reverse_order} if reverse_order else None
+    event = api_event_factory(
+        "GET", "/service/storage-backends", query_params=query_params
+    )
+
+    # Act
+    response = api_service.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    response_headers = response["multiValueHeaders"]
+    response_body = json.loads(response["body"])
+    assert response_headers.get("X-Paging-Reverse-Order")[0] == expected_header
+    labels = [backend["label"] for backend in response_body]
+    assert labels == sorted(labels, reverse=reverse_order is not None)

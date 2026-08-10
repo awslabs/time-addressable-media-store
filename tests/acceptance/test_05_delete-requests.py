@@ -3,7 +3,12 @@ from collections import deque
 
 import pytest
 import requests
-from conftest import ID_404, REGION, assert_json_response
+from conftest import (
+    ID_404,
+    REGION,
+    assert_headers_present,
+    assert_json_response,
+)
 
 pytestmark = [
     pytest.mark.acceptance,
@@ -596,6 +601,46 @@ def test_List_Flow_Delete_Requests_GET_200(api_client_cognito):
         assert "timerange_to_delete" in record
         assert "delete_flow" in record
         assert "status" in record
+
+
+def test_List_Flow_Delete_Requests_GET_200_sort_by_created(api_client_cognito):
+    """List delete requests sorted by created (most recent first by default)"""
+    # Arrange
+    path = "/flow-delete-requests"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"sort_by": "created"})
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "False" == response.headers["X-Paging-Reverse-Order"]
+    created = [record["created"] for record in response.json()]
+    assert created == sorted(created, reverse=True)
+
+
+def test_List_Flow_Delete_Requests_GET_200_reverse_order(api_client_cognito):
+    """List delete requests sorted by created reversed (oldest first)"""
+    # Arrange
+    path = "/flow-delete-requests"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"sort_by": "created", "reverse_order": "true"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "True" == response.headers["X-Paging-Reverse-Order"]
+    created = [record["created"] for record in response.json()]
+    assert created == sorted(created)
+
+
+def test_List_Flow_Delete_Requests_GET_400_sort_by(api_client_cognito):
+    """List delete requests with an invalid sort_by value returns 400"""
+    # Arrange
+    path = "/flow-delete-requests"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"sort_by": "invalid"})
+    # Assert
+    assert_json_response(response, 400)
 
 
 def test_Flow_Delete_Request_Details_HEAD_200(api_client_cognito, delete_requests):

@@ -30,6 +30,7 @@ from neptune import (
     set_node_property,
 )
 from schema import Contentformat, Source, Tags, Uuid
+from schema_extra import SourcesSortBy
 from typing_extensions import Annotated
 from utils import (
     generate_link_url,
@@ -59,12 +60,15 @@ UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 def list_sources(
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    param_sort_by: Annotated[Optional[SourcesSortBy], Query(alias="sort_by")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
     )
+    reverse_order = bool(param_reverse_order)
     custom_headers = {}
     items, next_page, limit_used = query_sources(
         {
@@ -72,6 +76,8 @@ def list_sources(
             "tag_values": param_tag_values,
             "tag_exists": param_tag_exists,
             "format": param_format.value if param_format else None,
+            "reverse_order": reverse_order,
+            "sort_by": param_sort_by.value if param_sort_by else None,
             "page": param_page,
             "limit": param_limit,
         }
@@ -81,6 +87,8 @@ def list_sources(
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
+    custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200

@@ -63,6 +63,7 @@ from schema import (
     Timerange,
     Uuid,
 )
+from schema_extra import FlowsSortBy
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
@@ -110,12 +111,15 @@ def get_flows(
     param_frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
     param_frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
     param_init_segments: Annotated[Optional[bool], Query(alias="init_segments")] = None,
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    param_sort_by: Annotated[Optional[FlowsSortBy], Query(alias="sort_by")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
     )
+    reverse_order = bool(param_reverse_order)
     custom_headers = {}
     items, next_page, limit_used = query_flows(
         {
@@ -129,6 +133,8 @@ def get_flows(
             "frame_width": param_frame_width,
             "frame_height": param_frame_height,
             "init_segments": param_init_segments,
+            "reverse_order": reverse_order,
+            "sort_by": param_sort_by.value if param_sort_by else None,
             "page": param_page,
             "limit": param_limit,
         }
@@ -154,6 +160,8 @@ def get_flows(
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
+    custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200

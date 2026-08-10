@@ -309,7 +309,9 @@ def test_List_Webhook_URLs_HEAD_200_limit(api_client_cognito):
     response = api_client_cognito.request("HEAD", path, params={"limit": "1"})
     # Assert
     assert_json_response(response, 200, empty_body=True)
-    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
+    assert_headers_present(
+        response, "link", "x-paging-limit", "x-paging-nextkey", "x-paging-count"
+    )
 
 
 def test_List_Webhook_URLs_HEAD_200_page(api_client_cognito):
@@ -350,6 +352,38 @@ def test_List_Webhook_URLs_GET_200(
         "id": webhook_ids[1],
         "status": "created",
     } in response_json
+
+
+def test_List_Webhook_URLs_GET_200_sort_by_url(
+    api_client_cognito, webhook_ids, webhook_test_data
+):
+    """List webhooks sorted by url (ascending alphabetical by default)"""
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request("GET", path)
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "False" == response.headers["X-Paging-Reverse-Order"]
+    urls = [webhook["url"] for webhook in response.json()]
+    assert urls == sorted(urls)
+
+
+def test_List_Webhook_URLs_GET_200_reverse_order(
+    api_client_cognito, webhook_ids, webhook_test_data
+):
+    """List webhooks sorted by url in reverse (descending alphabetical)"""
+    # Arrange
+    path = "/service/webhooks"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"reverse_order": "true"})
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "True" == response.headers["X-Paging-Reverse-Order"]
+    urls = [webhook["url"] for webhook in response.json()]
+    assert urls == sorted(urls, reverse=True)
 
 
 def test_List_Webhook_URLs_GET_200_tag_name(
@@ -463,7 +497,9 @@ def test_List_Webhook_URLs_GET_200_limit(api_client_cognito):
     response = api_client_cognito.request("GET", path, params={"limit": "1"})
     # Assert
     assert_json_response(response, 200)
-    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
+    assert_headers_present(
+        response, "link", "x-paging-limit", "x-paging-nextkey", "x-paging-count"
+    )
     response_json = response.json()
     assert 1 == len(response_json)
 
@@ -707,3 +743,31 @@ def test_Service_StorageBackends_GET_200(api_client_cognito, default_storage_id)
         },
         response_json[0],
     )
+
+
+def test_Service_StorageBackends_GET_200_sort_by_label(api_client_cognito):
+    """Storage backends are sorted alphabetically by label by default"""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request("GET", path)
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "False" == response.headers["X-Paging-Reverse-Order"]
+    labels = [backend["label"] for backend in response.json()]
+    assert labels == sorted(labels)
+
+
+def test_Service_StorageBackends_GET_200_reverse_order(api_client_cognito):
+    """Storage backends are sorted by label in reverse when reverse_order is set"""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"reverse_order": "true"})
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "True" == response.headers["X-Paging-Reverse-Order"]
+    labels = [backend["label"] for backend in response.json()]
+    assert labels == sorted(labels, reverse=True)

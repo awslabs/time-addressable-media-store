@@ -113,18 +113,84 @@ paths:
       operationId: HEAD_storage-backends
       tags:
       - Service
+      parameters:
+      - name: reverse_order
+        in: query
+        description: Return Storage Backends in reverse-alphabetical order of their `label`.
+        schema:
+          default: false
+          type: boolean
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
       responses:
         '200':
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
+              schema:
+                type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
           $ref: '#/components/responses/trait_resource_listing_head_200'
     get:
       summary: Storage Backend Information
-      description: Provide information about the storage backends available on this service instance. These are populated on deployment of the service instance.
+      description: |
+        Provide information about the storage backends available on this service instance.
+        These are populated on deployment of the service instance.
+
+        Storage Backends are sorted in alphabetical order of their `label` by default.
+        For resources where `label` is unset, `id` shall be used.
+        Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
       operationId: GET_storage-backends
       tags:
       - Service
+      parameters:
+      - name: reverse_order
+        in: query
+        description: Return Storage Backends in reverse-alphabetical order of their `label`.
+        schema:
+          default: false
+          type: boolean
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
       responses:
         '200':
           description: ''
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
+              schema:
+                type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -139,6 +205,12 @@ paths:
       tags:
       - Webhooks
       parameters:
+      - name: reverse_order
+        in: query
+        description: Return Webhooks in reverse-alphabetical order of their `url`.
+        schema:
+          default: false
+          type: boolean
       - name: tag.{name}
         in: query
         description: |
@@ -173,6 +245,14 @@ paths:
               description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the implementation
               schema:
                 type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
             X-Paging-NextKey:
               description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
               schema:
@@ -189,10 +269,18 @@ paths:
         Get the list of registered webhook URLs.
         Service implementations SHOULD take steps to avoid displaying URLs to users other than those who have suitable permissions (e.g. the owning user).
         Availability of this endpoint is indicated by the name "webhooks" appearing in the `event_stream_mechanisms` list on the [/service](#/operations/GET_service) endpoint.
+
+        Webhooks are sorted in alphabetical order of their `url` by default.
       operationId: GET_webhooks
       tags:
       - Webhooks
       parameters:
+      - name: reverse_order
+        in: query
+        description: Return Webhooks in reverse-alphabetical order of their `url`.
+        schema:
+          default: false
+          type: boolean
       - name: tag.{name}
         in: query
         description: |
@@ -227,6 +315,14 @@ paths:
               description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the implementation
               schema:
                 type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
             X-Paging-NextKey:
               description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
               schema:
@@ -373,6 +469,28 @@ paths:
         description: Filter on Sources that have the given label.
         schema:
           type: string
+      - name: reverse_order
+        in: query
+        description: Return Sources in reverse order.
+        schema:
+          default: false
+          type: boolean
+      - name: sort_by
+        in: query
+        description: |
+          Parameter to sort Sources by.
+          `created` and `updated` sort most recent first by default.
+          `label` sorts alphabetically by default.
+          Sorting may be reversed using the `reverse_order` query parameter.
+          Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
+        schema:
+          type: string
+          enum:
+          - created
+          - updated
+          - label
       - name: tag.{name}
         in: query
         description: |
@@ -412,6 +530,14 @@ paths:
               description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
               schema:
                 type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
             X-Paging-NextKey:
               description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
               schema:
@@ -434,6 +560,28 @@ paths:
         description: Filter on Sources that have the given label.
         schema:
           type: string
+      - name: reverse_order
+        in: query
+        description: Return Sources in reverse order.
+        schema:
+          default: false
+          type: boolean
+      - name: sort_by
+        in: query
+        description: |
+          Parameter to sort Sources by.
+          `created` and `updated` sort most recent first by default.
+          `label` sorts alphabetically by default.
+          Sorting may be reversed using the `reverse_order` query parameter.
+          Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
+        schema:
+          type: string
+          enum:
+          - created
+          - updated
+          - label
       - name: tag.{name}
         in: query
         description: |
@@ -473,6 +621,14 @@ paths:
               description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
               schema:
                 type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
             X-Paging-NextKey:
               description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
               schema:
@@ -821,6 +977,28 @@ paths:
         description: Filter on Flows that have the given label.
         schema:
           type: string
+      - name: reverse_order
+        in: query
+        description: Return Flows in reverse order.
+        schema:
+          default: false
+          type: boolean
+      - name: sort_by
+        in: query
+        description: |
+          Parameter to sort Flows by.
+          `created` and `metadata_updated` sort most recent first by default.
+          `label` sorts alphabetically by default.
+          Sorting may be reversed using the `reverse_order` query parameter.
+          Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
+        schema:
+          type: string
+          enum:
+          - created
+          - metadata_updated
+          - label
       - name: tag.{name}
         in: query
         description: |
@@ -870,6 +1048,14 @@ paths:
               description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
               schema:
                 type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
             X-Paging-NextKey:
               description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
               schema:
@@ -913,6 +1099,28 @@ paths:
         description: Filter on Flows that have the given label.
         schema:
           type: string
+      - name: reverse_order
+        in: query
+        description: Return Flows in reverse order.
+        schema:
+          default: false
+          type: boolean
+      - name: sort_by
+        in: query
+        description: |
+          Parameter to sort Flows by.
+          `created` and `metadata_updated` sort most recent first by default.
+          `label` sorts alphabetically by default.
+          Sorting may be reversed using the `reverse_order` query parameter.
+          Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
+        schema:
+          type: string
+          enum:
+          - created
+          - metadata_updated
+          - label
       - name: tag.{name}
         in: query
         description: |
@@ -962,6 +1170,14 @@ paths:
               description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
               schema:
                 type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
             X-Paging-NextKey:
               description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
               schema:
@@ -2479,8 +2695,52 @@ paths:
       operationId: HEAD_flow-delete-requests
       tags:
       - FlowDeleteRequests
+      parameters:
+      - name: reverse_order
+        in: query
+        description: Return Flow Delete Requests in reverse order.
+        schema:
+          default: false
+          type: boolean
+      - name: sort_by
+        in: query
+        description: |
+          Parameter to sort Flow Delete Requests by.
+          `created` and `expiry` sort most recent first by default.
+          Sorting may be reversed using the `reverse_order` query parameter.
+          Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
+        schema:
+          type: string
+          enum:
+          - created
+          - expiry
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
       responses:
         '200':
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
+              schema:
+                type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
           $ref: '#/components/responses/trait_resource_listing_head_200'
     get:
       summary: List Flow Delete Requests
@@ -2491,9 +2751,53 @@ paths:
       operationId: GET_flow-delete-requests
       tags:
       - FlowDeleteRequests
+      parameters:
+      - name: reverse_order
+        in: query
+        description: Return Flow Delete Requests in reverse order.
+        schema:
+          default: false
+          type: boolean
+      - name: sort_by
+        in: query
+        description: |
+          Parameter to sort Flow Delete Requests by.
+          `created` and `expiry` sort most recent first by default.
+          Sorting may be reversed using the `reverse_order` query parameter.
+          Assume `created` if not set.
+          For resources where the selected parameter is unset, `id` shall be used.
+          Resources using this fallback shall be sorted after those that aren't by default, and before when `reverse_order` is `true`.
+        schema:
+          type: string
+          enum:
+          - created
+          - expiry
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
       responses:
         '200':
           description: ''
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the service implementation
+              schema:
+                type: integer
+            X-Paging-Count:
+              description: The number of items in the returned data set.
+              schema:
+                type: integer
+            X-Paging-Reverse-Order:
+              description: The items are returned in reverse order.
+              schema:
+                type: boolean
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
           content:
             application/json:
               schema:

@@ -370,6 +370,48 @@ def query_flow_collection(flow_id: str) -> list:
 
 
 @tracer.capture_method(capture_response=False)
+def build_order_by(
+    ref_name: str,
+    sort_by: str | None,
+    reverse_order: bool,
+    datetime_cols: set[str],
+    default_col: str = "created",
+) -> tuple[list[str], bool]:
+    """Build cymple order_by arguments for a sorted, paginated listing.
+
+    Applies the spec default directions (datetime keys newest-first, string keys
+    ascending) and flips them when `reverse_order` is set. `id` is always appended
+    as a unique secondary sort key so that offset pagination remains deterministic
+    when the primary key has ties.
+
+    Records whose sort value is unset (NULL) sort after those with a value by
+    default, and before them when `reverse_order` is set (per the spec fallback
+    rule). This is achieved with a leading `(col IS NULL)` term whose direction
+    depends only on `reverse_order`, independent of the value direction; within
+    the NULL group the `id` tie-breaker then provides a total order.
+
+    Returns `(columns, ascending)` for `order_by`. Note cymple's `order_by`
+    applies the ASC/DESC keyword only to the LAST column, so every column except
+    the `id` tie-breaker carries its direction inline and `id` takes the
+    `ascending` flag. See the cymple-order-by-multicolumn limitation.
+    """
+    col = sort_by or default_col
+    # Datetime keys default newest-first (DESC); string keys default ascending (ASC)
+    ascending = col not in datetime_cols
+    if reverse_order:
+        ascending = not ascending
+    direction = "ASC" if ascending else "DESC"
+    # (col IS NULL) is False(0) for values, True(1) for NULLs: ASC puts NULLs
+    # last (default), DESC puts them first (reverse_order).
+    null_direction = "DESC" if reverse_order else "ASC"
+    return [
+        f"({ref_name}.{col} IS NULL) {null_direction}",
+        f"{ref_name}.{col} {direction}",
+        f"{ref_name}.id",
+    ], ascending
+
+
+@tracer.capture_method(capture_response=False)
 def query_sources(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Sources from the Neptune Database"""
     props, where_literals = parse_api_gw_parameters(
@@ -394,6 +436,12 @@ def query_sources(parameters: dict) -> tuple[list, int, int]:
         ),
         constants.MAX_PAGE_LIMIT,
     )
+    order_cols, ascending = build_order_by(
+        "source",
+        parameters.get("sort_by"),
+        parameters.get("reverse_order", False),
+        datetime_cols={"created", "updated"},
+    )
     query = generate_source_query(
         {
             "source": props["properties"],
@@ -402,7 +450,7 @@ def query_sources(parameters: dict) -> tuple[list, int, int]:
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["source"])
-        .order_by("source.id")
+        .order_by(order_cols, ascending=ascending)
         .skip(page)
         .limit(limit)
         .get()
@@ -446,6 +494,12 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
         ),
         constants.MAX_PAGE_LIMIT,
     )
+    order_cols, ascending = build_order_by(
+        "flow",
+        parameters.get("sort_by"),
+        parameters.get("reverse_order", False),
+        datetime_cols={"created", "metadata_updated"},
+    )
     query = generate_flow_query(
         {
             "flow": props["properties"],
@@ -456,7 +510,7 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["flow"])
-        .order_by("flow.id")
+        .order_by(order_cols, ascending=ascending)
         .skip(page)
         .limit(limit)
         .get()
@@ -470,12 +524,29 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
 
 
 @tracer.capture_method(capture_response=False)
-def query_delete_requests() -> list:
+def query_delete_requests(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Delete Request from the Neptune Database"""
+    page = int(parameters.get("page") or 0)
+    limit = min(
+        (
+            parameters["limit"]
+            if parameters.get("limit")
+            else constants.DEFAULT_PAGE_LIMIT
+        ),
+        constants.MAX_PAGE_LIMIT,
+    )
+    order_cols, ascending = build_order_by(
+        "delete_request",
+        parameters.get("sort_by"),
+        parameters.get("reverse_order", False),
+        datetime_cols={"created", "expiry"},
+    )
     query = generate_delete_request_query({})
     query = (
         query.return_literal(constants.RETURN_LITERAL["delete_request"])
-        .order_by("delete_request.id")
+        .order_by(order_cols, ascending=ascending)
+        .skip(page)
+        .limit(limit)
         .get()
     )
     results = execute_open_cypher_query(query)
@@ -483,7 +554,8 @@ def query_delete_requests() -> list:
         deserialise_neptune_obj(result["delete_request"])
         for result in results["results"]
     ]
-    return deserialised_results
+    next_page = page + limit if len(deserialised_results) == limit else None
+    return deserialised_results, next_page, limit
 
 
 @tracer.capture_method(capture_response=False)
@@ -501,6 +573,13 @@ def query_webhooks(parameters: dict) -> tuple[list, int, int]:
         ),
         constants.MAX_PAGE_LIMIT,
     )
+    order_cols, ascending = build_order_by(
+        "webhook",
+        None,
+        parameters.get("reverse_order", False),
+        datetime_cols=set(),
+        default_col="url",
+    )
     query = generate_webhook_query(
         {
             "webhook": props["properties"],
@@ -509,7 +588,7 @@ def query_webhooks(parameters: dict) -> tuple[list, int, int]:
     )
     query = (
         query.return_literal(constants.RETURN_LITERAL["webhook"])
-        .order_by("webhook.id")
+        .order_by(order_cols, ascending=ascending)
         .skip(page)
         .limit(limit)
         .get()

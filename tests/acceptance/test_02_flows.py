@@ -425,7 +425,9 @@ def test_List_Flows_HEAD_200_limit(api_client_cognito):
     response = api_client_cognito.request("HEAD", path, params={"limit": "2"})
     # Assert
     assert_json_response(response, 200, empty_body=True)
-    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
+    assert_headers_present(
+        response, "link", "x-paging-limit", "x-paging-nextkey", "x-paging-count"
+    )
 
 
 def test_List_Flows_HEAD_200_page(api_client_cognito):
@@ -749,7 +751,9 @@ def test_List_Flows_GET_200_limit(api_client_cognito):
     response = api_client_cognito.request("GET", path, params={"limit": "2"})
     # Assert
     assert_json_response(response, 200)
-    assert_headers_present(response, "link", "x-paging-limit", "x-paging-nextkey")
+    assert_headers_present(
+        response, "link", "x-paging-limit", "x-paging-nextkey", "x-paging-count"
+    )
     response_json = response.json()
     assert 2 == len(response_json)
 
@@ -764,6 +768,72 @@ def test_List_Flows_GET_200_page(api_client_cognito):
     assert_json_response(response, 200)
     response_json = response.json()
     assert 5 == len(response_json)
+
+
+def test_List_Flows_GET_200_sort_by_label(api_client_cognito):
+    """List flows sorted by label (ascending alphabetical by default)"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"sort_by": "label"})
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "False" == response.headers["X-Paging-Reverse-Order"]
+    has_label = [flow.get("label") is not None for flow in response.json()]
+    # label is optional; filtering absent labels preserves the relative order of
+    # those present, so a correct ascending sort still holds for this subset.
+    labels = [
+        flow["label"] for flow in response.json() if flow.get("label") is not None
+    ]
+    assert labels == sorted(labels)
+    # Flows with an unset label sort after those with one by default.
+    assert has_label == sorted(has_label, reverse=True)
+
+
+def test_List_Flows_GET_200_sort_by_label_reverse_order(api_client_cognito):
+    """List flows sorted by label in reverse (descending alphabetical)"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"sort_by": "label", "reverse_order": "true"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert_headers_present(response, "x-paging-reverse-order")
+    assert "True" == response.headers["X-Paging-Reverse-Order"]
+    has_label = [flow.get("label") is not None for flow in response.json()]
+    # label is optional; filtering absent labels preserves the relative order of
+    # those present, so a correct descending sort still holds for this subset.
+    labels = [
+        flow["label"] for flow in response.json() if flow.get("label") is not None
+    ]
+    assert labels == sorted(labels, reverse=True)
+    # Flows with an unset label sort before those with one when reversed.
+    assert has_label == sorted(has_label)
+
+
+def test_List_Flows_GET_200_sort_by_created(api_client_cognito):
+    """List flows sorted by created (most recent first by default)"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"sort_by": "created"})
+    # Assert
+    assert_json_response(response, 200)
+    created = [flow["created"] for flow in response.json()]
+    assert created == sorted(created, reverse=True)
+
+
+def test_List_Flows_GET_400_sort_by(api_client_cognito):
+    """List flows with an invalid sort_by value returns 400"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"sort_by": "invalid"})
+    # Assert
+    assert_json_response(response, 400)
 
 
 def test_List_Flows_GET_200_source_id(api_client_cognito, stub_data_flow):

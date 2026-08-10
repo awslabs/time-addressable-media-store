@@ -122,17 +122,20 @@ def post_service(service_post: Annotated[Servicepost, Body()]):
 @app.get("/service/webhooks")
 @tracer.capture_method(capture_response=False)
 def get_webhooks(
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
     )
+    reverse_order = bool(param_reverse_order)
     custom_headers = {}
     items, next_page, limit_used = query_webhooks(
         {
             "tag_values": param_tag_values,
             "tag_exists": param_tag_exists,
+            "reverse_order": reverse_order,
             "page": param_page,
             "limit": param_limit,
         }
@@ -142,6 +145,8 @@ def get_webhooks(
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
     if next_page or limit_used != param_limit:
         custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
+    custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
@@ -245,14 +250,56 @@ def delete_webhook_by_id(
 @app.head("/service/storage-backends")
 @app.get("/service/storage-backends")
 @tracer.capture_method(capture_response=False)
-def get_storage_backends():
-    storage_backends = list_storage_backends()
+def get_storage_backends(
+    param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
+    param_page: Annotated[Optional[str], Query(alias="page")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
+):
+    reverse_order = bool(param_reverse_order)
+    # list_storage_backends is lru_cached, so sort a copy rather than in place.
+    # Storage Backends sort alphabetically by label by default; id is a unique
+    # secondary key so pagination is deterministic when labels collide. Backends
+    # with an unset label sort after those with one by default (and before when
+    # reverse_order is set); the leading `label is None` flag separates the
+    # groups so None is never compared against a str.
+    storage_backends = sorted(
+        list_storage_backends(),
+        key=lambda backend: (
+            backend.get("label") is None,
+            backend.get("label"),
+            backend["id"],
+        ),
+        reverse=reverse_order,
+    )
+    page = int(param_page) if param_page else 0
+    limit_used = min(
+        param_limit if param_limit else constants.DEFAULT_PAGE_LIMIT,
+        constants.MAX_PAGE_LIMIT,
+    )
+    items = storage_backends[page : page + limit_used]
+    next_page = page + limit_used if page + limit_used < len(storage_backends) else None
+    custom_headers = {}
+    if next_page:
+        custom_headers["X-Paging-NextKey"] = str(next_page)
+        custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
+    if next_page or limit_used != param_limit:
+        custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
+    custom_headers["X-Paging-Reverse-Order"] = str(reverse_order)
     if app.current_event.request_context.http_method == "HEAD":
-        return None, HTTPStatus.OK.value  # 200
-    return model_dump(
-        Storagebackendslist(
-            [StoragebackendslistItem(**item) for item in storage_backends]
+        return Response(
+            status_code=HTTPStatus.OK.value,  # 200
+            content_type=content_types.APPLICATION_JSON,
+            body=None,
+            headers=custom_headers,
         )
+    return Response(
+        status_code=HTTPStatus.OK.value,  # 200
+        content_type=content_types.APPLICATION_JSON,
+        body=model_dump(
+            Storagebackendslist([StoragebackendslistItem(**item) for item in items])
+        ),
+        headers=custom_headers,
     )
 
 
