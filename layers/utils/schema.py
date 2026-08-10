@@ -1094,6 +1094,10 @@ class MediaObject(BaseModel):
         ..., description="The object store identifier for the Object."
     )
     put_url: Httprequest
+    presigned: bool | None = Field(
+        None,
+        description="If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed. The presigned URL SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).",
+    )
 
 
 class Flowstorage(BaseModel):
@@ -1129,6 +1133,10 @@ class Flowstoragepost(BaseModel):
     content_type: Mimetype | None = Field(
         None,
         description="The `content_type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of the Flow if not set.",
+    )
+    presigned: bool | None = Field(
+        None,
+        description="If set to `true`, the `put_url`s in the response will be presigned. If set to `false`, the `put_url`s in the response will not be presigned. If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs. Services may choose their own default. If Clients only support one mode of operation, they SHOULD specify this parameter.",
     )
 
 

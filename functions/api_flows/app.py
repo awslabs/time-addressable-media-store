@@ -67,6 +67,7 @@ from schema_extra import FlowsSortBy
 from typing_extensions import Annotated
 from utils import (
     base_delete_request_dict,
+    direct_s3_url,
     generate_link_url,
     generate_presigned_url,
     get_username,
@@ -823,9 +824,12 @@ def post_flow_storage_by_id(
         if flow_storage_post.content_type
         else flow.root.container.root
     )
+    presigned = (
+        True if flow_storage_post.presigned is None else flow_storage_post.presigned
+    )
     flow_storage: Flowstorage = Flowstorage(
         media_objects=[
-            get_presigned_put(content_type, storage_backend["bucket_name"], object_id)
+            get_put_url(content_type, storage_backend, presigned, object_id)
             for object_id in (
                 flow_storage_post.object_ids or [None] * flow_storage_post.limit
             )
@@ -863,18 +867,24 @@ def handle_validation_error(ex: RequestValidationError):
 
 
 @tracer.capture_method(capture_response=False)
-def get_presigned_put(content_type, bucket, object_id=None):
+def get_put_url(content_type, storage_backend, presigned, object_id=None):
     if object_id is None:
         object_id = str(uuid.uuid4())
-    url = generate_presigned_url(
-        "put_object",
-        bucket,
-        object_id,
-        ContentType=content_type,
-    )
+    if presigned:
+        url = generate_presigned_url(
+            "put_object",
+            storage_backend["bucket_name"],
+            object_id,
+            ContentType=content_type,
+        )
+    else:
+        url = direct_s3_url(
+            storage_backend["bucket_name"], storage_backend["region"], object_id
+        )
     return MediaObject(
         object_id=object_id,
         put_url=Httprequest.model_validate({"url": url, "content-type": content_type}),
+        presigned=True if presigned else None,
     )
 
 

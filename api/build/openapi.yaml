@@ -2081,7 +2081,7 @@ paths:
         Where Flow Segments reference initialisation segment Objects with the same ID, the initialisation segment is the same.
         Consuming clients may choose to ignore initialisation segment Objects that haven't changed in subsequent Flow Segments.
 
-        When making requests to the provided `get_urls`, clients should include credentials if the provided URL is on the same origin as the API itself, akin to the `same-origin` mode in the [WhatWG Fetch Standard](https://fetch.spec.whatwg.org/#concept-request-credentials-mode).
+        When making requests to provided `get_url`s that are not presigned, clients SHOULD include credentials if the provided URL is on the same origin as the Service itself, akin to the `same-origin` mode in the [WhatWG Fetch Standard](https://fetch.spec.whatwg.org/#concept-request-credentials-mode). Services MAY support the use of out-of-band credentials where the provided URL is on a different origin to the Service itself. Services SHOULD NOT solely require the use of out-of-band credentials.
       operationId: GET_flows-flowId-segments
       tags:
       - FlowSegments
@@ -2358,7 +2358,7 @@ paths:
         Service implementations need to handle situations where Objects are not used, and where content is were uploaded but the Object is not successfully registered against a Flow Segment or as an init Object against Media Objects.
         In these circumstances, Services should garbage collect Objects after the timeout advertised in [`min_object_timeout` at the `/service`](#/operations/GET_service) endpoint.
 
-        When making requests to the provided `put_url`, clients should include credentials if the provided URL is on the same origin as the API itself, akin to the `same-origin` mode in the [WhatWG Fetch Standard](https://fetch.spec.whatwg.org/#concept-request-credentials-mode).
+        When making requests to provided `put_url`s that are not presigned, clients SHOULD include credentials if the provided URL is on the same origin as the Service itself, akin to the `same-origin` mode in the [WhatWG Fetch Standard](https://fetch.spec.whatwg.org/#concept-request-credentials-mode). Services MAY support the use of out-of-band credentials where the provided URL is on a different origin to the Service itself. Services SHOULD NOT solely require the use of out-of-band credentials.
       operationId: POST_flows-flowId-storage
       tags:
       - MediaStorage
@@ -2497,6 +2497,8 @@ paths:
 
         The paging query parameters and headers are required for the list of Flow references in the Object.
         Service implementations should return a complete list of Flow references within reason and API clients should expect paging to happen in some rare cases where a Object is used in many Flows.
+
+        When making requests to provided `get_url`s that are not presigned, clients SHOULD include credentials if the provided URL is on the same origin as the Service itself, akin to the `same-origin` mode in the [WhatWG Fetch Standard](https://fetch.spec.whatwg.org/#concept-request-credentials-mode). Services MAY support the use of out-of-band credentials where the provided URL is on a different origin to the Service itself. Services SHOULD NOT solely require the use of out-of-band credentials.
       operationId: GET_objects
       tags:
       - Objects
@@ -3777,6 +3779,9 @@ components:
                 type: string
               put_url:
                 $ref: '#/components/schemas/httprequest'
+              presigned:
+                description: If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed. The presigned URL SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).
+                type: boolean
       additionalProperties: false
     flowstoragepost:
       title: Flow Storage Post
@@ -3797,6 +3802,9 @@ components:
         content_type:
           description: The `content_type` to use for the Objects. This parameter MUST only be set where requesting storage for initialisation segments in media formats which require them, and where the mime-type of those initialisation segments differs to that of the media segments. Assumed to be the `container` type of the Flow if not set.
           $ref: '#/components/schemas/mimetype'
+        presigned:
+          description: If set to `true`, the `put_url`s in the response will be presigned. If set to `false`, the `put_url`s in the response will not be presigned. If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs. Services may choose their own default. If Clients only support one mode of operation, they SHOULD specify this parameter.
+          type: boolean
       not:
         allOf:
         - required:

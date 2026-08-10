@@ -724,6 +724,11 @@ def create_storage_label(suffix=""):
     return f"aws.{REGION}:s3{f'.{suffix}' if suffix else ''}:{STORE_NAME}"
 
 
+def is_presigned_url(url):
+    """Return True if the URL carries SigV4 presigning query parameters."""
+    return "x-amz-signature=" in url.lower()
+
+
 def default_get_urls():
     """Return the standard get_urls structure for webhook expectations."""
     return [
