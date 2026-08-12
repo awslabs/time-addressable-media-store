@@ -174,6 +174,46 @@ def test_webhook_delivery_with_http_error(
 
 
 @responses.activate
+@pytest.mark.parametrize("status", [401, 403])
+# pylint: disable=redefined-outer-name
+def test_webhook_delivery_retries_transient_auth_error(
+    lambda_context, webhooks_delivery, sample_webhook, sample_sqs_event, status
+):
+    """Test a transient auth rejection is retried rather than erroring the webhook.
+
+    A newly issued API key at the receiving end may not be propagated when the
+    first event arrives. Entering the `error` state permanently stops delivery,
+    so these must be retried first.
+    """
+    # Arrange - rejected twice, then accepted
+    responses.add(responses.POST, sample_webhook["url"], json={}, status=status)
+    responses.add(responses.POST, sample_webhook["url"], json={}, status=status)
+    responses.add(
+        responses.POST, sample_webhook["url"], json={"status": "ok"}, status=200
+    )
+
+    event = sample_sqs_event(
+        "sources/deleted",
+        {"source_id": str(uuid.uuid4())},
+        sample_webhook,
+    )
+
+    # Act
+    result = webhooks_delivery.lambda_handler(event, lambda_context)
+
+    # Assert - delivery eventually succeeded after retrying
+    assert result["batchItemFailures"] == []
+    assert len(responses.calls) == 3
+
+    # Assert - nothing sent to the error queue, so the webhook stays enabled
+    client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
+    response = client.receive_message(QueueUrl=os.environ["ERROR_QUEUE_URL"])
+    assert "Messages" not in response, (
+        f"HTTP {status} was retried to success but still reported as an error"
+    )
+
+
+@responses.activate
 # pylint: disable=redefined-outer-name
 def test_webhook_delivery_segments_added(
     lambda_context, webhooks_delivery, sample_webhook, sample_sqs_event

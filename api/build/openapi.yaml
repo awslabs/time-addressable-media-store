@@ -516,6 +516,14 @@ paths:
         description: Filter on Source format.
         schema:
           $ref: '#/components/schemas/contentformat'
+      - name: collected_by_ids
+        in: query
+        description: |
+          Filter on Sources by the Source Collection(s) that collect them, given as a comma-separated list of Source IDs.
+          Returns Sources whose `collected_by` includes at least one of the given Source IDs.
+          An empty value (`collected_by_ids=`) returns only Sources that are not collected by any Source, i.e. top-level Sources with no `collected_by` value.
+        schema:
+          $ref: '#/components/schemas/uuidlistempty'
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -607,6 +615,14 @@ paths:
         description: Filter on Source format.
         schema:
           $ref: '#/components/schemas/contentformat'
+      - name: collected_by_ids
+        in: query
+        description: |
+          Filter on Sources by the Source Collection(s) that collect them, given as a comma-separated list of Source IDs.
+          Returns Sources whose `collected_by` includes at least one of the given Source IDs.
+          An empty value (`collected_by_ids=`) returns only Sources that are not collected by any Source, i.e. top-level Sources with no `collected_by` value.
+        schema:
+          $ref: '#/components/schemas/uuidlistempty'
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -760,7 +776,11 @@ paths:
               example: |
                 "ingest_service_api"
               schema:
-                type: string
+                oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
         '404':
           description: The requested Source or tag does not exist.
     put:
@@ -775,7 +795,11 @@ paths:
             example: |
               "new_value"
             schema:
-              type: string
+              oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
         required: true
       responses:
         '204':
@@ -1034,6 +1058,14 @@ paths:
         description: Filter Flows on the value of `init_segments`.
         schema:
           type: boolean
+      - name: collected_by_ids
+        in: query
+        description: |
+          Filter on Flows by the Flow Collection(s) that collect them, given as a comma-separated list of Flow IDs.
+          Returns Flows whose `collected_by` includes at least one of the given Flow IDs.
+          An empty value (`collected_by_ids=`) returns only Flows that are not collected by any Flow, i.e. top-level Flows with no `collected_by` value.
+        schema:
+          $ref: '#/components/schemas/uuidlistempty'
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1156,6 +1188,14 @@ paths:
         description: Filter Flows on the value of `init_segments`.
         schema:
           type: boolean
+      - name: collected_by_ids
+        in: query
+        description: |
+          Filter on Flows by the Flow Collection(s) that collect them, given as a comma-separated list of Flow IDs.
+          Returns Flows whose `collected_by` includes at least one of the given Flow IDs.
+          An empty value (`collected_by_ids=`) returns only Flows that are not collected by any Flow, i.e. top-level Flows with no `collected_by` value.
+        schema:
+          $ref: '#/components/schemas/uuidlistempty'
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -1274,6 +1314,9 @@ paths:
                 video_vfr:
                   summary: Video Flow - H.264 Codec, Variable Frame Rate
                   externalValue: examples/flow-get-200-video-h264-vfr.json
+                video_cleanfeed:
+                  summary: Video Flow - H.264 Codec, with Editorial Purpose Tag
+                  externalValue: examples/flow-get-200-video-h264-cleanfeed.json
                 audio:
                   summary: Audio Flow - AAC Codec
                   externalValue: examples/flow-get-200-audio-aac.json
@@ -1459,7 +1502,11 @@ paths:
               example: |
                 "full"
               schema:
-                type: string
+                oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
         '404':
           description: The requested Flow or tag does not exist.
     put:
@@ -1474,7 +1521,11 @@ paths:
             example: |
               "proxy"
             schema:
-              type: string
+              oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
         required: true
       responses:
         '204':
@@ -2877,9 +2928,6 @@ webhooks:
                   properties:
                     flow:
                       $ref: '#/components/schemas/flow'
-      responses:
-        '200':
-          description: Webhook received successfully
   flows/updated:
     post:
       security:
@@ -2909,9 +2957,6 @@ webhooks:
                   properties:
                     flow:
                       $ref: '#/components/schemas/flow'
-      responses:
-        '200':
-          description: Webhook received successfully
   flows/deleted:
     post:
       security:
@@ -4333,6 +4378,11 @@ components:
       description: A list of Universally Unique Identifiers (UUIDs) as defined in [RFC9562](https://www.rfc-editor.org/rfc/rfc9562), formatted for use in query string parameters
       type: string
       pattern: ^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*$
+    uuidlistempty:
+      title: Query String UUID list (optionally empty)
+      description: A list of Universally Unique Identifiers (UUIDs) as defined in [RFC9562](https://www.rfc-editor.org/rfc/rfc9562), formatted for use in query string parameters, or an empty string. An empty value selects resources that are not in any collection.
+      type: string
+      pattern: ^(([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*)?$
     webhook:
       title: Register Webhook
       description: Register to receive updates via webhook

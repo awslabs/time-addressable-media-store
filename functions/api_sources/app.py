@@ -29,7 +29,7 @@ from neptune import (
     query_sources,
     set_node_property,
 )
-from schema import Contentformat, Source, Tags, Uuid
+from schema import Contentformat, Source, Tags, Uuid, Uuidlistempty
 from schema_extra import SourcesSortBy
 from typing_extensions import Annotated
 from utils import (
@@ -52,6 +52,7 @@ record_type = "source"
 event_bus = os.environ["EVENT_BUS"]
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
+UUIDLISTEMPTY_PATTERN = Uuidlistempty.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/sources")
@@ -62,6 +63,10 @@ def list_sources(
     param_format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
     param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
     param_sort_by: Annotated[Optional[SourcesSortBy], Query(alias="sort_by")] = None,
+    param_collected_by_ids: Annotated[
+        Optional[str],
+        Query(alias="collected_by_ids", pattern=UUIDLISTEMPTY_PATTERN),
+    ] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
@@ -78,6 +83,7 @@ def list_sources(
             "format": param_format.value if param_format else None,
             "reverse_order": reverse_order,
             "sort_by": param_sort_by.value if param_sort_by else None,
+            "collected_by_ids": param_collected_by_ids,
             "page": param_page,
             "limit": param_limit,
         }

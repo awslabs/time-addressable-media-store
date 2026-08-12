@@ -676,6 +676,22 @@ class Uuidlist(
     )
 
 
+class Uuidlistempty(
+    RootModel[
+        constr(
+            pattern=r"^(([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*)?$"
+        )
+    ]
+):
+    root: constr(
+        pattern=r"^(([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(,[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})*)?$"
+    ) = Field(
+        ...,
+        description="A list of Universally Unique Identifiers (UUIDs) as defined in [RFC9562](https://www.rfc-editor.org/rfc/rfc9562), formatted for use in query string parameters, or an empty string. An empty value selects resources that are not in any collection.",
+        title="Query String UUID list (optionally empty)",
+    )
+
+
 class Event(StrEnum):
     flows_created = "flows/created"
     flows_updated = "flows/updated"
