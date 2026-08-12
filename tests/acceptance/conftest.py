@@ -462,8 +462,9 @@ def webhook_verification_lifecycle(
             "start_time": int(time.time() * 1000),
         }
 
-        # 3. Get API key value
+        # 3. Get API key value and wait until it is accepted at the edge
         api_key_value = get_api_key_value(session, api_key_id)
+        wait_for_api_key_active(base_webhook_url, api_key_value)
 
         # 4. Register webhooks with TAMS API
         webhooks_config = [
@@ -793,6 +794,47 @@ def get_api_key_value(session, api_key_id):
     apigw = session.client("apigateway", region_name=REGION)
     response = apigw.get_api_key(apiKey=api_key_id, includeValue=True)
     return response["value"]
+
+
+def wait_for_api_key_active(base_webhook_url, api_key_value, timeout=60):
+    """Poll the deployed webhook endpoint until the API key is accepted.
+
+    A newly created API Gateway API key is not immediately usable at the edge.
+    Registering webhooks before propagation completes means the first events
+    are rejected with a 403, which puts the webhook into the `error` state and
+    permanently stops delivery for the rest of the session. Only the unfiltered
+    webhook is exposed to this, since it is the only one matching the very
+    first event.
+    """
+    url = f"{base_webhook_url}/_api_key_warmup"
+    deadline = time.time() + timeout
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            response = requests.post(
+                url,
+                headers={
+                    "x-api-key": api_key_value,
+                    "Content-Type": "application/json",
+                },
+                json={},
+                timeout=30,
+            )
+            if response.status_code == 200:
+                logger.info(f"✅ API key active after {attempt} attempt(s)")
+                return
+            status = response.status_code
+        except requests.RequestException as e:
+            status = repr(e)
+        if time.time() >= deadline:
+            # pylint: disable=broad-exception-raised
+            raise Exception(
+                f"API key not accepted within {timeout}s "
+                f"(last result: {status}) - webhook deliveries would 403"
+            )
+        logger.info(f"Waiting for API key propagation (last result: {status})...")
+        time.sleep(2)
 
 
 def delete_cloudformation_stack(session, stack_name):

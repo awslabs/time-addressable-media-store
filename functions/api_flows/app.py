@@ -62,6 +62,7 @@ from schema import (
     Tags,
     Timerange,
     Uuid,
+    Uuidlistempty,
 )
 from schema_extra import FlowsSortBy
 from typing_extensions import Annotated
@@ -92,6 +93,7 @@ del_queue = os.environ["DELETE_QUEUE_URL"]
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
 TIMERANGE_PATTERN = Timerange.model_fields["root"].metadata[0].pattern
 MIMETYPE_PATTERN = Mimetype.model_fields["root"].metadata[0].pattern
+UUIDLISTEMPTY_PATTERN = Uuidlistempty.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/flows")
@@ -114,6 +116,10 @@ def get_flows(
     param_init_segments: Annotated[Optional[bool], Query(alias="init_segments")] = None,
     param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
     param_sort_by: Annotated[Optional[FlowsSortBy], Query(alias="sort_by")] = None,
+    param_collected_by_ids: Annotated[
+        Optional[str],
+        Query(alias="collected_by_ids", pattern=UUIDLISTEMPTY_PATTERN),
+    ] = None,
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
@@ -136,6 +142,7 @@ def get_flows(
             "init_segments": param_init_segments,
             "reverse_order": reverse_order,
             "sort_by": param_sort_by.value if param_sort_by else None,
+            "collected_by_ids": param_collected_by_ids,
             "page": param_page,
             "limit": param_limit,
         }

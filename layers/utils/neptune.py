@@ -412,6 +412,35 @@ def build_order_by(
 
 
 @tracer.capture_method(capture_response=False)
+def collected_by_where_literal(
+    collected_by_ids: str | None,
+    not_collected_pattern: str,
+    collected_by_id_pattern,
+) -> str | None:
+    """Returns an OpenCypher WHERE literal filtering an entity on its collected_by relationship.
+
+    The raw query string value determines the behaviour:
+      - None: no filtering is applied (returns None)
+      - "" (empty string): only entities that are not collected by any other entity
+      - "id[,id...]": only entities collected by at least one of the given IDs
+
+    not_collected_pattern is an OpenCypher path pattern, anchored on the entity node, used
+    inside NOT exists(...) to select uncollected entities. collected_by_id_pattern is a
+    callable that, given a single collecting entity ID, returns the OpenCypher path pattern
+    used inside exists(...) to test for that specific collecting entity.
+    """
+    if collected_by_ids is None:
+        return None
+    if collected_by_ids == "":
+        return f"NOT exists({not_collected_pattern})"
+    conditions = [
+        f"exists({collected_by_id_pattern(collected_by_id)})"
+        for collected_by_id in collected_by_ids.split(",")
+    ]
+    return f"({' OR '.join(conditions)})"
+
+
+@tracer.capture_method(capture_response=False)
 def query_sources(parameters: dict) -> tuple[list, int, int]:
     """Returns a list of the TAMS Sources from the Neptune Database"""
     props, where_literals = parse_api_gw_parameters(
@@ -427,6 +456,16 @@ def query_sources(parameters: dict) -> tuple[list, int, int]:
             ]
         }
     )
+    source_collected_by_literal = collected_by_where_literal(
+        parameters.get("collected_by_ids"),
+        "(source)<-[:represents]-(:flow)-[:collected_by]->(:flow)",
+        lambda collected_by_id: (
+            "(source)<-[:represents]-(:flow)-[:collected_by]->(:flow)"
+            f'-[:represents]->(:source {{id: "{collected_by_id}"}})'
+        ),
+    )
+    if source_collected_by_literal:
+        where_literals.append(source_collected_by_literal)
     page = int(parameters["page"]) if parameters.get("page") else 0
     limit = min(
         (
@@ -485,6 +524,15 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
     )
     if parameters.get("source_id"):
         props["source_properties"]["id"] = parameters["source_id"]
+    flow_collected_by_literal = collected_by_where_literal(
+        parameters.get("collected_by_ids"),
+        "(flow)-[:collected_by]->(:flow)",
+        lambda collected_by_id: (
+            f'(flow)-[:collected_by]->(:flow {{id: "{collected_by_id}"}})'
+        ),
+    )
+    if flow_collected_by_literal:
+        where_literals.append(flow_collected_by_literal)
     page = int(parameters.get("page") or 0)
     limit = min(
         (

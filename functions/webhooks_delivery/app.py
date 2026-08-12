@@ -39,7 +39,12 @@ def record_handler(record: SQSRecord) -> None:
     retries = Retry(
         total=5,
         backoff_factor=0.1,
-        status_forcelist=[408, 429, 500, 502, 503, 504],
+        # 401/403 are retried because they are frequently transient at the
+        # receiving end: newly issued API keys/credentials are commonly not yet
+        # propagated across a gateway's edge when the first event arrives. The
+        # spec requires appropriate retries before entering the `error` state,
+        # which permanently stops delivery for the webhook.
+        status_forcelist=[401, 403, 408, 429, 500, 502, 503, 504],
         allowed_methods=["POST"],
         raise_on_status=False,
         respect_retry_after_header=True,
