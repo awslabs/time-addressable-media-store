@@ -11,7 +11,7 @@ info:
     **Note**: the examples provided in this specification are for a system which uses a Storage Backend that provides HTTP URLs for uploading and downloading Objects in buckets.
     This could for example be implemented using an AWS S3 compatible store using presigned URLs or by a simple file system storage with an HTTP frontend.
     Clients should parse the [/service](#/operations/GET_service) endpoint and handle the Storage Backend type in use appropriately.
-  version: '8.1'
+  version: '8.2'
   contact:
     name: BBC R&D - Cloud-Fit Production Team
     email: cloudfit-opensource@rd.bbc.co.uk
@@ -27,7 +27,7 @@ servers:
   variables:
     version:
       description: API version
-      default: v8.1
+      default: v8.2
 security:
 - bearer_token_auth: []
 - url_token_auth: []
@@ -114,6 +114,26 @@ paths:
       tags:
       - Service
       parameters:
+      - name: tag.{name}
+        in: query
+        description: |
+          Filter on Storage Backends that have a tag named {name} with a value in the given comma-seperated list of values.
+          The {name} and the value MUST be URL encoded where special characters are present.
+          Where the tag's value is a string, at least one of the given values will match.
+          Where the tag's value is an array, at least one value in the array will match at least one of the given values.
+          Partial string matches of the values are not valid.
+        schema:
+          $ref: '#/components/schemas/urltaglist'
+      - name: tag_exists.{name}
+        in: query
+        description: |
+          Filter on Storage Backends that have a tag named {name} regardless of value.
+          The {name} MUST be URL encoded where special characters are present.
+          If set to true then the presence of the tag is filtered for.
+          If set to false then its absence is.
+          If left out then no filtering on tag presence is performed.
+        schema:
+          type: boolean
       - name: reverse_order
         in: query
         description: Return Storage Backends in reverse-alphabetical order of their `label`.
@@ -159,6 +179,26 @@ paths:
       tags:
       - Service
       parameters:
+      - name: tag.{name}
+        in: query
+        description: |
+          Filter on Storage Backends that have a tag named {name} with a value in the given comma-seperated list of values.
+          The {name} and the value MUST be URL encoded where special characters are present.
+          Where the tag's value is a string, at least one of the given values will match.
+          Where the tag's value is an array, at least one value in the array will match at least one of the given values.
+          Partial string matches of the values are not valid.
+        schema:
+          $ref: '#/components/schemas/urltaglist'
+      - name: tag_exists.{name}
+        in: query
+        description: |
+          Filter on Storage Backends that have a tag named {name} regardless of value.
+          The {name} MUST be URL encoded where special characters are present.
+          If set to true then the presence of the tag is filtered for.
+          If set to false then its absence is.
+          If left out then no filtering on tag presence is performed.
+        schema:
+          type: boolean
       - name: reverse_order
         in: query
         description: Return Storage Backends in reverse-alphabetical order of their `label`.
@@ -197,6 +237,182 @@ paths:
                 $ref: '#/components/schemas/storagebackendslist'
               example:
                 $ref: examples/storage-backends-get-200.json
+  /service/profiles:
+    head:
+      summary: Profile Backend Information
+      description: Return Profile headers
+      operationId: HEAD_profiles
+      tags:
+      - Profiles
+      parameters:
+      - name: format
+        in: query
+        description: Filter on Profile format. Only single-essence formats are supported.
+        schema:
+          title: Profile Content Format
+          description: Identifies the content format for a Profile using a URN string. The multi format is not applicable to Profiles.
+          type: string
+          format: uri
+          enum:
+          - urn:x-nmos:format:video
+          - urn:x-tam:format:image
+          - urn:x-nmos:format:audio
+          - urn:x-nmos:format:data
+      - name: codec
+        in: query
+        description: Filter on Profile codec.
+        schema:
+          $ref: '#/components/schemas/mimetype'
+      - name: label
+        in: query
+        description: Filter on Profiles that have the given label.
+        schema:
+          type: string
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
+      responses:
+        '200':
+          description: ''
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' and a link to the next page is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the implementation
+              schema:
+                type: integer
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Bad request. Invalid query options.
+    get:
+      summary: Profile Backend Information
+      description: List of Profiles supported by the store instance for use when creating flows.
+      operationId: GET_profiles
+      tags:
+      - Profiles
+      parameters:
+      - name: format
+        in: query
+        description: Filter on Profile format.
+        schema:
+          $ref: '#/components/schemas/contentformat'
+      - name: codec
+        in: query
+        description: Filter on Profile codec.
+        schema:
+          $ref: '#/components/schemas/mimetype'
+      - name: label
+        in: query
+        description: Filter on Profiles that have the given label.
+        schema:
+          type: string
+      - $ref: '#/components/parameters/trait_resource_paged_key'
+      - $ref: '#/components/parameters/trait_paged_limit'
+      responses:
+        '200':
+          description: ''
+          headers:
+            Link:
+              description: Provides references to cursors for paging. Only the 'rel' attribute with value 'next' and a link to the next page is currently supported. If 'next' is not present then it is the last page.
+              schema:
+                type: string
+            X-Paging-Limit:
+              description: Identifies the current limit being used for paging. This may not match the requested value if the requested value was too high for the implementation
+              schema:
+                type: integer
+            X-Paging-NextKey:
+              description: Opaque string that can be supplied to the `page` query parameter to get the next page of results.
+              schema:
+                type: string
+          content:
+            application/json:
+              example:
+                $ref: examples/profiles-get-200.json
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/profile'
+        '400':
+          description: Bad request. Invalid query options.
+  /service/profiles/{profileId}:
+    parameters:
+    - name: profileId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuid'
+      description: The Profile identifier.
+    head:
+      summary: Profile Details
+      description: Return Profile path headers
+      operationId: HEAD_profiles-profileId
+      tags:
+      - Profiles
+      responses:
+        '200':
+          $ref: '#/components/responses/trait_resource_info_head_200'
+        '404':
+          $ref: '#/components/responses/trait_resource_info_head_404'
+    get:
+      summary: Profile Details
+      description: Returns Profile metadata.
+      operationId: GET_profiles-profileId
+      tags:
+      - Profiles
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/profile'
+              examples:
+                video-h264:
+                  summary: h264 TS Video Profile
+                  externalValue: examples/profile-get-200-video-h264.json
+                video-h264-mxf:
+                  summary: h264 MXF Video Profile
+                  externalValue: examples/profile-get-200-video-h264-mxf.json
+                jpegimage:
+                  summary: Image Profile
+                  externalValue: examples/profile-get-200-image.json
+        '404':
+          description: The requested profile does not exist.
+    post:
+      summary: Create Profile
+      description: "Create a new Profile to be used when creating flows with the matching metadata.  \n\nServices MUST reject requests that would update an existing Profile as this would mean it no longer matches flows that have already been created using it.\nIf a change to a Profile is required then a new Profile should be created with the updated information and new flows reference this new Profile.  \n\nAttempting to update an existing profiles should return a 400 error.\n\nTags can be created at the Profile level to hold information about the Profile itself.  \nThese do not form part of the flow that is created.  \nThese are tag/value format and could be used for tasks such as version tracking or holding encoding parameters.\n"
+      operationId: POST_profiles-profileId
+      tags:
+      - Profiles
+      requestBody:
+        content:
+          application/json:
+            example:
+              $ref: examples/profile-put.json
+            schema:
+              $ref: '#/components/schemas/profile'
+        required: true
+      responses:
+        '201':
+          description: The Profile has been created.
+          content:
+            application/json:
+              example:
+                $ref: examples/profile-post-201.json
+              schema:
+                $ref: '#/components/schemas/profile'
+        '400':
+          description: Bad request. Invalid Profile JSON or Profile already exists.
+        '404':
+          description: The requested Profile ID in the path is invalid.
   /service/webhooks:
     head:
       summary: List Webhook URLs
@@ -699,6 +915,10 @@ paths:
                   summary: Multi-essence Source
                   description: Multi-essence Sources collect multiple Sources of different formats under one Source ID.
                   externalValue: examples/source-get-200-multi.json
+                tags:
+                  summary: Source with tags
+                  description: Source example with tags set matching associated Flow
+                  externalValue: examples/source-get-200-tags.json
         '404':
           description: The requested Source does not exist.
   /sources/{sourceId}/tags:
@@ -996,6 +1216,11 @@ paths:
         description: Filter on Flow codec.
         schema:
           $ref: '#/components/schemas/mimetype'
+      - name: profile_id
+        in: query
+        description: Filter on Profile identifier.
+        schema:
+          $ref: '#/components/schemas/uuid'
       - name: label
         in: query
         description: Filter on Flows that have the given label.
@@ -1023,6 +1248,11 @@ paths:
           - created
           - metadata_updated
           - label
+      - name: status
+        in: query
+        description: Filter on Flows on the value of `status`.
+        schema:
+          $ref: '#/components/schemas/flowstatus'
       - name: tag.{name}
         in: query
         description: |
@@ -1126,6 +1356,11 @@ paths:
         description: Filter on Flow codec.
         schema:
           $ref: '#/components/schemas/mimetype'
+      - name: profile_id
+        in: query
+        description: Filter on Profile identifier.
+        schema:
+          $ref: '#/components/schemas/uuid'
       - name: label
         in: query
         description: Filter on Flows that have the given label.
@@ -1153,6 +1388,11 @@ paths:
           - created
           - metadata_updated
           - label
+      - name: status
+        in: query
+        description: Filter on Flows on the value of `status`.
+        schema:
+          $ref: '#/components/schemas/flowstatus'
       - name: tag.{name}
         in: query
         description: |
@@ -1229,7 +1469,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/flow'
+                  $ref: '#/components/schemas/flowget'
         '400':
           description: Bad request. Invalid query options.
   /flows/{flowId}:
@@ -1291,7 +1531,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/flow'
+                $ref: '#/components/schemas/flowget'
               examples:
                 video:
                   summary: Video Flow - H.264 Codec
@@ -1351,19 +1591,10 @@ paths:
           description: Bad request. Invalid query options.
     put:
       summary: Create or Replace Flow
-      description: |
-        Create or replace the Flow metadata.
-
-        Clients should aim to populate as many of the Flow metadata fields as possible and practical. The fewer parameters that are set, the higher the likelihood that reading clients will have to retrieve the media to determine technical metadata to e.g. configure decoders.
-
-        Some parameters may be ignored/overridden by service implementations. This is to enable the Flow json-blob to be re-used with no/minimal editing in various use cases. Such parameters are called out in their description.
-
-        Service implementations SHOULD verify that Flow metadata is compatible with the associated Source.
-        Service implementations MAY accept modification/addition of parameters, and reflect such changes in the Source, where it will not bring any Flows of the Source into conflict.
-        Where metadata would result in any Flow of the Source coming into conflict, the request SHOULD be rejected with a 400 response.
-        Examples of conflicting metadata include `format` not matching, or the `role` in `source_collection` and `flow_collection` not matching.
-        It may also be possible for service implementations to detect some instances where multiple Flows should not be considered of the same Source, such as audio Flows with different numbers of tracks.
-        Further guidance on when Flows/Sources may be considered the same/different may be found in the [Practical Guidance for Media](https://specs.amwa.tv/ms-04/releases/v1.0.0/docs/3.0._Practical_Guidance_for_Media.html) section of AMWA MS-04.
+      description: "Create or replace the Flow metadata.\n\nClients should aim to populate as many of the Flow metadata fields as possible and practical. The fewer parameters that are set, the higher the likelihood that reading clients will have to retrieve the media to determine technical metadata to e.g. configure decoders.\n\nSome parameters may be ignored/overridden by service implementations. This is to enable the Flow json-blob to be re-used with no/minimal editing in various use cases. Such parameters are called out in their description.\n\nService implementations SHOULD verify that Flow metadata is compatible with the associated Source.\nService implementations MAY accept modification/addition of parameters, and reflect such changes in the Source, where it will not bring any Flows of the Source into conflict.\nWhere metadata would result in any Flow of the Source coming into conflict, the request SHOULD be rejected with a 400 response.\nExamples of conflicting metadata include `format`\
+        \ not matching, or `role` or ordering in `source_collection` and `flow_collection` not matching.\nIt may also be possible for service implementations to detect some instances where multiple Flows should not be considered of the same Source, such as audio Flows with different numbers of tracks.\nFurther guidance on when Flows/Sources may be considered the same/different may be found in the [Practical Guidance for Media](https://specs.amwa.tv/ms-04/releases/v1.0.0/docs/3.0._Practical_Guidance_for_Media.html) section of AMWA MS-04.\n\nFlows can be created either by directly supplying all the required technical metadata or by referencing an existing Profile in the store.  \nWhen using a Profile, the Service Implementation will populate the Flow's technical parameters (format, codec, essence_parameters etc.) from that profile, along with the metadata provided.  \nIt is up to the Service Implementation whether this is normalised on the Flow creation or on read.\n\nWhen creating a flow\
+        \ using a Profile it is not possible to override any specific fields as this would invalidate the link to the Profile.  \nSupplying a Profile ID and any technical metadata should result in a 400 validation error.\n\nWhen updating a Flow created using a profile then  consideration needs to be given to the fields which were inherited. \nFor the standard fields (eg label, description, tags) which form part of the common Flow metadata and provided directly regardless of the Profile then these can be updated through the standard process.\n\nIn the scenario where the technical characteristics do need to be changed on a Flow created from a Profile then it is necessary to remove the link to the Profile as part of the update since it will no longer match the Profile entirely.\nThis is achieved by means of setting the `profile_id` field to an empty string as part of the update.\nThis will then break the link to the Profile and allow the store to update the technical parameters.\nIt should\
+        \ be noted that searching for Flows using a Profile will no longer include the updated Flow since it no longer matches or is linked to the Profile.\n"
       operationId: PUT_flows-flowId
       tags:
       - Flows
@@ -1377,8 +1608,11 @@ paths:
               multi:
                 summary: Multi-essence Flow
                 externalValue: examples/flow-put-multi.json
+              profile:
+                summary: Flow created using a Profile
+                externalValue: examples/flow-put-profile.json
             schema:
-              $ref: '#/components/schemas/flow'
+              $ref: '#/components/schemas/flowput'
         required: true
       responses:
         '201':
@@ -1388,7 +1622,7 @@ paths:
               example:
                 $ref: examples/flow-put-201.json
               schema:
-                $ref: '#/components/schemas/flow'
+                $ref: '#/components/schemas/flowget'
         '204':
           description: No content. The Flow has been updated.
         '400':
@@ -1771,7 +2005,7 @@ paths:
           $ref: '#/components/responses/trait_resource_info_head_404'
     get:
       summary: Flow Collection
-      description: Returns the Flow collection property. A list of Flows that are collected together by this Flow.
+      description: Returns the Flow collection property. An ordered list of Flows that are collected together by this Flow.
       operationId: GET_flows-flowId-flow-collection
       tags:
       - Flows
@@ -1789,7 +2023,7 @@ paths:
     put:
       summary: Create or Update Flow Collection
       description: |
-        Create or update the Flow collection property. A list of Flows that are collected together by this Flow.
+        Create or update the Flow collection property. An ordered list of Flows that are collected together by this Flow.
 
         Service implementations SHOULD verify that Flow metadata is compatible with the associated Source.
         Service implementations MAY accept modification/addition of parameters, and reflect such changes in the Source, where it will not bring any Flows of the Source into conflict.
@@ -1954,6 +2188,11 @@ paths:
 
         The average bit rate of the Flow Segments in 1000 bits/second.
         A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
+
+        When a Flow is created from a Profile then the average bit rate is inherited from the Profile.
+        In this scenario is it not possible to update the average bit rate directly as it would invalidate the link to the Profile.
+        Any attempt to update the average bitrate should be rejected by the store with a 400 error message as this is a bad request.
+        To update the average bit rate then it is necessary to remove the link to the Profile first before updating directly.
       operationId: PUT_flows-flowId-avg-bit-rate
       tags:
       - Flows
@@ -2055,6 +2294,18 @@ paths:
           If omitted, both presigned and non-presigned URLs will be returned.
           If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs.
           Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
+        schema:
+          type: boolean
+      - name: storage_backend_tag.{name}
+        in: query
+        description: |
+          Filter Flow Segment `get_urls` and `init_object.get_urls` on tag values. This option is the same as the `tag.{name}` query parameter on the `/service/storage-backends` API endpoint.
+        schema:
+          type: string
+      - name: storage_backend_tag_exists.{name}
+        in: query
+        description: |
+          Filter Flow Segment `get_urls` and `init_object.get_urls` on tag names. This option is the same as the `tag_exists.{name}` query parameter on the `/service/storage-backends` API endpoint.
         schema:
           type: boolean
       - name: include_object_timerange
@@ -2190,6 +2441,18 @@ paths:
           If omitted, both presigned and non-presigned URLs will be returned.
           If `presigned` is set to `false`, the response from the service could be substantially faster if it is not required to generate a large number of pre-signed URLs.
           Where multiple filter query parameters are provided, the returned `get_urls` and `init_object.get_urls` will match all filters.
+        schema:
+          type: boolean
+      - name: storage_backend_tag.{name}
+        in: query
+        description: |
+          Filter Flow Segment `get_urls` and `init_object.get_urls` on tag values. This option is the same as the `tag.{name}` query parameter on the `/service/storage-backends` API endpoint.
+        schema:
+          type: string
+      - name: storage_backend_tag_exists.{name}
+        in: query
+        description: |
+          Filter Flow Segment `get_urls` and `init_object.get_urls` on tag names. This option is the same as the `tag_exists.{name}` query parameter on the `/service/storage-backends` API endpoint.
         schema:
           type: boolean
       - name: include_object_timerange
@@ -2515,6 +2778,18 @@ paths:
           Filter `referenced_by_flows` on tag names. This option is the same as the `tag_exists.{name}` query parameter on the `/flows/` API endpoint.
         schema:
           type: boolean
+      - name: storage_backend_tag.{name}
+        in: query
+        description: |
+          Filter `get_urls` and `init_object.get_urls` on tag values. This option is the same as the `tag.{name}` query parameter on the `/service/storage-backends` API endpoint.
+        schema:
+          type: string
+      - name: storage_backend_tag_exists.{name}
+        in: query
+        description: |
+          Filter `get_urls` and `init_object.get_urls` on tag names. This option is the same as the `tag_exists.{name}` query parameter on the `/service/storage-backends` API endpoint.
+        schema:
+          type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
       - $ref: '#/components/parameters/trait_paged_limit'
       responses:
@@ -2612,6 +2887,18 @@ paths:
         in: query
         description: |
           Filter `referenced_by_flows` on tag names. This option is the same as the `tag_exists.{name}` query parameter on the `/flows/` API endpoint.
+        schema:
+          type: boolean
+      - name: storage_backend_tag.{name}
+        in: query
+        description: |
+          Filter `get_urls` and `init_object.get_urls` on tag values. This option is the same as the `tag.{name}` query parameter on the `/service/storage-backends` API endpoint.
+        schema:
+          type: string
+      - name: storage_backend_tag_exists.{name}
+        in: query
+        description: |
+          Filter `get_urls` and `init_object.get_urls` on tag names. This option is the same as the `tag_exists.{name}` query parameter on the `/service/storage-backends` API endpoint.
         schema:
           type: boolean
       - $ref: '#/components/parameters/trait_resource_paged_key'
@@ -2927,7 +3214,7 @@ webhooks:
                   - flow
                   properties:
                     flow:
-                      $ref: '#/components/schemas/flow'
+                      $ref: '#/components/schemas/flowget'
   flows/updated:
     post:
       security:
@@ -2956,7 +3243,7 @@ webhooks:
                   - flow
                   properties:
                     flow:
-                      $ref: '#/components/schemas/flow'
+                      $ref: '#/components/schemas/flowget'
   flows/deleted:
     post:
       security:
@@ -3228,13 +3515,12 @@ components:
       type: object
       required:
       - id
-      - role
       properties:
         id:
           description: Source or Flow Identifier of the member of this collection. Sources MUST only collect Sources, and Flows MUST only collect Flows. Must already be registered in this service instance
           $ref: '#/components/schemas/uuid'
         role:
-          description: A human-readable role of the element in this collection (e.g. 'R' to denote a right audio channel in a collection of mono audio Sources)
+          description: The purpose of this element in the collection, primarily intended to be human-readable.
           type: string
     containermapping:
       title: Container Mapping
@@ -3392,22 +3678,12 @@ components:
         config:
           type: object
           description: Configuration options required to make use of this mechanism
-    flow:
-      title: Flow
-      description: Describes a Flow
-      type: object
-      oneOf:
-      - $ref: '#/components/schemas/flowvideo'
-      - $ref: '#/components/schemas/flowaudio'
-      - $ref: '#/components/schemas/flowimage'
-      - $ref: '#/components/schemas/flowdata'
-      - $ref: '#/components/schemas/flowmulti'
     flowaudio:
       title: Audio Flow
       description: Describes an audio Flow
       type: object
       allOf:
-      - $ref: '#/components/schemas/flowcore'
+      - $ref: '#/components/schemas/flowtechnical'
       - type: object
         required:
         - format
@@ -3469,7 +3745,7 @@ components:
                 type: boolean
     flowcollection:
       title: Flow Collection
-      description: Describes how Flows are collected into another Flow
+      description: Describes how Flows are collected into another Flow. Note that this is an ordered list.
       type: array
       items:
         type: object
@@ -3481,10 +3757,10 @@ components:
             container_mapping:
               description: Describes the mapping of the Flow essence from this Flow collection's container
               $ref: '#/components/schemas/containermapping'
-    flowcore:
-      title: Flow Core
-      description: Describes a Flow (common properties to all Flows, imported by type-specific specifications)
+    flowcommon:
       type: object
+      description: Describes the core fields of a Flow (common properties to all Flows, imported by flow-get and flow-put specifications)
+      title: Flow Common
       required:
       - id
       - source_id
@@ -3511,12 +3787,11 @@ components:
           description: 'Key value is a freeform string. WARNING: When updating a Flow with `tags` set, `tags` will be replaced with the provided dictionary. `tags` WILL NOT be merged with the provided values. When `tags` is not set in the request, `tags` will be unset (i.e. set to `{}`). To update individual tags, clients should use the [Create or Update Flow Tag](#/operations/PUT_flows-flowId-tags-name) endpoint.'
           $ref: '#/components/schemas/tags'
         metadata_version:
-          description: A change to the Flow metadata, not including metadata_version, metadata_updated, segments_updated, or Segments, results in a new version. If the metadata_version for Flow instances is identical then the metadata is identical. Service implementations SHOULD set suitable default values for `metadata_version` whenever Flow metadata is changed and `metadata_version` is either not set by the client, or set to it's existing value. Service implementations MAY permit clients to edit the value, subject to suitable permissions-based limitations. Where media is transfered between TAMS service instances without changing the Flow metadata, clients SHOULD maintain the `metadata_version`. To support this, service implementations SHOULD always accept the setting of `metadata_version` by the client on initial Flow creation. Service implementations SHOULD update this field where metadata is updated via child endpoints. Note that this specification places no requirements on incremental
+          description: A change to the Flow metadata, not including metadata_version, metadata_updated, segments_updated or Segments, results in a new version. If the metadata_version for Flow instances is identical then the metadata is identical. Service implementations SHOULD set suitable default values for `metadata_version` whenever Flow metadata is changed and `metadata_version` is either not set by the client, or set to it's existing value. Service implementations MAY permit clients to edit the value, subject to suitable permissions-based limitations. Where media is transfered between TAMS service instances without changing the Flow metadata, clients SHOULD maintain the `metadata_version`. To support this, service implementations SHOULD always accept the setting of `metadata_version` by the client on initial Flow creation. Service implementations SHOULD update this field where metadata is updated via child endpoints. Note that this specification places no requirements on incremental
             versioning. Service implementations may, for example, choose to use hashes or date-time version identifiers.
           type: string
         generation:
-          description: An indication of whether a particular Flow of a Source has been through more or fewer lossy encodings than another Flow of the same Source. This parameter provides a hint to clients as to which is the "highest quality" Flow available to them. A Flow with a higher generation may contain less of the original information than a Flow with a lower generation, although the absolute values generally have no particular meaning. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via lossless capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where a lossy transcode has been carried out on an existing Flow, the `generation` should be incremented by 1 on the transcoded Flow. Where the originating device outputs multiple qualities of the Source (for example an ingester generated a transcoded proxy and ingested it at
-            the same time), `generation` should be set to represent the encoding processes each has been through.
+          description: An indication of how many lossy encodings the Flow content has been through. This parameter provides a hint to clients as to which is the "highest qualty" Flow available to them. A Flow with a higher generation may contain less of the original information than a flow with a lower generation. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where the originating device outputs multiple qualities of the Source, `generation` should represent the encoding processes each has been through as accurately as possible.
           type: integer
           minimum: 0
         created:
@@ -3531,41 +3806,17 @@ components:
           description: The date-time the Flow Segments were updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally
           type: string
           format: date-time
+        status:
+          $ref: '#/components/schemas/flowstatus'
         read_only:
           description: If set to 'true', service implementations SHOULD reject client requests to update Flow metadata (other than the read_only property), and Flow Segments. Service implementations should also reject requests to the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage) endpoint for the Flow, and requests to delete the Flow.
           type: boolean
-        codec:
-          description: A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.
-          $ref: '#/components/schemas/mimetype'
-        container:
-          description: The container MIME type for Flow Segments. Where the media format employs initialisation segments, this is the mime type of the media segments and NOT the initialisation segment(s). Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type
-            to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence Flows that do reference Media Objects), this property MUST NOT be set.
-          $ref: '#/components/schemas/mimetype'
-        avg_bit_rate:
-          description: The average bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
-          type: integer
-          minimum: 0
         max_bit_rate:
           description: The maximum bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
           type: integer
           minimum: 0
-        segment_duration:
-          description: The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
-          type: object
-          required:
-          - numerator
-          properties:
-            numerator:
-              description: numerator
-              type: integer
-              exclusiveMinimum: 0
-            denominator:
-              description: denominator
-              type: integer
-              default: 1
-              exclusiveMinimum: 0
         timerange:
-          description: The timerange of samples available in the Flow, as described by the [TimeRange](#/schemas/timerange) type. Service implementations MUST ignore this if given in a PUT request, and instead manage it internally.
+          description: The timerange of samples available in the Flow, as described by the [TimeRange](../schemas/timerange#top) type. Service implementations MUST ignore this if given in a PUT request, and instead manage it internally.
           $ref: '#/components/schemas/timerange'
         flow_collection:
           description: List of Flows that are collected together by this Flow.
@@ -3575,15 +3826,12 @@ components:
           description: Flows that reference this Flow to include it in a collection. This attribute is intended to be read-only. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally
           items:
             $ref: '#/components/schemas/uuid'
-        container_mapping:
-          description: Describes the mapping of the Flow essence from the this Flow's container
-          $ref: '#/components/schemas/containermapping'
     flowdata:
       title: Data Flow
       description: Describes a data Flow
       type: object
       allOf:
-      - $ref: '#/components/schemas/flowcore'
+      - $ref: '#/components/schemas/flowtechnical'
       - type: object
         required:
         - format
@@ -3607,12 +3855,28 @@ components:
               init_segments:
                 description: Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.
                 type: boolean
+    flowget:
+      title: Flow
+      description: Describes a Flow
+      type: object
+      properties:
+        profile_id:
+          description: Profile identifier that was used to create the flow.
+          $ref: '#/components/schemas/uuid'
+      allOf:
+      - $ref: '#/components/schemas/flowcommon'
+      - oneOf:
+        - $ref: '#/components/schemas/flowvideo'
+        - $ref: '#/components/schemas/flowaudio'
+        - $ref: '#/components/schemas/flowimage'
+        - $ref: '#/components/schemas/flowdata'
+        - $ref: '#/components/schemas/flowmulti'
     flowimage:
       title: Image Flow
       description: Describes a still image Flow, for use by thumbnail tracks etc
       type: object
       allOf:
-      - $ref: '#/components/schemas/flowcore'
+      - $ref: '#/components/schemas/flowtechnical'
       - type: object
         required:
         - format
@@ -3661,13 +3925,13 @@ components:
       description: Describes a multi-essence Flow
       type: object
       allOf:
-      - $ref: '#/components/schemas/flowcore'
+      - $ref: '#/components/schemas/flowtechnical'
       - type: object
         required:
         - format
         properties:
           format:
-            description: The primary content type URN for the Flow.
+            description: The primary content type URN for the flow.
             type: string
             enum:
             - urn:x-nmos:format:multi
@@ -3680,6 +3944,26 @@ components:
               init_segments:
                 description: Whether the Flow makes use of initialisation segments. This parameter MUST be set to `true` if Media Objects have `init_object` populated. If set to `true`, all Media Objects MUST have `init_object` populated. Assume `false` if omitted.
                 type: boolean
+    flowput:
+      type: object
+      description: Describes a Flow
+      title: Flow
+      allOf:
+      - $ref: '#/components/schemas/flowcommon'
+      - oneOf:
+        - type: object
+          title: Flow Profile
+          required:
+          - profile_id
+          properties:
+            profile_id:
+              description: Profile identifier that was used to create the flow.  When supplying a profile_id no metadata which can be contained in a Profile should also be provided, doing so will result in a 400 validation error.  Trying to create a Flow using a Profile ID that does not exist should also provide a 400 validation error
+              $ref: '#/components/schemas/uuid'
+        - $ref: '#/components/schemas/flowvideo'
+        - $ref: '#/components/schemas/flowaudio'
+        - $ref: '#/components/schemas/flowimage'
+        - $ref: '#/components/schemas/flowdata'
+        - $ref: '#/components/schemas/flowmulti'
     flowsegment:
       type: object
       description: Provides the location and metadata of the media files corresponding to timerange segments of a Flow.
@@ -3804,6 +4088,16 @@ components:
         key_frame_count:
           description: The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point
           type: integer
+    flowstatus:
+      title: Flow Status
+      description: 'The current ingest status of a Flow. Available values are as follows. `awaiting_content` - Flow is expecting, but not currently receiving content. `ingesting` - Content is currently being ingested. `replication_in_progress` - Content is currently being ingested to this Flow from another Service Instance via a replication process. `closed_complete` - Flow is complete and will not receive any more content. NOTE: Because this parameter is maintained/updated by a Client, the value of this parameter is only indicative and not authoritative. If the Client ingesting the content becomes unavailable, it may leave this parameter in an incorrect state. Clients should aim to tidy up this state appropriately once they recover. Service Implementers MAY consider adding more active management of the `status` of Flows to mitigate Clients failing to tidy up on completion/failure, as part of more general lifecycle management capability, in line with the approach described for [retention
+        management](https://github.com/bbc/tams/blob/main/docs/appnotes/0019-implementing-retention-management.md). But Clients should not assume such capability.'
+      type: string
+      enum:
+      - awaiting_content
+      - ingesting
+      - replication_in_progress
+      - closed_complete
     flowstorage:
       type: object
       title: Media Bucket Object Store
@@ -3856,12 +4150,47 @@ components:
           - limit
         - required:
           - object_ids
+    flowtechnical:
+      title: Flow Technical
+      description: Describes the technical characteristics of a Flow (imported by type-specific specifications or as part of a profile)
+      type: object
+      properties:
+        codec:
+          description: A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.
+          type: string
+          pattern: ^[^\s/]+/[^\s/]+$
+        container:
+          description: The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.
+          type: string
+          pattern: ^[^\s/]+/[^\s/]+$
+        avg_bit_rate:
+          description: The average bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.
+          type: integer
+          minimum: 0
+        segment_duration:
+          description: The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
+          type: object
+          required:
+          - numerator
+          properties:
+            numerator:
+              description: numerator
+              type: integer
+              exclusiveMinimum: 0
+            denominator:
+              description: denominator
+              type: integer
+              default: 1
+              exclusiveMinimum: 0
+        container_mapping:
+          description: Describes the mapping of the Flow essence from the this Flow's container
+          $ref: '#/components/schemas/containermapping'
     flowvideo:
       title: Video Flow
       description: Describes a video Flow
       type: object
       allOf:
-      - $ref: '#/components/schemas/flowcore'
+      - $ref: '#/components/schemas/flowtechnical'
       - type: object
         required:
         - format
@@ -4173,6 +4502,49 @@ components:
           label:
             description: Label identifying this Object instance. Service implementations should reject any requests using labels that are already associated with Storage Backends.
             type: string
+    profile:
+      type: object
+      description: Describes a Profile
+      title: Profile
+      required:
+      - id
+      - flow_metadata
+      properties:
+        id:
+          description: Profile identifier.
+          $ref: '#/components/schemas/uuid'
+        label:
+          description: Freeform string label for the Profile.
+          type: string
+        description:
+          description: Freeform text describing the Profile.
+          type: string
+        created_by:
+          description: A string identifier for the entity that created the Profile. Implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.
+          type: string
+        created:
+          description: The date-time the Profile was created in a given context, e.g. in the store. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally.
+          type: string
+          format: date-time
+        tags:
+          description: Key value is a freeform string.  As Profiles are considered immutable then this also applies to tags which cannot be updated after a Profile has been created.
+          $ref: '#/components/schemas/tags'
+        flow_metadata:
+          description: The technical characteristics of the Profile.  This section will be mapped directly to all flows created using this Profile.
+          type: object
+          oneOf:
+          - title: Video Flow
+            description: The technical characteristics of the Profile.  This section will be mapped directly to all flows created using this Profile.
+            $ref: '#/components/schemas/flowvideo'
+          - title: Audio Flow
+            description: The technical characteristics of the Profile.  This section will be mapped directly to all flows created using this Profile.
+            $ref: '#/components/schemas/flowaudio'
+          - title: Image Flow
+            description: The technical characteristics of the Profile.  This section will be mapped directly to all flows created using this Profile.
+            $ref: '#/components/schemas/flowimage'
+          - title: Data Flow
+            description: The technical characteristics of the Profile.  This section will be mapped directly to all flows created using this Profile.
+            $ref: '#/components/schemas/flowdata'
     service:
       title: Service
       description: Provides information about the service instance
@@ -4291,6 +4663,9 @@ components:
         store_product:
           description: The storage product name.
           type: string
+        tags:
+          description: Key value is a freeform string.
+          $ref: '#/components/schemas/tags'
     storagebackendslist:
       title: Storage Backends List
       description: Information about the storage backends available on this service instance.
@@ -4422,12 +4797,12 @@ components:
           items:
             $ref: '#/components/schemas/uuid'
         flow_collected_by_ids:
-          description: Limit Flow and Flow Segment events to those with Flow that is collected by a Flow Collection in the given list of Flow Collection IDs
+          description: Limit Flow and Flow Segment events to those with a Flow that is collected by a Flow Collection in the given list of Flow Collection IDs. An empty array limits events to Flows that are not collected by any Flow Collection.
           type: array
           items:
             $ref: '#/components/schemas/uuid'
         source_collected_by_ids:
-          description: Limit Flow, Flow Segment and Source events to those with Source that is collected by a Source Collection in the given list of Source Collection IDs
+          description: Limit Flow, Flow Segment and Source events to those with a Source that is collected by a Source Collection in the given list of Source Collection IDs. An empty array limits events to Sources that are not collected by any Source Collection.
           type: array
           items:
             $ref: '#/components/schemas/uuid'
@@ -4535,6 +4910,8 @@ tags:
 - name: Flows
   description: |
     Sources which have been 'rendered' to a specific encoding/packaging format.
+- name: Profiles
+  description: Centralised management of the technical characteristics of a flow
   externalDocs:
     url: https://specs.amwa.tv/ms-04/releases/v1.0.0/docs/2.3._Explanation_-_Flow.html
 - name: FlowSegments

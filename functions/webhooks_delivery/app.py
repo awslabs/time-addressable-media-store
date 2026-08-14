@@ -17,7 +17,7 @@ from aws_lambda_powertools.utilities.data_classes.sqs_event import SQSEvent, SQS
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from requests import Session
 from requests.adapters import HTTPAdapter, Retry
-from schema import Error, Flow, Flowsegment, Source
+from schema import Error, Flowget, Flowsegment, Source
 from schema_extra import Webhookfull
 from utils import model_dump, put_message
 
@@ -57,7 +57,7 @@ def record_handler(record: SQSRecord) -> None:
     # Use associated model to clean the response data
     match event.detail_type:
         case "flows/created" | "flows/updated":
-            event.detail["flow"] = model_dump(Flow(event.detail["flow"]))
+            event.detail["flow"] = model_dump(Flowget(event.detail["flow"]))
         case "sources/created" | "sources/updated":
             event.detail["source"] = model_dump(Source(**event.detail["source"]))
         case "flows/segments_added":

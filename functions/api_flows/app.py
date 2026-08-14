@@ -51,9 +51,11 @@ from neptune import (
 from schema import (
     Contentformat,
     Deletionrequest,
-    Flow,
     Flowcollection,
     FlowcollectionItem,
+    Flowget,
+    Flowput,
+    Flowput3,
     Flowstorage,
     Flowstoragepost,
     Httprequest,
@@ -179,7 +181,7 @@ def get_flows(
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump([Flow(item) for item in items]),
+        body=model_dump([Flowget(item) for item in items]),
         headers=custom_headers,
     )
 
@@ -210,17 +212,32 @@ def get_flow_by_id(
         )
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump(Flow(item)), HTTPStatus.OK.value  # 200
+    return model_dump(Flowget(item)), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
 def put_flow_by_id(
-    flow: Annotated[Flow, Body()],
+    flow: Annotated[Flowput, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     if flow.root.id.root != flow_id:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
+    # The profile_id is read from the raw body rather than the parsed model: when
+    # both profile_id and technical metadata are supplied the model resolves to a
+    # non-profile variant and silently discards profile_id, so the parsed model
+    # cannot distinguish that case from a valid technical-metadata-only request.
+    supplied_profile_id = (app.current_event.json_body or {}).get("profile_id")
+    if supplied_profile_id is not None:
+        if not isinstance(flow.root, Flowput3):
+            raise BadRequestError(
+                "Bad request. When supplying a profile_id no metadata which can be contained in a Profile may also be provided."
+            )  # 400
+        # TODO: Remove once Profiles are implemented, at which point the profile
+        # is resolved and its technical metadata materialised onto the Flow.
+        raise BadRequestError(
+            "Bad request. Creating a Flow from a profile_id is not yet supported."
+        )  # 400
     # Validate vfr vs frame_rate essence_parameters as pydantic model not able to enforce conditions
     if flow.root.format.value == Contentformat.urn_x_nmos_format_video.value:
         validate_frame_rate(model_dump(flow.root.essence_parameters))
@@ -257,7 +274,7 @@ def put_flow_by_id(
         flow.root.created_by = username
     if not flow.root.updated_by and existing_item:
         flow.root.updated_by = username
-    item_dict = model_dump(Flow(merge_source_flow(model_dump(flow), existing_item)))
+    item_dict = model_dump(Flowget(merge_source_flow(model_dump(flow), existing_item)))
     publish_event(
         (f"{record_type}s/updated" if existing_item else f"{record_type}s/created"),
         {record_type: item_dict},
@@ -821,7 +838,7 @@ def post_flow_storage_by_id(
         raise ForbiddenError(
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
-    flow: Flow = Flow(item)
+    flow: Flowget = Flowget(item)
     if flow.root.container is None:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
@@ -829,7 +846,7 @@ def post_flow_storage_by_id(
     content_type = (
         flow_storage_post.content_type.root
         if flow_storage_post.content_type
-        else flow.root.container.root
+        else flow.root.container
     )
     presigned = (
         True if flow_storage_post.presigned is None else flow_storage_post.presigned
