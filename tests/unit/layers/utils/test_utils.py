@@ -250,6 +250,32 @@ class TestUtils:
         # Ensure misc properties are included appropriately
         assert return_dict["properties"]["misc"] == query_parameters["misc"]
 
+    def test_parse_api_gw_parameters_tag_value_matches_array_member(self):
+        """A tag filter must match a member of an array-valued tag.
+
+        Tag values may be arrays from spec 8.2, but there is no array-specific
+        branch in parse_api_gw_parameters. It works because serialise_tags_dict
+        stores every value as JSON and the filter searches for the value wrapped
+        in quotes, which is a substring of the serialised array. That is an
+        implicit contract between two functions, so it is asserted directly
+        against json.dumps output rather than against a hand-written literal.
+        """
+        _, where_literals = utils.parse_api_gw_parameters(
+            {"tag_values": {"colour": "green"}}
+        )
+
+        assert where_literals == ['(t.`colour` CONTAINS "\\"green\\"")']
+
+        # The literal's operand is what CONTAINS is applied to in Neptune, so
+        # substring behaviour against the stored form can be checked here.
+        operand = json.loads(where_literals[0].split(" CONTAINS ", 1)[1][:-1])
+        assert operand in json.dumps(["red", "green"])  # member of an array
+        assert operand in json.dumps("green")  # unchanged for a scalar
+        # Quoting is what prevents a partial match; without it "green" would be
+        # found inside "greenish" and inside a same-prefixed sibling tag value.
+        assert operand not in json.dumps("greenish")
+        assert operand not in json.dumps(["greenish", "evergreen"])
+
     def test_filter_dict_removes_keys(self):
         input_dict = {"a": 1, "b": 2, "c": 3}
 

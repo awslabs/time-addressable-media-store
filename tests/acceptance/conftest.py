@@ -269,6 +269,9 @@ def stub_multi_flow():
             "input_quality": "contribution",
             "flow_status": "ingesting",
             "test": "this",
+            # Array-valued tag (allowed from 8.2). Only present on the multi
+            # Flow, so tag.test_list identifies it uniquely.
+            "test_list": ["this", "that"],
         },
         "container": "video/mp2t",
         "flow_collection": [
@@ -364,6 +367,9 @@ def stub_multi_source():
             "input_quality": "contribution",
             "flow_status": "ingesting",
             "test": "this",
+            # Array-valued tag (allowed from 8.2). Only present on the multi
+            # Source, so tag.test_list identifies it uniquely.
+            "test_list": ["this", "that"],
         },
         "source_collection": [
             {"id": "00000000-0000-1000-8000-000000000000", "role": "video"},

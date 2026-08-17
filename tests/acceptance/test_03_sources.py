@@ -545,6 +545,37 @@ def test_List_Sources_GET_200_tag_name(api_client_cognito, stub_multi_source):
     assert_equal_unordered([stub_multi_source], response_json)
 
 
+def test_List_Sources_GET_200_tag_name_array(api_client_cognito, stub_multi_source):
+    """List sources with tag.{name} matching one member of an array-valued tag
+
+    Tag values may be arrays from 8.2. There is no array-specific code path:
+    tags are stored JSON-serialised, so ["this", "that"] is stored as the text
+    '["this", "that"]', and the filter searches for the quote-wrapped value
+    '"that"', which is a substring of it. The same quoting is what stops a
+    partial value matching, so a change to either half would silently break
+    membership -- and nothing else pins it, since every other tag filter test
+    uses a scalar.
+
+    "that" is used rather than "this" deliberately: matching a non-first member
+    shows this is genuine membership and not a prefix match on the serialised
+    form. It also avoids the value used by tag.test above, so a regression that
+    confused the two tags could not pass by coincidence.
+    """
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"tag.test_list": "that"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 1 == len(response_json)
+    assert_equal_unordered([stub_multi_source], response_json)
+
+
 def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
     """List sources with tag_exists.{name} query specified"""
     # Arrange
