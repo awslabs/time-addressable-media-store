@@ -369,6 +369,26 @@ def test_List_Flows_HEAD_200_codec(api_client_cognito):
     assert_json_response(response, 200, empty_body=True)
 
 
+def test_List_Flows_HEAD_200_collected_by_ids(api_client_cognito, stub_multi_flow):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"collected_by_ids": stub_multi_flow["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_List_Flows_HEAD_200_collected_by_ids_empty(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("HEAD", path, params={"collected_by_ids": ""})
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
 def test_List_Flows_HEAD_200_format(api_client_cognito):
     # Arrange
     path = "/flows"
@@ -500,6 +520,30 @@ def test_List_Flows_HEAD_400_codec(api_client_cognito):
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"codec": "audio/aac", "timerange": "bad"}
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_List_Flows_HEAD_400_collected_by_ids(api_client_cognito, stub_multi_flow):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"collected_by_ids": stub_multi_flow["id"], "timerange": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_List_Flows_HEAD_400_collected_by_ids_malformed(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"collected_by_ids": "not-a-uuid"}
     )
     # Assert
     assert_json_response(response, 400, empty_body=True)
@@ -670,6 +714,81 @@ def test_List_Flows_GET_200_codec(api_client_cognito, stub_audio_flow):
     response_json = remove_dynamic_props(response.json())
     assert 1 == len(response_json)
     assert_equal_unordered([stub_audio_flow], response_json)
+
+
+def test_List_Flows_GET_200_collected_by_ids(
+    api_client_cognito,
+    stub_multi_flow,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_image_flow,
+):
+    """List flows collected by the given Flow id"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"collected_by_ids": stub_multi_flow["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 4 == len(response_json)
+    assert_equal_unordered(
+        [stub_video_flow, stub_audio_flow, stub_data_flow, stub_image_flow],
+        response_json,
+    )
+
+
+def test_List_Flows_GET_200_collected_by_ids_multiple(
+    api_client_cognito,
+    stub_multi_flow,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_image_flow,
+):
+    """List flows collected by any of the given Flow ids
+
+    Multiple ids are OR-ed, so pairing the real collecting Flow with one that
+    collects nothing must not narrow the result set.
+    """
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": f"{stub_multi_flow['id']},{ID_404}"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 4 == len(response_json)
+    assert_equal_unordered(
+        [stub_video_flow, stub_audio_flow, stub_data_flow, stub_image_flow],
+        response_json,
+    )
+
+
+def test_List_Flows_GET_200_collected_by_ids_empty(
+    api_client_cognito, stub_multi_flow, stub_init_flow
+):
+    """List only flows that no other Flow collects
+
+    An empty value is a filter, not an absent one: it must return the
+    uncollected Flows rather than all six.
+    """
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"collected_by_ids": ""})
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 2 == len(response_json)
+    assert_equal_unordered([stub_multi_flow, stub_init_flow], response_json)
 
 
 def test_List_Flows_GET_200_format(api_client_cognito, stub_data_flow):
@@ -909,6 +1028,38 @@ def test_List_Flows_GET_400_codec(api_client_cognito):
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"codec": "audio/aac", "timerange": "bad"}
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_List_Flows_GET_400_collected_by_ids(api_client_cognito, stub_multi_flow):
+    """List flows with collected_by_ids query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": stub_multi_flow["id"], "timerange": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_List_Flows_GET_400_collected_by_ids_malformed(api_client_cognito):
+    """List flows with a collected_by_ids value that is not a UUID list"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"collected_by_ids": "not-a-uuid"}
     )
     # Assert
     assert_json_response(response, 400)

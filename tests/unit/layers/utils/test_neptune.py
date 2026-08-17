@@ -1,7 +1,7 @@
 import pytest
 
 # pylint: disable=no-name-in-module
-from neptune import build_order_by
+from neptune import build_order_by, collected_by_where_literal
 
 pytestmark = [
     pytest.mark.unit,
@@ -133,3 +133,66 @@ class TestBuildOrderBy:
         ]:
             cols, _ = build_order_by("source", sort_by, True, datetime_cols)
             assert cols[0] == f"(source.{sort_by} IS NULL) DESC"
+
+
+class TestCollectedByWhereLiteral:
+    """Tests for collected_by_where_literal.
+
+    The filter is three-state and every state is driven by the raw query string,
+    so None and "" must stay distinct: absent means "apply no filter", empty
+    means "only entities that nothing collects". Both are falsy, so a truthiness
+    check (`if not collected_by_ids`) would collapse them and silently turn an
+    unfiltered list request into an uncollected-only one. That split is asserted
+    explicitly rather than left to coincidence.
+
+    The returned literal is appended to a list of WHERE clauses that are joined
+    with AND, so the id form must be bracketed as a single unit -- unbracketed,
+    `a OR b` would bind as `... AND a OR b` and widen the result set. Hence the
+    assertions on exact bracketing rather than on substrings. The uncollected
+    form needs no brackets because `NOT exists(...)` is already a single term.
+
+    The patterns are the real ones from query_flows, so the expected values are
+    the literals actually sent to Neptune.
+    """
+
+    NOT_COLLECTED = "(flow)-[:collected_by]->(:flow)"
+    ID_A = "10000000-0000-1000-8000-000000000003"
+    ID_B = "10000000-0000-1000-8000-000000000009"
+
+    @staticmethod
+    def by_id(collected_by_id):
+        return f'(flow)-[:collected_by]->(:flow {{id: "{collected_by_id}"}})'
+
+    def test_none_applies_no_filter(self):
+        assert collected_by_where_literal(None, self.NOT_COLLECTED, self.by_id) is None
+
+    def test_empty_string_selects_uncollected(self):
+        assert (
+            collected_by_where_literal("", self.NOT_COLLECTED, self.by_id)
+            == "NOT exists((flow)-[:collected_by]->(:flow))"
+        )
+
+    def test_none_and_empty_string_are_not_equivalent(self):
+        # Both are falsy but only "" is a filter; guards the collapse regression.
+        assert collected_by_where_literal(
+            None, self.NOT_COLLECTED, self.by_id
+        ) != collected_by_where_literal("", self.NOT_COLLECTED, self.by_id)
+
+    def test_single_id_is_wrapped_in_exists(self):
+        assert collected_by_where_literal(
+            self.ID_A, self.NOT_COLLECTED, self.by_id
+        ) == (f'(exists((flow)-[:collected_by]->(:flow {{id: "{self.ID_A}"}})))')
+
+    def test_multiple_ids_are_or_ed_within_one_group(self):
+        assert collected_by_where_literal(
+            f"{self.ID_A},{self.ID_B}", self.NOT_COLLECTED, self.by_id
+        ) == (
+            f'(exists((flow)-[:collected_by]->(:flow {{id: "{self.ID_A}"}}))'
+            f' OR exists((flow)-[:collected_by]->(:flow {{id: "{self.ID_B}"}})))'
+        )
+
+    def test_id_form_is_bracketed_for_any_number_of_ids(self):
+        for value in [self.ID_A, f"{self.ID_A},{self.ID_B}"]:
+            literal = collected_by_where_literal(value, self.NOT_COLLECTED, self.by_id)
+            assert literal.startswith("(")
+            assert literal.endswith(")")
