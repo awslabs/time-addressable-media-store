@@ -44,10 +44,15 @@ def generate_opencyher_query(event_type, where_conditions):
             " AND "
             + rf'(webhook.SERIALISE_{k} IS NULL OR webhook.SERIALISE_{k} CONTAINS "\"{v}\"")'
         )
-    # Add collected_by exclusions at the end (to match actual query order)
+    # Add collected_by conditions at the end (to match actual query order). An
+    # absent filter (NULL) and an empty list ("[]") both match an event carrying
+    # no collected_by resources -- an empty list means "collected by nothing".
     for k in ["flow_collected_by_ids", "source_collected_by_ids"]:
         if k not in where_conditions:
-            where_expression += " AND " + rf"webhook.SERIALISE_{k} IS NULL"
+            where_expression += (
+                " AND "
+                + rf'(webhook.SERIALISE_{k} IS NULL OR webhook.SERIALISE_{k} = "[]")'
+            )
     return (
         r"MATCH (webhook: webhook)-[: has_tags]->(t: tags) WHERE "
         + rf'webhook.status IN ["created", "started"] AND webhook.SERIALISE_events CONTAINS "\"{event_type}\""'
@@ -1047,3 +1052,92 @@ def test_segments_added_using_external_storage(
     for key, value in message_body["item"].items():
         if value:
             assert value == webhook_item[key]
+
+
+# These clauses are written out rather than built by generate_opencyher_query.
+# That helper mirrors the production logic, so a change made identically in both
+# would leave every test above green while changing which webhooks match.
+FLOW_UNCOLLECTED_CLAUSE = (
+    "(webhook.SERIALISE_flow_collected_by_ids IS NULL "
+    'OR webhook.SERIALISE_flow_collected_by_ids = "[]")'
+)
+SOURCE_UNCOLLECTED_CLAUSE = (
+    "(webhook.SERIALISE_source_collected_by_ids IS NULL "
+    'OR webhook.SERIALISE_source_collected_by_ids = "[]")'
+)
+
+
+# pylint: disable=redefined-outer-name
+def test_uncollected_event_matches_empty_collected_by_filter(
+    lambda_context, webhooks, mock_neptune_client
+):
+    """An event carrying no collected_by resources must reach webhooks whose
+    collected_by filter is an empty array as well as those with no filter.
+
+    From 8.2 an empty array is not "no filter": it limits events to resources
+    collected by nothing, so both are valid matches here. The two stay
+    distinguishable in the graph because serialise_neptune_obj stores an empty
+    list as the text "[]" rather than collapsing it to NULL.
+    """
+    # Arrange
+    mock_neptune_client.execute_open_cypher_query.return_value = {"results": []}
+    # flows/deleted needs no Segment or storage setup and no webhook is returned,
+    # so only the query is exercised.
+    event = {
+        "detail-type": "flows/deleted",
+        "resources": [f"tams:flow:{SAMPLE_FLOW_ID}"],
+        "detail": {"flow_id": SAMPLE_FLOW_ID},
+    }
+
+    # Act
+    webhooks.lambda_handler(event, lambda_context)
+    query = mock_neptune_client.execute_open_cypher_query.call_args.kwargs[
+        "openCypherQuery"
+    ]
+
+    # Assert
+    assert FLOW_UNCOLLECTED_CLAUSE in query
+    assert SOURCE_UNCOLLECTED_CLAUSE in query
+
+
+def test_collected_event_excludes_empty_collected_by_filter(
+    lambda_context, webhooks, mock_neptune_client
+):
+    """An event carrying collected_by resources must not reach webhooks whose
+    collected_by filter is an empty array.
+
+    The exclusion is implicit: the id group is satisfied by IS NULL or by
+    CONTAINS the id, and "[]" is neither. What is asserted is that the group is
+    emitted without an empty-array alternative, since adding one there would
+    deliver every collected resource's events to an uncollected-only webhook.
+    """
+    # Arrange
+    flow_collection_id = str(uuid.uuid4())
+    source_collection_id = str(uuid.uuid4())
+    mock_neptune_client.execute_open_cypher_query.return_value = {"results": []}
+    event = {
+        "detail-type": "flows/deleted",
+        "resources": [
+            f"tams:flow:{SAMPLE_FLOW_ID}",
+            f"tams:flow-collected-by:{flow_collection_id}",
+            f"tams:source-collected-by:{source_collection_id}",
+        ],
+        "detail": {"flow_id": SAMPLE_FLOW_ID},
+    }
+
+    # Act
+    webhooks.lambda_handler(event, lambda_context)
+    query = mock_neptune_client.execute_open_cypher_query.call_args.kwargs[
+        "openCypherQuery"
+    ]
+
+    # Assert
+    for attr, collection_id in [
+        ("flow_collected_by_ids", flow_collection_id),
+        ("source_collected_by_ids", source_collection_id),
+    ]:
+        assert (
+            rf'(webhook.SERIALISE_{attr} IS NULL OR webhook.SERIALISE_{attr} CONTAINS "\"{collection_id}\"")'
+            in query
+        )
+        assert f'webhook.SERIALISE_{attr} = "[]"' not in query

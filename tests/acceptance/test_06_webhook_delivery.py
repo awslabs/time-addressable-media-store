@@ -3,6 +3,7 @@ import logging
 import pytest
 from conftest import WEBHOOK_VERIFICATION_ENABLED
 from webhook_helpers import (
+    get_event_key,
     get_resource_id,
     get_source_id_from_event,
     validate_webhook_body_matches,
@@ -173,3 +174,106 @@ def test_collected_source_webhook(webhook_test_data, stub_multi_source):
                             f"Expected verbose storage fields (one of {verbose_fields}), got {get_url.keys()}"
                         )
     logger.info(f"All {len(events)} events are collected sources with verbose storage")
+
+
+def test_uncollected_flow_webhook(webhook_test_data, stub_multi_flow):
+    """Validate an empty flow_collected_by_ids limits events to Flows uncollected
+    *at the time of the event*.
+
+    An empty array is not "no filter": per 8.2 it means "only Flows not collected by
+    any Flow Collection". Being collected is not a fixed property of a Flow, though --
+    the four collected Flows are created before the collecting Flow exists, so their
+    flows/created events are legitimately delivered here. So this does not assert a
+    fixed set of Flow IDs. What must hold is that no single event reaches both this
+    webhook and test-events-collected-flow: an event either carries flow-collected-by
+    resources or it does not, and stub_multi_flow is the only Flow Collection in the
+    fixture set. A regression treating [] as absent would deliver every Flow's events
+    here and break that.
+
+    Where the Flow object is in the body it carries the Flow's collected_by as it was
+    at the time of the event, which is the property being filtered on, so that is
+    asserted directly too.
+    """
+    # Arrange
+    uncollected = webhook_test_data["webhooks"].get("test-events-uncollected-flow")
+    collected = webhook_test_data["webhooks"].get("test-events-collected-flow")
+    assert uncollected is not None, "test-events-uncollected-flow webhook not found"
+    assert collected is not None, "test-events-collected-flow webhook not found"
+    uncollected_events = uncollected.get("events", [])
+    collected_events = collected.get("events", [])
+    assert len(uncollected_events) > 0, "uncollected_flow webhook received no events"
+    assert len(collected_events) > 0, "collected_flow webhook received no events"
+    # Act
+    collected_keys = {get_event_key(event["body"]) for event in collected_events}
+    # Assert
+    for event in uncollected_events:
+        body = event["body"]
+        event_type = body["event_type"]
+        assert get_event_key(body) not in collected_keys, (
+            f"{event_type}: event for Flow {get_resource_id(body, event_type)} was "
+            f"delivered to both an empty and a populated flow_collected_by_ids "
+            f"webhook, which are mutually exclusive"
+        )
+        flow = body.get("event", {}).get("flow", {})
+        assert not flow.get("collected_by"), (
+            f"{event_type}: Flow {flow.get('id')} reports collected_by "
+            f"{flow.get('collected_by')}, so an empty flow_collected_by_ids must "
+            f"exclude it"
+        )
+    # stub_multi_flow is never collected by anything, so its events arrive only here.
+    assert any(
+        get_resource_id(event["body"], event["body"]["event_type"])
+        == stub_multi_flow["id"]
+        for event in uncollected_events
+        if event["body"]["event_type"].startswith("flows/")
+    ), f"no events for the uncollected Flow {stub_multi_flow['id']}"
+    logger.info(
+        f"All {len(uncollected_events)} events were for Flows uncollected at the time"
+    )
+
+
+def test_uncollected_source_webhook(webhook_test_data, stub_multi_source):
+    """Validate an empty source_collected_by_ids limits events to Sources uncollected
+    *at the time of the event*.
+
+    As for Flows, and for the same reason not an assertion over a fixed set of Source
+    IDs. source_collected_by_ids applies to Flow and Flow Segment events too, so the
+    mutual-exclusion check covers every event type, while the direct collected_by
+    check applies only to sources/* events, whose body carries the Source object.
+    """
+    # Arrange
+    uncollected = webhook_test_data["webhooks"].get("test-events-uncollected-source")
+    collected = webhook_test_data["webhooks"].get("test-events-collected-source")
+    assert uncollected is not None, "test-events-uncollected-source webhook not found"
+    assert collected is not None, "test-events-collected-source webhook not found"
+    uncollected_events = uncollected.get("events", [])
+    collected_events = collected.get("events", [])
+    assert len(uncollected_events) > 0, "uncollected_source webhook received no events"
+    assert len(collected_events) > 0, "collected_source webhook received no events"
+    # Act
+    collected_keys = {get_event_key(event["body"]) for event in collected_events}
+    # Assert
+    for event in uncollected_events:
+        body = event["body"]
+        event_type = body["event_type"]
+        assert get_event_key(body) not in collected_keys, (
+            f"{event_type}: event for Source "
+            f"{get_source_id_from_event(body, event_type)} was delivered to both an "
+            f"empty and a populated source_collected_by_ids webhook, which are "
+            f"mutually exclusive"
+        )
+        source = body.get("event", {}).get("source", {})
+        assert not source.get("collected_by"), (
+            f"{event_type}: Source {source.get('id')} reports collected_by "
+            f"{source.get('collected_by')}, so an empty source_collected_by_ids must "
+            f"exclude it"
+        )
+    # stub_multi_source is never collected, so its events arrive only here.
+    assert any(
+        get_source_id_from_event(event["body"], event["body"]["event_type"])
+        == stub_multi_source["id"]
+        for event in uncollected_events
+    ), f"no events for the uncollected Source {stub_multi_source['id']}"
+    logger.info(
+        f"All {len(uncollected_events)} events were for Sources uncollected at the time"
+    )

@@ -1135,11 +1135,19 @@ def get_matching_webhooks(event: EventBridgeEvent) -> list[Webhookfull]:
             resource_conditions.append(
                 rf'webhook.{constants.SERIALISE_PREFIX}{attr} CONTAINS "\"{resource_id}\""'
             )
+        # An empty collected_by filter means "only resources collected by nothing",
+        # so it must not match here. No condition is needed for that: "[]" is
+        # neither NULL nor CONTAINS any id, so it already fails this group.
         where_literals.append(f"({' OR '.join(resource_conditions)})")
-    # Explicitly exclude webhooks with collected_by filters when event has no collected_by resources
+    # Exclude webhooks whose collected_by filter cannot match an event carrying no
+    # collected_by resources. An absent filter (NULL) means "no filter" and an
+    # empty list means "only resources collected by nothing" -- per spec 8.2 both
+    # match here. They stay distinguishable because serialise_neptune_obj stores
+    # an empty list as the text "[]" rather than collapsing it to NULL.
     for attr in ["flow_collected_by_ids", "source_collected_by_ids"]:
         if attr not in expressions:
-            where_literals.append(f"webhook.{constants.SERIALISE_PREFIX}{attr} IS NULL")
+            prop_name = f"webhook.{constants.SERIALISE_PREFIX}{attr}"
+            where_literals.append(f'({prop_name} IS NULL OR {prop_name} = "[]")')
     query = generate_webhook_query(
         {
             "webhook": {},

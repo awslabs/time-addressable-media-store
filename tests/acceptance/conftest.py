@@ -436,7 +436,7 @@ def webhook_verification_lifecycle(
     1. Deploy webhook-api-gateway stack
     2. Get stack outputs (API URL, API Key, Log Group)
     3. Get API key value from API Gateway
-    4. Register webhooks with TAMS API (5 webhooks with different filters)
+    4. Register webhooks with TAMS API (7 webhooks with different filters)
     5. [Tests run]
     6. Cleanup webhook registrations
     7. Delete CloudFormation stack
@@ -504,6 +504,21 @@ def webhook_verification_lifecycle(
                 "config": {
                     "source_collected_by_ids": [stub_multi_source["id"]],
                     "verbose_storage": True,
+                },
+            },
+            # An empty list is not "no filter": per 8.2 it limits events to
+            # resources collected by nothing. Registered as separate webhooks so
+            # the delivered set can be asserted against the collected ones above.
+            {
+                "identifier": "test-events-uncollected-flow",
+                "config": {
+                    "flow_collected_by_ids": [],
+                },
+            },
+            {
+                "identifier": "test-events-uncollected-source",
+                "config": {
+                    "source_collected_by_ids": [],
                 },
             },
         ]
