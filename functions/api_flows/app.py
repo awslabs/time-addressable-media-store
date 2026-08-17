@@ -56,6 +56,7 @@ from schema import (
     Flowget,
     Flowput,
     Flowput3,
+    Flowstatus,
     Flowstorage,
     Flowstoragepost,
     Httprequest,
@@ -118,6 +119,7 @@ def get_flows(
     param_init_segments: Annotated[Optional[bool], Query(alias="init_segments")] = None,
     param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
     param_sort_by: Annotated[Optional[FlowsSortBy], Query(alias="sort_by")] = None,
+    param_status: Annotated[Optional[Flowstatus], Query(alias="status")] = None,
     param_collected_by_ids: Annotated[
         Optional[str],
         Query(alias="collected_by_ids", pattern=UUIDLISTEMPTY_PATTERN),
@@ -144,6 +146,7 @@ def get_flows(
             "init_segments": param_init_segments,
             "reverse_order": reverse_order,
             "sort_by": param_sort_by.value if param_sort_by else None,
+            "status": param_status.value if param_status else None,
             "collected_by_ids": param_collected_by_ids,
             "page": param_page,
             "limit": param_limit,

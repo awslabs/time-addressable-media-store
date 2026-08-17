@@ -519,6 +519,7 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
                 "frame_width",
                 "frame_height",
                 "init_segments",
+                "status",
             ]
         }
     )

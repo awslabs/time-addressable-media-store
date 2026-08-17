@@ -231,6 +231,11 @@ def stub_data_flow():
         "essence_parameters": {
             "data_type": "text",
         },
+        # The only Flow with a status (8.2 field), so ?status= identifies it
+        # uniquely. Deliberately not "ingesting" like the legacy flow_status tag
+        # every fixture carries, so a filter reading the tag rather than the
+        # field would return the wrong Flows.
+        "status": "closed_complete",
         "read_only": True,
         "collected_by": ["10000000-0000-1000-8000-000000000003"],
     }

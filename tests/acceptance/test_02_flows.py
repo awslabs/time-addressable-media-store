@@ -470,6 +470,17 @@ def test_List_Flows_HEAD_200_source_id(api_client_cognito, stub_data_flow):
     assert_json_response(response, 200, empty_body=True)
 
 
+def test_List_Flows_HEAD_200_status(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"status": "closed_complete"}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
 def test_List_Flows_HEAD_200_tag_name(api_client_cognito):
     # Arrange
     path = "/flows"
@@ -633,6 +644,15 @@ def test_List_Flows_HEAD_400_source_id(api_client_cognito, stub_data_flow):
         path,
         params={"source_id": stub_data_flow["source_id"], "timerange": "bad"},
     )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_List_Flows_HEAD_400_status(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("HEAD", path, params={"status": "invalid"})
     # Assert
     assert_json_response(response, 400, empty_body=True)
 
@@ -970,6 +990,21 @@ def test_List_Flows_GET_200_source_id(api_client_cognito, stub_data_flow):
     assert_equal_unordered([stub_data_flow], response_json)
 
 
+def test_List_Flows_GET_200_status(api_client_cognito, stub_data_flow):
+    """List flows with status query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"status": stub_data_flow["status"]}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 1 == len(response_json)
+    assert_equal_unordered([stub_data_flow], response_json)
+
+
 def test_List_Flows_GET_200_tag_name(api_client_cognito, stub_multi_flow):
     """List flows with tag.{name} query specified"""
     # Arrange
@@ -1213,6 +1248,16 @@ def test_List_Flows_GET_400_source_id(api_client_cognito, stub_data_flow):
     response_json = response.json()
     assert isinstance(response_json["message"], list)
     assert 0 < len(response_json["message"])
+
+
+def test_List_Flows_GET_400_status(api_client_cognito):
+    """List flows with an invalid status value returns 400"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"status": "invalid"})
+    # Assert
+    assert_json_response(response, 400)
 
 
 def test_List_Flows_GET_400_tag_name(api_client_cognito):
