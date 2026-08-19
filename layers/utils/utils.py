@@ -285,8 +285,20 @@ def remove_null(obj: dict | list) -> None:
 
 
 @tracer.capture_method(capture_response=False)
-def parse_tag_parameters(params: None) -> tuple[dict, dict]:
-    """Parse Tags Value and Exist parameters from request query string parameters"""
+def parse_tag_parameters(
+    params: dict | None,
+    value_prefixes: tuple[str, ...] = ("tag", "flow_tag"),
+    exists_prefixes: tuple[str, ...] = ("tag_exists", "flow_tag_exists"),
+) -> tuple[dict, dict]:
+    """Parse Tags Value and Exist parameters from request query string parameters.
+
+    value_prefixes / exists_prefixes select which query parameter prefixes are
+    treated as tag-value and tag-existence filters. The defaults handle the
+    tag.{name} / tag_exists.{name} (and flow_ aliases) used by most endpoints;
+    a caller filtering on a different namespace -- e.g. storage_backend_tag.{name}
+    -- passes its own prefixes so the two do not collide on one request. Prefixes
+    are matched exactly, so "storage_backend_tag" is never mistaken for "tag".
+    """
     values = {}
     exists = {}
     if params is None:
@@ -296,25 +308,52 @@ def parse_tag_parameters(params: None) -> tuple[dict, dict]:
             key_prefix, key_name = key.split(".", 1)
         except ValueError:
             continue  # Key's without a "." cannot be tag keys so continue
-        match key_prefix:
-            case "tag" | "flow_tag":
-                values[key_name] = value
-            case "tag_exists" | "flow_tag_exists":
-                if value.lower() in ("true", "false"):
-                    exists[key_name] = value.lower() == "true"
-                else:
-                    raise BadRequestError(
-                        [
-                            {
-                                "type": "bool_parsing",
-                                "loc": ["query", key],
-                                "msg": "Input should be a valid boolean, unable to interpret input",
-                                "input": value,
-                                "url": "https://errors.pydantic.dev/2.10/v/bool_parsing",
-                            }
-                        ]
-                    )  # 400
+        if key_prefix in value_prefixes:
+            values[key_name] = value
+        elif key_prefix in exists_prefixes:
+            if value.lower() in ("true", "false"):
+                exists[key_name] = value.lower() == "true"
+            else:
+                raise BadRequestError(
+                    [
+                        {
+                            "type": "bool_parsing",
+                            "loc": ["query", key],
+                            "msg": "Input should be a valid boolean, unable to interpret input",
+                            "input": value,
+                            "url": "https://errors.pydantic.dev/2.10/v/bool_parsing",
+                        }
+                    ]
+                )  # 400
     return (values, exists)
+
+
+@tracer.capture_method(capture_response=False)
+def tags_match(item_tags: dict, tag_values: dict, tag_exists: dict) -> bool:
+    """Return True if an item's tags satisfy the given value and existence filters.
+
+    Mirrors the OpenCypher tag matching in parse_api_gw_parameters, but in Python
+    for tags held outside Neptune (e.g. Storage Backend tags in DynamoDB):
+      - value filters are comma-separated lists matched as OR; a match is on a
+        whole value, never a substring;
+      - where the tag's stored value is a list, a match on any member counts;
+      - an existence filter requires the tag to be present (True) or absent
+        (False).
+    All supplied filters must hold (AND across tag names).
+    """
+    item_tags = item_tags or {}
+    for tag_name, tag_value in tag_values.items():
+        if tag_name not in item_tags:
+            return False
+        wanted = {v.strip() for v in tag_value.split(",")}
+        stored = item_tags[tag_name]
+        stored_set = set(stored) if isinstance(stored, list) else {stored}
+        if wanted.isdisjoint(stored_set):
+            return False
+    for tag_name, must_exist in tag_exists.items():
+        if (tag_name in item_tags) != must_exist:
+            return False
+    return True
 
 
 @tracer.capture_method(capture_response=False)

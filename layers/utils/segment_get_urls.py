@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from aws_lambda_powertools import Tracer
 from dynamodb import list_storage_backends
 from schema import Storagebackend
-from utils import direct_s3_url, generate_presigned_url, model_dump
+from utils import direct_s3_url, generate_presigned_url, model_dump, tags_match
 
 tracer = Tracer()
 
@@ -79,11 +79,15 @@ def create_presigned_urls_parallel(url_set: set[str]) -> dict[str, str]:
 @tracer.capture_method(capture_response=False)
 def get_storage_backends(
     accept_storage_ids: Optional[str],
+    tag_values: Optional[dict] = None,
+    tag_exists: Optional[dict] = None,
 ) -> dict[str, dict]:
     """Get storage backend configurations for accepted storage ids.
 
     Args:
         accept_storage_ids: Comma-separated storage IDs to filter by
+        tag_values: storage_backend_tag.{name} filters (value in comma list)
+        tag_exists: storage_backend_tag_exists.{name} filters (presence)
 
     Returns:
         Dict mapping storage IDs to their backend configurations
@@ -92,6 +96,12 @@ def get_storage_backends(
         storage_backend["id"]: storage_backend
         for storage_backend in list_storage_backends()
     }
+    if tag_values or tag_exists:
+        storage_backends = {
+            k: v
+            for k, v in storage_backends.items()
+            if tags_match(v.get("tags"), tag_values or {}, tag_exists or {})
+        }
     if not accept_storage_ids:
         return storage_backends
     filter_ids = set(accept_storage_ids.split(",")) if accept_storage_ids else None
@@ -146,6 +156,8 @@ def populate_get_urls(
     accept_storage_ids: Optional[str] = None,
     presigned: Optional[bool] = None,
     include_storage_id: Optional[bool] = False,
+    storage_backend_tag_values: Optional[dict] = None,
+    storage_backend_tag_exists: Optional[dict] = None,
 ) -> None:
     """Populate the object get_urls based on the supplied parameters.
 
@@ -155,6 +167,8 @@ def populate_get_urls(
         verbose_storage: Whether to include verbose storage information
         accept_storage_ids: Comma-separated storage IDs to filter by
         presigned: Whether to generate presigned URLs only
+        storage_backend_tag_values: storage_backend_tag.{name} filters
+        storage_backend_tag_exists: storage_backend_tag_exists.{name} filters
     """
     # Early return if no urls are requested
     if accept_get_urls == "":
@@ -172,7 +186,11 @@ def populate_get_urls(
     filter_labels = (
         None if accept_get_urls is None else accept_get_urls.split(",")
     )  # Test explictly for None as empty string has special meaning but would be falsey
-    storage_backends = get_storage_backends(accept_storage_ids)
+    storage_backends = get_storage_backends(
+        accept_storage_ids,
+        storage_backend_tag_values,
+        storage_backend_tag_exists,
+    )
     default_storage_backend = next(
         (v for v in storage_backends.values() if v.get("default_storage")), None
     )

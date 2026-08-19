@@ -183,6 +183,63 @@ class TestUtils:
         with pytest.raises(BadRequestError):
             utils.parse_tag_parameters(params)
 
+    def test_parse_tag_parameters_custom_prefixes_isolate_namespaces(self):
+        """storage_backend_tag.{name} must parse only under its own prefixes and
+        never collide with the tag.{name} filters sharing the same request (the
+        objects endpoint uses both at once)."""
+        params = {
+            "tag.env": "prod",
+            "tag_exists.region": "true",
+            "storage_backend_tag.tier": "gold",
+            "storage_backend_tag_exists.zone": "false",
+        }
+        # Default prefixes see only the plain tag.* params.
+        values, exists = utils.parse_tag_parameters(params)
+        assert values == {"env": "prod"}
+        assert exists == {"region": True}
+        # Storage-backend prefixes see only their own params.
+        sb_values, sb_exists = utils.parse_tag_parameters(
+            params,
+            value_prefixes=("storage_backend_tag",),
+            exists_prefixes=("storage_backend_tag_exists",),
+        )
+        assert sb_values == {"tier": "gold"}
+        assert sb_exists == {"zone": False}
+
+    @pytest.mark.parametrize(
+        "item_tags,tag_values,tag_exists,expected",
+        [
+            # No filters -> everything matches
+            ({"env": "prod"}, {}, {}, True),
+            # String value, comma-separated OR
+            ({"env": "test"}, {"env": "prod,test"}, {}, True),
+            ({"env": "dev"}, {"env": "prod,test"}, {}, False),
+            # Array-valued tag: match on any member
+            ({"tier": ["silver", "bronze"]}, {"tier": "gold,silver"}, {}, True),
+            ({"tier": ["bronze"]}, {"tier": "gold,silver"}, {}, False),
+            # Whole-value match, never a substring
+            ({"env": "production"}, {"env": "prod"}, {}, False),
+            # Missing tag never satisfies a value filter
+            ({}, {"env": "prod"}, {}, False),
+            # Existence filters
+            ({"env": "prod"}, {}, {"env": True}, True),
+            ({}, {}, {"env": True}, False),
+            ({}, {}, {"env": False}, True),
+            ({"env": "prod"}, {}, {"env": False}, False),
+            # AND across tag names: every supplied filter must hold
+            ({"env": "prod", "tier": "gold"}, {"env": "prod"}, {"tier": True}, True),
+            ({"env": "prod"}, {"env": "prod"}, {"tier": True}, False),
+            # None item tags behaves as empty
+            (None, {}, {"env": False}, True),
+            (None, {"env": "prod"}, {}, False),
+        ],
+    )
+    def test_tags_match(self, item_tags, tag_values, tag_exists, expected):
+        assert utils.tags_match(item_tags, tag_values, tag_exists) is expected
+
+    def test_tags_match_strips_whitespace_around_values(self):
+        assert utils.tags_match({"env": "test"}, {"env": "prod, test"}, {}) is True
+
     def test_json_number_returns_float(self):
         input_float = "1.23"
         result = utils.json_number(input_float)

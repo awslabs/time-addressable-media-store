@@ -79,6 +79,11 @@ def get_objects_by_id(
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
     )
+    sb_tag_values, sb_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters,
+        value_prefixes=("storage_backend_tag",),
+        exists_prefixes=("storage_backend_tag_exists",),
+    )
     # An init Object is never a Segment's object_id; it is referenced
     # indirectly via init_object_id on Media Object Segments. Query the right
     # index: on a paged request the token itself indicates which index it came
@@ -155,6 +160,8 @@ def get_objects_by_id(
         param_verbose_storage,
         param_accept_storage_ids,
         param_presigned,
+        storage_backend_tag_values=sb_tag_values,
+        storage_backend_tag_exists=sb_tag_exists,
     )
     # Build init_object if any segment references one (never for an init
     # Object itself, which has no init_object).
@@ -180,6 +187,8 @@ def get_objects_by_id(
             param_verbose_storage,
             param_accept_storage_ids,
             param_presigned,
+            storage_backend_tag_values=sb_tag_values,
+            storage_backend_tag_exists=sb_tag_exists,
         )
         init_object_data = {
             "id": init_object_id,

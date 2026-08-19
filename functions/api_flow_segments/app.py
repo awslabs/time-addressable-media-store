@@ -49,6 +49,7 @@ from utils import (
     generate_failed_segment,
     generate_link_url,
     model_dump,
+    parse_tag_parameters,
     publish_event,
     put_message,
 )
@@ -165,12 +166,19 @@ def get_flow_segments_by_id(
             item.setdefault("object_timerange", item["timerange"])
         else:
             item.pop("object_timerange", None)
+    sb_tag_values, sb_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters,
+        value_prefixes=("storage_backend_tag",),
+        exists_prefixes=("storage_backend_tag_exists",),
+    )
     populate_get_urls(
         items,
         param_accept_get_urls,
         param_verbose_storage,
         param_accept_storage_ids,
         param_presigned,
+        storage_backend_tag_values=sb_tag_values,
+        storage_backend_tag_exists=sb_tag_exists,
     )
     schema_items = [Flowsegment(**item) for item in items]
     return Response(

@@ -42,7 +42,7 @@ from schema import (
     Webhookput,
 )
 from typing_extensions import Annotated
-from utils import generate_link_url, model_dump, parse_tag_parameters
+from utils import generate_link_url, model_dump, parse_tag_parameters, tags_match
 
 tracer = Tracer()
 logger = Logger()
@@ -256,6 +256,16 @@ def get_storage_backends(
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
     reverse_order = bool(param_reverse_order)
+    param_tag_values, param_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters
+    )
+    # Storage Backend tags live on the DynamoDB record (set out of band, not via
+    # the API); filter on them here as list_storage_backends holds no filter.
+    backends = [
+        backend
+        for backend in list_storage_backends()
+        if tags_match(backend.get("tags"), param_tag_values, param_tag_exists)
+    ]
     # list_storage_backends is lru_cached, so sort a copy rather than in place.
     # Storage Backends sort alphabetically by label by default; id is a unique
     # secondary key so pagination is deterministic when labels collide. Backends
@@ -263,7 +273,7 @@ def get_storage_backends(
     # reverse_order is set); the leading `label is None` flag separates the
     # groups so None is never compared against a str.
     storage_backends = sorted(
-        list_storage_backends(),
+        backends,
         key=lambda backend: (
             backend.get("label") is None,
             backend.get("label"),

@@ -1,5 +1,7 @@
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from conftest import (
     ID_404,
     REGION,
@@ -771,3 +773,69 @@ def test_Service_StorageBackends_GET_200_reverse_order(api_client_cognito):
     assert "True" == response.headers["X-Paging-Reverse-Order"]
     labels = [backend["label"] for backend in response.json()]
     assert labels == sorted(labels, reverse=True)
+
+
+# Storage Backend tags are set out of band directly on the DynamoDB record (there
+# is no API to set them), so a freshly deployed backend carries none. A positive
+# tag match is therefore not provable here -- only that a filter correctly
+# includes the untagged backend (tag_exists=false) or excludes it (any value
+# filter, or tag_exists=true). Real discrimination is covered by the functional
+# tier, whose fixture creates two tagged backends.
+def test_Service_StorageBackends_HEAD_200_tag_exists_false(api_client_cognito):
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"tag_exists.anything": "false"}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_Service_StorageBackends_GET_200_tag_exists_false(api_client_cognito):
+    """tag_exists=false matches the untagged deployed backend, so it is returned."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.anything": "false"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert 1 == len(response.json())
+
+
+def test_Service_StorageBackends_GET_200_tag_exists_true_empty(api_client_cognito):
+    """tag_exists=true excludes the untagged deployed backend, giving an empty list."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.anything": "true"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert 0 == len(response.json())
+
+
+def test_Service_StorageBackends_GET_200_tag_value_empty(api_client_cognito):
+    """A tag value filter excludes the untagged deployed backend."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"tag.anything": "value"})
+    # Assert
+    assert_json_response(response, 200)
+    assert 0 == len(response.json())
+
+
+def test_Service_StorageBackends_GET_400_bad_tag_exists(api_client_cognito):
+    """A non-boolean tag_exists value is a 400."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.anything": "notabool"}
+    )
+    # Assert
+    assert_json_response(response, 400)

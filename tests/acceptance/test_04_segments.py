@@ -4,6 +4,8 @@ import json
 
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from conftest import (
     ID_404,
     REGION,
@@ -1277,6 +1279,49 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
         assert 2 == len(record["get_urls"])
 
 
+# The deployed Storage Backend carries no tags (they are set out of band directly
+# on the DynamoDB record), so storage_backend_tag[_exists] filters can only be
+# proved by whether they include the untagged backend (tag_exists=false) or
+# exclude it (a value filter, or tag_exists=true). These segments' get_urls are
+# all controlled (from the default backend) with no stored uncontrolled ones, so
+# excluding the backend empties get_urls, which is then dropped from the body.
+def test_List_Flow_Segments_GET_200_storage_backend_tag_exists_false(
+    api_client_cognito, stub_video_flow
+):
+    """tag_exists=false matches the untagged backend, so its get_urls remain."""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"storage_backend_tag_exists.nonexistent": "false"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 30 == len(response_json)
+    for record in response_json:
+        assert "get_urls" in record
+        assert 2 == len(record["get_urls"])
+
+
+def test_List_Flow_Segments_GET_200_storage_backend_tag_excludes_backend(
+    api_client_cognito, stub_video_flow
+):
+    """A value filter matches no backend, so the backend's get_urls disappear."""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"storage_backend_tag.nonexistent": "value"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 30 == len(response_json)
+    for record in response_json:
+        assert "get_urls" not in record
+
+
 def test_List_Flow_Segments_GET_200_limit(api_client_cognito, stub_video_flow):
     """List segments with limit query specified"""
     # Arrange
@@ -2128,6 +2173,25 @@ def test_Get_Media_Object_Information_GET_200_with_verbose_false(
     assert "store_product" not in response_json["get_urls"][0]
     assert "storage_id" not in response_json["get_urls"][0]
     assert "controlled" not in response_json["get_urls"][0]
+
+
+def test_Get_Media_Object_Information_GET_200_storage_backend_tag_excludes_backend(
+    api_client_cognito, media_objects
+):
+    """A storage_backend_tag value filter matches no (untagged) backend, so the
+    Media Object's controlled get_urls disappear. As on the segments endpoint,
+    the deployed backend has no tags, so only exclusion is provable live."""
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"storage_backend_tag.nonexistent": "value"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert [] == response_json.get("get_urls", [])
 
 
 def test_Get_Media_Object_Information_GET_400(api_client_cognito, media_objects):
