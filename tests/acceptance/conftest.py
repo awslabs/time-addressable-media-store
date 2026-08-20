@@ -200,6 +200,20 @@ def stub_profile():
 
 
 @pytest.fixture(scope="session")
+def stub_profile_flow(stub_profile):
+    # A Flow created from stub_profile (§3.3). Profile-only PUT body: the technical
+    # metadata is materialised from the Profile's flow_metadata (video). Uses fresh
+    # ids so it doesn't collide with the stub flows/sources; created and deleted
+    # within its own test block.
+    return {
+        "id": "10000000-0000-1000-8000-0000000000f0",
+        "source_id": "00000000-0000-1000-8000-0000000000f0",
+        "profile_id": stub_profile["id"],
+        "label": "pytest - flow from profile",
+    }
+
+
+@pytest.fixture(scope="session")
 def stub_video_flow():
     return {
         "id": "10000000-0000-1000-8000-000000000000",
