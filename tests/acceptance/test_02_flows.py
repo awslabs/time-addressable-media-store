@@ -2890,6 +2890,61 @@ def test_Create_Flow_From_Profile_PUT_400_mutual_exclusion(
     assert_json_response(response, 400)
 
 
+# §3.5: profile_id filter on /flows. The GET-200 case needs a Flow linked to the
+# Profile, so it lives here in the create-from-Profile block (the linked Flow
+# created above, before it is unlinked/deleted below, is the only one linked to
+# stub_profile -> the filter returns exactly it). The HEAD/400 cases do not need
+# a matching Flow but are grouped here to keep the §3.5 tests together.
+def test_List_Flows_GET_200_profile_id(
+    api_client_cognito, stub_profile, stub_profile_flow
+):
+    """List Flows filtered by profile_id returns the profile-linked Flow."""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"profile_id": stub_profile["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
+    assert stub_profile_flow["id"] == response_json[0]["id"]
+    assert stub_profile["id"] == response_json[0]["profile_id"]
+
+
+def test_List_Flows_HEAD_200_profile_id(api_client_cognito, stub_profile):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"profile_id": stub_profile["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_List_Flows_GET_400_profile_id(api_client_cognito):
+    """List Flows with an invalid (non-UUID) profile_id returns 400"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"profile_id": "invalid"})
+    # Assert
+    assert_json_response(response, 400)
+
+
+def test_List_Flows_HEAD_400_profile_id(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"profile_id": "invalid"}
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
 def test_Flow_Avg_Bit_Rate_PUT_400_profile_linked(
     api_client_cognito, stub_profile_flow
 ):

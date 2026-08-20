@@ -561,6 +561,7 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
             in [
                 "format",
                 "codec",
+                "profile_id",
                 "label",
                 "tag_values",
                 "tag_exists",

@@ -113,6 +113,9 @@ def get_flows(
     param_codec: Annotated[
         Optional[str], Query(alias="codec", pattern=MIMETYPE_PATTERN)
     ] = None,
+    param_profile_id: Annotated[
+        Optional[str], Query(alias="profile_id", pattern=UUID_PATTERN)
+    ] = None,
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
     param_frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
@@ -138,6 +141,7 @@ def get_flows(
             "timerange": param_timerange,
             "format": param_format.value if param_format else None,
             "codec": param_codec,
+            "profile_id": param_profile_id,
             "label": param_label,
             "tag_values": param_tag_values,
             "tag_exists": param_tag_exists,
