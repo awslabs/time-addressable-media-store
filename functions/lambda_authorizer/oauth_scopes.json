@@ -44,6 +44,30 @@
             "tams-api/delete"
         ]
     },
+    "/service/profiles": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ]
+    },
+    "/service/profiles/{profileId}": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "POST": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
     "/service/webhooks": {
         "HEAD": [
             "tams-api/admin",

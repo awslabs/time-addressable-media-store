@@ -32,6 +32,23 @@ pytestmark = [
             "DELETE",
             ["tams-api/write", "tams-api/delete"],
         ),
+        ("/service/profiles", "HEAD", ["tams-api/write", "tams-api/delete"]),
+        ("/service/profiles", "GET", ["tams-api/write", "tams-api/delete"]),
+        (
+            "/service/profiles/20000000-0000-1000-8000-00000000000a",
+            "HEAD",
+            ["tams-api/write", "tams-api/delete"],
+        ),
+        (
+            "/service/profiles/20000000-0000-1000-8000-00000000000a",
+            "GET",
+            ["tams-api/write", "tams-api/delete"],
+        ),
+        (
+            "/service/profiles/20000000-0000-1000-8000-00000000000a",
+            "POST",
+            ["tams-api/read", "tams-api/delete"],
+        ),
         ("/sources", "HEAD", ["tams-api/write", "tams-api/delete"]),
         ("/sources", "GET", ["tams-api/write", "tams-api/delete"]),
         (

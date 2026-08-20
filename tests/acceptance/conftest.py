@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import time
+import uuid
 from copy import deepcopy
 
 import boto3
@@ -165,6 +166,37 @@ def init_media_objects():
 @pytest.fixture(scope="session")
 def delete_requests():
     return []
+
+
+@pytest.fixture(scope="session")
+def stub_profile():
+    # Profiles are immutable and have no delete endpoint, so a fresh random id
+    # per session avoids the create test failing on a re-run against a persistent
+    # store. The label embeds the id so it is unique across runs, letting the
+    # label filter assert an exact match despite Profiles accumulating.
+    profile_id = str(uuid.uuid4())
+    return {
+        "id": profile_id,
+        "label": f"pytest - profile {profile_id}",
+        "description": "pytest - profile",
+        "tags": {"encoder": "test"},
+        "flow_metadata": {
+            "format": "urn:x-nmos:format:video",
+            "codec": "video/h264",
+            "container": "video/mp2t",
+            "essence_parameters": {
+                "frame_rate": {"numerator": 50, "denominator": 1},
+                "frame_width": 1920,
+                "frame_height": 1080,
+                "bit_depth": 8,
+                "interlace_mode": "progressive",
+                "component_type": "YCbCr",
+                "horiz_chroma_subs": 2,
+                "vert_chroma_subs": 1,
+                "avc_parameters": {"profile": 122, "level": 42, "flags": 0},
+            },
+        },
+    }
 
 
 @pytest.fixture(scope="session")

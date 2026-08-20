@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Optional
 
@@ -26,12 +27,17 @@ from mediatimestamp.immutable import Timestamp
 from neptune import (
     check_node_exists,
     delete_webhook,
+    merge_profile,
     merge_webhook,
     query_node,
+    query_profiles,
     query_webhooks,
 )
 from schema import (
+    Contentformat,
     Eventstreamcommon,
+    Mimetype,
+    Profile,
     Service,
     Servicepost,
     Storagebackendslist,
@@ -42,7 +48,13 @@ from schema import (
     Webhookput,
 )
 from typing_extensions import Annotated
-from utils import generate_link_url, model_dump, parse_tag_parameters, tags_match
+from utils import (
+    generate_link_url,
+    get_username,
+    model_dump,
+    parse_tag_parameters,
+    tags_match,
+)
 
 tracer = Tracer()
 logger = Logger()
@@ -56,6 +68,7 @@ dynamodb = boto3.resource("dynamodb")
 service_table = dynamodb.Table(os.environ["SERVICE_TABLE"])
 
 UUID_PATTERN = Uuid.model_fields["root"].metadata[0].pattern
+MIMETYPE_PATTERN = Mimetype.model_fields["root"].metadata[0].pattern
 
 
 @app.head("/")
@@ -311,6 +324,89 @@ def get_storage_backends(
         ),
         headers=custom_headers,
     )
+
+
+@app.head("/service/profiles")
+@app.get("/service/profiles")
+@tracer.capture_method(capture_response=False)
+def get_profiles(
+    param_format: Annotated[Optional[Contentformat], Query(alias="format")] = None,
+    param_codec: Annotated[
+        Optional[str], Query(alias="codec", pattern=MIMETYPE_PATTERN)
+    ] = None,
+    param_label: Annotated[Optional[str], Query(alias="label")] = None,
+    param_page: Annotated[Optional[str], Query(alias="page")] = None,
+    param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
+):
+    custom_headers = {}
+    items, next_page, limit_used = query_profiles(
+        {
+            "format": param_format.value if param_format else None,
+            "codec": param_codec,
+            "label": param_label,
+            "page": param_page,
+            "limit": param_limit,
+        }
+    )
+    if next_page:
+        custom_headers["X-Paging-NextKey"] = str(next_page)
+        custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
+    if next_page or limit_used != param_limit:
+        custom_headers["X-Paging-Limit"] = str(limit_used)
+    custom_headers["X-Paging-Count"] = str(len(items))
+    if app.current_event.request_context.http_method == "HEAD":
+        return Response(
+            status_code=HTTPStatus.OK.value,  # 200
+            body=None,
+            headers=custom_headers,
+        )
+    return Response(
+        status_code=HTTPStatus.OK.value,  # 200
+        content_type=content_types.APPLICATION_JSON,
+        body=model_dump([Profile(**item) for item in items]),
+        headers=custom_headers,
+    )
+
+
+@app.head("/service/profiles/<profileId>")
+@app.get("/service/profiles/<profileId>")
+@tracer.capture_method(capture_response=False)
+def get_profile_by_id(
+    profile_id: Annotated[str, Path(alias="profileId", pattern=UUID_PATTERN)],
+):
+    try:
+        item = query_node("profile", profile_id)
+    except ValueError as e:
+        raise NotFoundError("The requested profile does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return model_dump(Profile(**item)), HTTPStatus.OK.value  # 200
+
+
+@app.post("/service/profiles/<profileId>")
+@tracer.capture_method(capture_response=False)
+def post_profile_by_id(
+    profile: Annotated[Profile, Body()],
+    profile_id: Annotated[str, Path(alias="profileId", pattern=UUID_PATTERN)],
+):
+    if profile.id.root != profile_id:
+        raise NotFoundError("The requested Profile ID in the path is invalid.")  # 404
+    # Profiles are immutable: recreating one would change the Flows already
+    # created from it, so an existing Profile must be rejected, not updated.
+    if check_node_exists("profile", profile_id):
+        raise BadRequestError(
+            "Bad request. The requested Profile already exists and Profiles are immutable."
+        )  # 400
+    # Profile.created is an AwareDatetime, so set a timezone-aware value; it
+    # round-trips through Neptune and is re-validated when the Profile is rebuilt.
+    profile.created = datetime.now(timezone.utc)
+    if not profile.created_by:
+        profile.created_by = get_username(app.current_event.request_context)
+    # Use the project model_dump (exclude_unset / exclude_none) rather than the raw
+    # pydantic dump, so unset defaults (e.g. essence_parameters.vfr=False) are not
+    # persisted or echoed back -- mirrors how put_flow_by_id dumps a Flow.
+    item = merge_profile(model_dump(profile))
+    return model_dump(Profile(**item)), HTTPStatus.CREATED.value  # 201
 
 
 @logger.inject_lambda_context(

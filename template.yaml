@@ -576,6 +576,36 @@ Resources:
             RestApiId: !Ref Api
             Path: /service/storage-backends
             Method: Get
+        headProfiles:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/profiles
+            Method: Head
+        getProfiles:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/profiles
+            Method: Get
+        headServiceProfileProfileId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/profiles/{profileId}
+            Method: Head
+        getServiceProfileProfileId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/profiles/{profileId}
+            Method: Get
+        postServiceProfileProfileId:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /service/profiles/{profileId}
+            Method: Post
         headServiceWebhooks:
           Type: Api
           Properties:
