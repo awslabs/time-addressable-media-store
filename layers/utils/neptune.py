@@ -779,9 +779,11 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
     )
     if existing_dict:
         existing_flow_collection = existing_dict.get("flow_collection", [])
-        # If there is an flow collection and it has changed delete it so that it is set correctly with the merge
+        # If there is a flow collection and it has changed delete it so that it is
+        # set correctly with the merge. Order matters (flow_collection is an
+        # ordered list), so this is order-sensitive: a pure reorder is a change.
         if existing_flow_collection and DeepDiff(
-            flow_collection, existing_flow_collection, ignore_order=True
+            flow_collection, existing_flow_collection, ignore_order=False
         ):
             set_flow_collection(flow_dict["id"], "temp", [])
         null_tags = {
@@ -1235,6 +1237,10 @@ def generate_flow_collection_query(
     ref_names = []
     for n, collection in enumerate(flow_collection):
         collection_properties = filter_dict(collection, {"id"})
+        # Persist list position on the collected_by edge so the ordered
+        # flow_collection (and the derived source_collection) can be restored on
+        # read; deserialise_neptune_obj sorts by it and strips it.
+        collection_properties["index"] = n
         ref_names.append((f"f{n}", f"c{n}", collection["id"], collection_properties))
     # Add the match queries for each flow_collection record
     for f_ref, _, f_id, _ in ref_names:

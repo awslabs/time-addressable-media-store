@@ -2301,6 +2301,75 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
     )
 
 
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+def test_Flow_Flow_Collection_ordering(
+    api_client_cognito,
+    stub_multi_flow,
+    stub_multi_source,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_image_flow,
+    expect_webhooks,
+):
+    """flow_collection is an ordered list (§3.9): the order PUT is the order
+    returned, on both the sub-resource and the whole Flow, and the derived
+    source_collection follows the same order. Reverses then restores the
+    fixture order so downstream tests are unaffected."""
+    # Arrange
+    fc_path = f"/flows/{stub_multi_flow['id']}/flow_collection"
+    flow_to_source = {
+        flow["id"]: flow["source_id"]
+        for flow in (stub_video_flow, stub_audio_flow, stub_data_flow, stub_image_flow)
+    }
+    reversed_collection = list(reversed(stub_multi_flow["flow_collection"]))
+    expected_flow_ids = [item["id"] for item in reversed_collection]
+    expected_source_ids = [flow_to_source[flow_id] for flow_id in expected_flow_ids]
+
+    # Act: PUT the collection in reversed order
+    response = api_client_cognito.request("PUT", fc_path, json=reversed_collection)
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": {**stub_multi_flow, "flow_collection": reversed_collection}
+            },
+        },
+    )
+    # The sub-resource GET returns the collection in the reversed order.
+    fc_response = api_client_cognito.request("GET", fc_path)
+    assert_json_response(fc_response, 200)
+    assert expected_flow_ids == [item["id"] for item in fc_response.json()]
+    # The whole-Flow GET returns flow_collection in the same order.
+    flow_response = api_client_cognito.request("GET", f"/flows/{stub_multi_flow['id']}")
+    assert_json_response(flow_response, 200)
+    assert expected_flow_ids == [
+        item["id"] for item in flow_response.json()["flow_collection"]
+    ]
+    # The derived source_collection on the multi Source follows the same order.
+    source_response = api_client_cognito.request(
+        "GET", f"/sources/{stub_multi_source['id']}"
+    )
+    assert_json_response(source_response, 200)
+    assert expected_source_ids == [
+        item["id"] for item in source_response.json()["source_collection"]
+    ]
+
+    # Restore the fixture order for downstream tests.
+    restore = api_client_cognito.request(
+        "PUT", fc_path, json=stub_multi_flow["flow_collection"]
+    )
+    assert_json_response(restore, 204, empty_body=True)
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {"flow": stub_multi_flow},
+        },
+    )
+
+
 def test_Create_or_Update_Flow_Flow_Collection_PUT_400(
     api_client_cognito, stub_video_flow
 ):
