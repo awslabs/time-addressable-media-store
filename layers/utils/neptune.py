@@ -409,10 +409,18 @@ def query_flow_collection(flow_id: str) -> list:
             .get()
         )
         results = execute_open_cypher_query(query)
-        return [
+        # This path deserialises each collection item on its own, so (unlike the
+        # whole-Flow read) it does not go through deserialise_neptune_obj's
+        # flow_collection branch -- order by the collected_by edge `index` and
+        # strip it here so the ordered list is returned without the internal key.
+        items = [
             deserialise_neptune_obj(item)
             for item in results["results"][0]["flow_collection"]
         ]
+        items.sort(key=lambda item: item.get("index", 0))
+        for item in items:
+            item.pop("index", None)
+        return items
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
 
