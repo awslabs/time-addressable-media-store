@@ -301,3 +301,20 @@ def get_source_id_from_event(body, event_type):
     else:
         flow_id = get_resource_id(body, event_type)
         return "0" + flow_id[1:]
+
+
+def get_event_key(body):
+    """Identity of the underlying event, shared by every webhook that receives it.
+
+    event_timestamp is the EventBridge event time, so it is identical across
+    deliveries of one event, whereas the delivered bodies are not: get_urls
+    filters such as presigned or verbose_storage differ per webhook. Used to
+    check that one event did not reach two webhooks with mutually exclusive
+    filters.
+    """
+    event_type = body["event_type"]
+    return (
+        body.get("event_timestamp"),
+        event_type,
+        get_resource_id(body, event_type),
+    )

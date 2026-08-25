@@ -51,9 +51,12 @@ from neptune import (
 from schema import (
     Contentformat,
     Deletionrequest,
-    Flow,
     Flowcollection,
     FlowcollectionItem,
+    Flowget,
+    Flowput,
+    Flowput3,
+    Flowstatus,
     Flowstorage,
     Flowstoragepost,
     Httprequest,
@@ -110,12 +113,16 @@ def get_flows(
     param_codec: Annotated[
         Optional[str], Query(alias="codec", pattern=MIMETYPE_PATTERN)
     ] = None,
+    param_profile_id: Annotated[
+        Optional[str], Query(alias="profile_id", pattern=UUID_PATTERN)
+    ] = None,
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_frame_width: Annotated[Optional[int], Query(alias="frame_width")] = None,
     param_frame_height: Annotated[Optional[int], Query(alias="frame_height")] = None,
     param_init_segments: Annotated[Optional[bool], Query(alias="init_segments")] = None,
     param_reverse_order: Annotated[Optional[bool], Query(alias="reverse_order")] = None,
     param_sort_by: Annotated[Optional[FlowsSortBy], Query(alias="sort_by")] = None,
+    param_status: Annotated[Optional[Flowstatus], Query(alias="status")] = None,
     param_collected_by_ids: Annotated[
         Optional[str],
         Query(alias="collected_by_ids", pattern=UUIDLISTEMPTY_PATTERN),
@@ -134,6 +141,7 @@ def get_flows(
             "timerange": param_timerange,
             "format": param_format.value if param_format else None,
             "codec": param_codec,
+            "profile_id": param_profile_id,
             "label": param_label,
             "tag_values": param_tag_values,
             "tag_exists": param_tag_exists,
@@ -142,6 +150,7 @@ def get_flows(
             "init_segments": param_init_segments,
             "reverse_order": reverse_order,
             "sort_by": param_sort_by.value if param_sort_by else None,
+            "status": param_status.value if param_status else None,
             "collected_by_ids": param_collected_by_ids,
             "page": param_page,
             "limit": param_limit,
@@ -179,7 +188,7 @@ def get_flows(
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump([Flow(item) for item in items]),
+        body=model_dump([Flowget(item) for item in items]),
         headers=custom_headers,
     )
 
@@ -210,17 +219,45 @@ def get_flow_by_id(
         )
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
-    return model_dump(Flow(item)), HTTPStatus.OK.value  # 200
+    return model_dump(Flowget(item)), HTTPStatus.OK.value  # 200
 
 
 @app.put("/flows/<flowId>")
 @tracer.capture_method(capture_response=False)
 def put_flow_by_id(
-    flow: Annotated[Flow, Body()],
+    flow: Annotated[Flowput, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     if flow.root.id.root != flow_id:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
+    # The profile_id is read from the raw body rather than the parsed model: when
+    # both profile_id and technical metadata are supplied the model resolves to a
+    # non-profile variant and silently discards profile_id, so the parsed model
+    # cannot distinguish that case from a valid technical-metadata-only request.
+    # An empty string is the explicit "unlink from Profile" signal (AppNote0020):
+    # it is ignored by the technical variant, falls through to the normal update
+    # path below, and merge_flow clears the stored profile_id (absent from the new
+    # properties), so no special handling is needed for it here.
+    supplied_profile_id = (app.current_event.json_body or {}).get("profile_id")
+    if supplied_profile_id:
+        if not isinstance(flow.root, Flowput3):
+            raise BadRequestError(
+                "Bad request. When supplying a profile_id no metadata which can be contained in a Profile may also be provided."
+            )  # 400
+        try:
+            profile = query_node("profile", supplied_profile_id)
+        except ValueError as e:
+            raise BadRequestError(
+                "Bad request. The requested profile_id does not exist."
+            ) from e  # 400
+        # Materialise the Profile's technical metadata onto the Flow (the store
+        # de-normalises the parameters so reads look the same however the Flow was
+        # created). Re-validate as the matching technical variant with profile_id
+        # stripped -- no technical variant carries it -- so the normal create logic
+        # below runs unchanged; profile_id is re-attached to the stored dict.
+        materialised = {**model_dump(flow.root), **profile["flow_metadata"]}
+        materialised.pop("profile_id", None)
+        flow = Flowput(**materialised)
     # Validate vfr vs frame_rate essence_parameters as pydantic model not able to enforce conditions
     if flow.root.format.value == Contentformat.urn_x_nmos_format_video.value:
         validate_frame_rate(model_dump(flow.root.essence_parameters))
@@ -257,7 +294,10 @@ def put_flow_by_id(
         flow.root.created_by = username
     if not flow.root.updated_by and existing_item:
         flow.root.updated_by = username
-    item_dict = model_dump(Flow(merge_source_flow(model_dump(flow), existing_item)))
+    flow_dict = model_dump(flow)
+    if supplied_profile_id:
+        flow_dict["profile_id"] = supplied_profile_id
+    item_dict = model_dump(Flowget(merge_source_flow(flow_dict, existing_item)))
     publish_event(
         (f"{record_type}s/updated" if existing_item else f"{record_type}s/created"),
         {record_type: item_dict},
@@ -286,19 +326,25 @@ def delete_flow_by_id(
     # Get flow timerange, if timerange is empty delete flow sync, otherwise return a delete request
     flow_timerange = TimeRange.from_str(get_flow_timerange(flow_id))
     if flow_timerange.is_empty():
+        # Resolve the event resources (source + collection membership) while the
+        # Flow still exists; deleting it first would drop the collected-by
+        # resources that webhook collection filters match on. The sources/deleted
+        # event takes only the source-typed entries so it doesn't route to
+        # flow-filtered webhooks.
+        event_resources = get_event_resources(item)
         source_id = delete_flow(flow_id)
         if source_id:
             publish_event(
                 f"{record_type}s/deleted",
                 {f"{record_type}_id": flow_id},
-                get_event_resources(item),
+                event_resources,
             )
         # Delete source if no longer referenced by any other flows
         if check_delete_source(source_id):
             publish_event(
                 "sources/deleted",
                 {"source_id": source_id},
-                enhance_resources([f"tams:source:{source_id}"]),
+                [r for r in event_resources if r.startswith("tams:source")],
             )
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request
@@ -712,6 +758,10 @@ def put_flow_avg_bit_rate(
         raise ForbiddenError(
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
+    if item.get("profile_id"):
+        raise BadRequestError(
+            "Bad request. avg_bit_rate is inherited from the Flow's Profile and cannot be changed while linked. Unlink the Flow from the Profile first."
+        )  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.avg_bit_rate": avg_bit_rate}
@@ -739,6 +789,10 @@ def delete_flow_avg_bit_rate(
         raise ForbiddenError(
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
+    if item.get("profile_id"):
+        raise BadRequestError(
+            "Bad request. avg_bit_rate is inherited from the Flow's Profile and cannot be changed while linked. Unlink the Flow from the Profile first."
+        )  # 400
     username = get_username(app.current_event.request_context)
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.avg_bit_rate": None}
@@ -821,7 +875,7 @@ def post_flow_storage_by_id(
         raise ForbiddenError(
             "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
         )  # 403
-    flow: Flow = Flow(item)
+    flow: Flowget = Flowget(item)
     if flow.root.container is None:
         raise BadRequestError(
             "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
@@ -829,7 +883,7 @@ def post_flow_storage_by_id(
     content_type = (
         flow_storage_post.content_type.root
         if flow_storage_post.content_type
-        else flow.root.container.root
+        else flow.root.container
     )
     presigned = (
         True if flow_storage_post.presigned is None else flow_storage_post.presigned

@@ -62,6 +62,32 @@ def test_List_Sources_HEAD_200(api_client_cognito):
     assert_json_response(response, 200, empty_body=True)
 
 
+def test_List_Sources_HEAD_200_collected_by_ids(api_client_cognito, stub_multi_source):
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"collected_by_ids": stub_multi_source["id"]},
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_List_Sources_HEAD_200_collected_by_ids_empty(api_client_cognito):
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"collected_by_ids": ""},
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
 def test_List_Sources_HEAD_200_label(api_client_cognito):
     # Arrange
     path = "/sources"
@@ -138,6 +164,32 @@ def test_List_Sources_HEAD_400(api_client_cognito):
         "HEAD",
         path,
         params={"format": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_List_Sources_HEAD_400_collected_by_ids(api_client_cognito, stub_multi_source):
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"collected_by_ids": stub_multi_source["id"], "format": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_List_Sources_HEAD_400_collected_by_ids_malformed(api_client_cognito):
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"collected_by_ids": "not-a-uuid"},
     )
     # Assert
     assert_json_response(response, 400, empty_body=True)
@@ -239,6 +291,91 @@ def test_List_Sources_GET_200(
         ],
         response_json,
     )
+
+
+def test_List_Sources_GET_200_collected_by_ids(
+    api_client_cognito,
+    stub_multi_source,
+    stub_video_source,
+    stub_audio_source,
+    stub_data_source,
+    stub_image_source,
+):
+    """List sources collected by the given Source id
+
+    Source collection is derived from the Flow graph: a Source is collected by
+    another Source when one of its Flows is collected by a Flow of that Source.
+    """
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": stub_multi_source["id"]},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 4 == len(response_json)
+    assert_equal_unordered(
+        [stub_video_source, stub_audio_source, stub_data_source, stub_image_source],
+        response_json,
+    )
+
+
+def test_List_Sources_GET_200_collected_by_ids_multiple(
+    api_client_cognito,
+    stub_multi_source,
+    stub_video_source,
+    stub_audio_source,
+    stub_data_source,
+    stub_image_source,
+):
+    """List sources collected by any of the given Source ids
+
+    Multiple ids are OR-ed, so pairing the real collecting Source with one that
+    collects nothing must not narrow the result set.
+    """
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": f"{stub_multi_source['id']},{ID_404}"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 4 == len(response_json)
+    assert_equal_unordered(
+        [stub_video_source, stub_audio_source, stub_data_source, stub_image_source],
+        response_json,
+    )
+
+
+def test_List_Sources_GET_200_collected_by_ids_empty(
+    api_client_cognito, stub_multi_source, stub_init_source
+):
+    """List only sources that no other Source collects
+
+    An empty value is a filter, not an absent one: it must return the
+    uncollected Sources rather than all six.
+    """
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": ""},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 2 == len(response_json)
+    assert_equal_unordered([stub_multi_source, stub_init_source], response_json)
 
 
 def test_List_Sources_GET_200_format(api_client_cognito, stub_data_source):
@@ -408,6 +545,37 @@ def test_List_Sources_GET_200_tag_name(api_client_cognito, stub_multi_source):
     assert_equal_unordered([stub_multi_source], response_json)
 
 
+def test_List_Sources_GET_200_tag_name_array(api_client_cognito, stub_multi_source):
+    """List sources with tag.{name} matching one member of an array-valued tag
+
+    Tag values may be arrays from 8.2. There is no array-specific code path:
+    tags are stored JSON-serialised, so ["this", "that"] is stored as the text
+    '["this", "that"]', and the filter searches for the quote-wrapped value
+    '"that"', which is a substring of it. The same quoting is what stops a
+    partial value matching, so a change to either half would silently break
+    membership -- and nothing else pins it, since every other tag filter test
+    uses a scalar.
+
+    "that" is used rather than "this" deliberately: matching a non-first member
+    shows this is genuine membership and not a prefix match on the serialised
+    form. It also avoids the value used by tag.test above, so a regression that
+    confused the two tags could not pass by coincidence.
+    """
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"tag.test_list": "that"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 1 == len(response_json)
+    assert_equal_unordered([stub_multi_source], response_json)
+
+
 def test_List_Sources_GET_200_tag_exists_name(api_client_cognito):
     """List sources with tag_exists.{name} query specified"""
     # Arrange
@@ -432,6 +600,40 @@ def test_List_Sources_GET_400(api_client_cognito):
         "GET",
         path,
         params={"format": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_List_Sources_GET_400_collected_by_ids(api_client_cognito, stub_multi_source):
+    """List sources with collected_by_ids query specified"""
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": stub_multi_source["id"], "format": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_List_Sources_GET_400_collected_by_ids_malformed(api_client_cognito):
+    """List sources with a collected_by_ids value that is not a UUID list"""
+    # Arrange
+    path = "/sources"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": "not-a-uuid"},
     )
     # Assert
     assert_json_response(response, 400)

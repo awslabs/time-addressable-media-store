@@ -185,6 +185,52 @@ def generate_webhook_query(
 
 @tracer.capture_method(capture_response=False)
 # pylint: disable=dangerous-default-value
+def generate_profile_query(
+    properties: dict, set_dict: dict = None, where_literals: list = []
+) -> cymple.builder.NodeAvailable:
+    """Returns an Open Cypher Match query to return specified Profile.
+
+    The technical metadata is decomposed like a Flow's: a flow_metadata node holds
+    the scalar technical fields (format, codec, container, ...) as directly-queryable
+    properties, with essence_parameters as a child node (the existing node type).
+    So format/codec filters match the flow_metadata node and essence filters the
+    essence_parameters node -- no JSON blob.
+    """
+    query = (
+        qb.match()
+        .node(
+            ref_name="profile",
+            labels="profile",
+            properties=properties.get("profile", {}),
+        )
+        .related_to(label="has_flow_metadata")
+        .node(
+            ref_name="fm",
+            labels="flow_metadata",
+            properties=properties.get("flow_metadata", {}),
+        )
+        .match()
+        .node(ref_name="fm")
+        .related_to(label="has_essence_parameters")
+        .node(
+            ref_name="e",
+            labels="essence_parameters",
+            properties=properties.get("essence_parameters", {}),
+        )
+        .match()
+        .node(ref_name="profile")
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags", properties=properties.get("tags", {}))
+    )
+    if set_dict:
+        query = query.set(set_dict).with_("*")
+    if len(where_literals) > 0:
+        query = query.where_literal(" AND ".join(where_literals))
+    return query
+
+
+@tracer.capture_method(capture_response=False)
+# pylint: disable=dangerous-default-value
 def generate_match_query(
     record_type: str, properties: dict, set_dict: dict = None, where_literals: list = []
 ) -> cymple.builder.NodeAvailable:
@@ -198,6 +244,8 @@ def generate_match_query(
             return generate_delete_request_query(properties, set_dict, where_literals)
         case "webhook":
             return generate_webhook_query(properties, set_dict, where_literals)
+        case "profile":
+            return generate_profile_query(properties, set_dict, where_literals)
 
 
 @tracer.capture_method(capture_response=False)
@@ -361,10 +409,18 @@ def query_flow_collection(flow_id: str) -> list:
             .get()
         )
         results = execute_open_cypher_query(query)
-        return [
+        # This path deserialises each collection item on its own, so (unlike the
+        # whole-Flow read) it does not go through deserialise_neptune_obj's
+        # flow_collection branch -- order by the collected_by edge `index` and
+        # strip it here so the ordered list is returned without the internal key.
+        items = [
             deserialise_neptune_obj(item)
             for item in results["results"][0]["flow_collection"]
         ]
+        items.sort(key=lambda item: item.get("index", 0))
+        for item in items:
+            item.pop("index", None)
+        return items
     except IndexError as e:
         raise ValueError("No results returned from the database query.") from e
 
@@ -513,12 +569,14 @@ def query_flows(parameters: dict) -> tuple[list, int, int]:
             in [
                 "format",
                 "codec",
+                "profile_id",
                 "label",
                 "tag_values",
                 "tag_exists",
                 "frame_width",
                 "frame_height",
                 "init_segments",
+                "status",
             ]
         }
     )
@@ -650,6 +708,52 @@ def query_webhooks(parameters: dict) -> tuple[list, int, int]:
 
 
 @tracer.capture_method(capture_response=False)
+def query_profiles(parameters: dict) -> tuple[list, int, int]:
+    """Returns a list of the TAMS Profiles from the Neptune Database.
+
+    format and codec match the flow_metadata node's properties; label matches the
+    Profile node's own property -- splitting the filters across nodes as
+    generate_flow_query does for flow vs essence filters.
+    """
+    flow_metadata_props = {
+        k: parameters[k] for k in ("format", "codec") if parameters.get(k)
+    }
+    profile_props = {"label": parameters["label"]} if parameters.get("label") else {}
+    page = int(parameters.get("page") or 0)
+    limit = min(
+        (
+            parameters["limit"]
+            if parameters.get("limit")
+            else constants.DEFAULT_PAGE_LIMIT
+        ),
+        constants.MAX_PAGE_LIMIT,
+    )
+    order_cols, ascending = build_order_by(
+        "profile",
+        None,
+        parameters.get("reverse_order", False),
+        datetime_cols=set(),
+        default_col="label",
+    )
+    query = generate_profile_query(
+        {"profile": profile_props, "flow_metadata": flow_metadata_props}
+    )
+    query = (
+        query.return_literal(constants.RETURN_LITERAL["profile"])
+        .order_by(order_cols, ascending=ascending)
+        .skip(page)
+        .limit(limit)
+        .get()
+    )
+    results = execute_open_cypher_query(query)
+    deserialised_results = [
+        deserialise_neptune_obj(result["profile"]) for result in results["results"]
+    ]
+    next_page = page + limit if len(deserialised_results) == limit else None
+    return deserialised_results, next_page, limit
+
+
+@tracer.capture_method(capture_response=False)
 def merge_source(source_dict: dict) -> None:
     """Perform an OpenCypher Merge operation on the supplied TAMS Source record"""
     tags = source_dict.get("tags", {})
@@ -683,9 +787,11 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
     )
     if existing_dict:
         existing_flow_collection = existing_dict.get("flow_collection", [])
-        # If there is an flow collection and it has changed delete it so that it is set correctly with the merge
+        # If there is a flow collection and it has changed delete it so that it is
+        # set correctly with the merge. Order matters (flow_collection is an
+        # ordered list), so this is order-sensitive: a pure reorder is a change.
         if existing_flow_collection and DeepDiff(
-            flow_collection, existing_flow_collection, ignore_order=True
+            flow_collection, existing_flow_collection, ignore_order=False
         ):
             set_flow_collection(flow_dict["id"], "temp", [])
         null_tags = {
@@ -751,6 +857,13 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
         existing_dict.get("source_id")
         and flow_dict["source_id"] != existing_dict["source_id"]
     ):
+        # Resolve the old source's collected-by resources before removing the
+        # represents edge (and possibly deleting the source), so a sources/deleted
+        # event keeps the resources webhook collection filters match on. This
+        # yields only source-typed resources (no flow was passed).
+        old_source_resources = enhance_resources(
+            [f"tams:source:{existing_dict['source_id']}"]
+        )
         # Delete the old represents edge
         query_delete = (
             qb.match()
@@ -766,7 +879,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
             publish_event(
                 "sources/deleted",
                 {"source_id": existing_dict["source_id"]},
-                enhance_resources([f"tams:source:{existing_dict['source_id']}"]),
+                old_source_resources,
             )
     # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
     return query_node("flow", flow_dict["id"])
@@ -849,6 +962,55 @@ def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
         deserialise_neptune_obj(result["webhook"]) for result in results["results"]
     ]
     return deserialised_results[0]
+
+
+@tracer.capture_method(capture_response=False)
+def merge_profile(profile_dict: dict) -> dict:
+    """Create a TAMS Profile in the Neptune Database.
+
+    Profiles are immutable, so this only ever creates -- callers must reject an
+    attempt to recreate an existing Profile before calling (there is no update or
+    null-diff logic as there is for webhooks). The technical metadata is decomposed
+    the same way a Flow's is: a flow_metadata node holds the scalar technical fields
+    (format, codec, container, ...) as directly-queryable properties, with
+    essence_parameters as a child node -- not a JSON blob.
+    """
+    tags = profile_dict.get("tags", {})
+    flow_metadata = profile_dict.get("flow_metadata") or {}
+    essence_parameters = flow_metadata.get("essence_parameters", {})
+    profile_properties = filter_dict(profile_dict, {"id", "tags", "flow_metadata"})
+    flow_metadata_properties = filter_dict(flow_metadata, {"essence_parameters"})
+    query = (
+        qb.merge()
+        .node(
+            ref_name="profile",
+            labels="profile",
+            properties={"id": profile_dict["id"]},
+        )
+        .merge()
+        .node(ref_name="profile")
+        .related_to(label="has_flow_metadata")
+        .node(ref_name="fm", labels="flow_metadata")
+        .merge()
+        .node(ref_name="fm")
+        .related_to(label="has_essence_parameters")
+        .node(ref_name="e", labels="essence_parameters")
+        .merge()
+        .node(ref_name="profile")
+        .related_to(label="has_tags")
+        .node(ref_name="t", labels="tags")
+        .set(serialise_neptune_obj(profile_properties, "profile."))
+    )
+    query = query.set(serialise_neptune_obj(flow_metadata_properties, "fm."))
+    if essence_parameters:
+        query = query.set(serialise_neptune_obj(essence_parameters, "e."))
+    if tags:
+        query = query.set(serialise_tags_dict(tags, "t."))
+    query = query.return_literal(constants.RETURN_LITERAL["profile"])
+    results = execute_open_cypher_query(query.get())
+    return [
+        deserialise_neptune_obj(result["profile"]) for result in results["results"]
+    ][0]
 
 
 @tracer.capture_method(capture_response=False)
@@ -1090,6 +1252,10 @@ def generate_flow_collection_query(
     ref_names = []
     for n, collection in enumerate(flow_collection):
         collection_properties = filter_dict(collection, {"id"})
+        # Persist list position on the collected_by edge so the ordered
+        # flow_collection (and the derived source_collection) can be restored on
+        # read; deserialise_neptune_obj sorts by it and strips it.
+        collection_properties["index"] = n
         ref_names.append((f"f{n}", f"c{n}", collection["id"], collection_properties))
     # Add the match queries for each flow_collection record
     for f_ref, _, f_id, _ in ref_names:
@@ -1135,11 +1301,19 @@ def get_matching_webhooks(event: EventBridgeEvent) -> list[Webhookfull]:
             resource_conditions.append(
                 rf'webhook.{constants.SERIALISE_PREFIX}{attr} CONTAINS "\"{resource_id}\""'
             )
+        # An empty collected_by filter means "only resources collected by nothing",
+        # so it must not match here. No condition is needed for that: "[]" is
+        # neither NULL nor CONTAINS any id, so it already fails this group.
         where_literals.append(f"({' OR '.join(resource_conditions)})")
-    # Explicitly exclude webhooks with collected_by filters when event has no collected_by resources
+    # Exclude webhooks whose collected_by filter cannot match an event carrying no
+    # collected_by resources. An absent filter (NULL) means "no filter" and an
+    # empty list means "only resources collected by nothing" -- per spec 8.2 both
+    # match here. They stay distinguishable because serialise_neptune_obj stores
+    # an empty list as the text "[]" rather than collapsing it to NULL.
     for attr in ["flow_collected_by_ids", "source_collected_by_ids"]:
         if attr not in expressions:
-            where_literals.append(f"webhook.{constants.SERIALISE_PREFIX}{attr} IS NULL")
+            prop_name = f"webhook.{constants.SERIALISE_PREFIX}{attr}"
+            where_literals.append(f'({prop_name} IS NULL OR {prop_name} = "[]")')
     query = generate_webhook_query(
         {
             "webhook": {},

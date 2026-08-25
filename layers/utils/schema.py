@@ -218,15 +218,6 @@ class EssenceParameters(BaseModel):
     )
 
 
-class SegmentDuration(BaseModel):
-    """
-    The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
-    """
-
-    numerator: PositiveInt = Field(..., description="numerator")
-    denominator: PositiveInt | None = Field(1, description="denominator")
-
-
 class Format1(StrEnum):
     """
     The primary content type URN for the Flow.
@@ -292,7 +283,7 @@ class EssenceParameters2(BaseModel):
 
 class Format3(StrEnum):
     """
-    The primary content type URN for the Flow.
+    The primary content type URN for the flow.
     """
 
     urn_x_nmos_format_multi = "urn:x-nmos:format:multi"
@@ -320,6 +311,53 @@ class GetUrl(BaseModel):
     label: str = Field(
         ...,
         description="Label identifying this URL. Service implementations should reject any requests using labels that are already associated with Storage Backends. Service implementations should reject any requests containing multiple `get_urls` with the same `label`.",
+    )
+
+
+class Flowstatus(StrEnum):
+    """
+    The current ingest status of a Flow. Available values are as follows. `awaiting_content` - Flow is expecting, but not currently receiving content. `ingesting` - Content is currently being ingested. `replication_in_progress` - Content is currently being ingested to this Flow from another Service Instance via a replication process. `closed_complete` - Flow is complete and will not receive any more content. NOTE: Because this parameter is maintained/updated by a Client, the value of this parameter is only indicative and not authoritative. If the Client ingesting the content becomes unavailable, it may leave this parameter in an incorrect state. Clients should aim to tidy up this state appropriately once they recover. Service Implementers MAY consider adding more active management of the `status` of Flows to mitigate Clients failing to tidy up on completion/failure, as part of more general lifecycle management capability, in line with the approach described for [retention management](https://github.com/bbc/tams/blob/main/docs/appnotes/0019-implementing-retention-management.md). But Clients should not assume such capability.
+    """
+
+    awaiting_content = "awaiting_content"
+    ingesting = "ingesting"
+    replication_in_progress = "replication_in_progress"
+    closed_complete = "closed_complete"
+
+
+class SegmentDuration(BaseModel):
+    """
+    The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
+    """
+
+    numerator: PositiveInt = Field(..., description="numerator")
+    denominator: PositiveInt | None = Field(1, description="denominator")
+
+
+class Flowtechnical(BaseModel):
+    """
+    Describes the technical characteristics of a Flow (imported by type-specific specifications or as part of a profile)
+    """
+
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") | None = Field(
+        None,
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
+    container: constr(pattern=r"^[^\s/]+/[^\s/]+$") | None = Field(
+        None,
+        description="The container MIME type for Flow Segments. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
+    avg_bit_rate: conint(ge=0) | None = Field(
+        None,
+        description="The average bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.",
+    )
+    segment_duration: SegmentDuration | None = Field(
+        None,
+        description="The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.",
+    )
+    container_mapping: Containermapping | None = Field(
+        None,
+        description="Describes the mapping of the Flow essence from the this Flow's container",
     )
 
 
@@ -500,6 +538,25 @@ class EssenceParameters4(BaseModel):
     )
 
 
+class Flowvideo(Flowtechnical):
+    """
+    Describes a video Flow
+    """
+
+    format: Format4 = Field(
+        ..., description="The primary content type URN for the Flow."
+    )
+    essence_parameters: EssenceParameters4 = Field(
+        ...,
+        description="Describes the parameters of the essence inside this video Flow",
+        title="Video Flow Essence Parameters",
+    )
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") = Field(
+        ...,
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
+
+
 class Httprequest(BaseModel):
     """
     Gives information on a particular http request a client should perform
@@ -572,28 +629,6 @@ class StoreType(StrEnum):
     """
 
     http_object_store = "http_object_store"
-
-
-class Storagebackend(BaseModel):
-    """
-    Provides technical, and logic metadata about a storage backend
-    """
-
-    store_type: StoreType | None = Field(
-        None,
-        description="The generic Storage Backend type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.",
-    )
-    provider: str | None = Field(
-        None, description="The cloud (or other) provider of the Storage Backend"
-    )
-    region: str | None = Field(
-        None, description="The region in the cloud this Storage Backend resides"
-    )
-    availability_zone: str | None = Field(
-        None,
-        description="The availability zone in the cloud region this Storage Backend resides. Note that many cloud providers randomize availability zone identifiers such that they are consistent within a cloud account, but not necessarily between accounts. Caution should be exercised when using this parameter.",
-    )
-    store_product: str | None = Field(None, description="The storage product name.")
 
 
 class Tags(RootModel[dict[str, str | list[str]]]):
@@ -726,11 +761,11 @@ class Webhook(BaseModel):
     )
     flow_collected_by_ids: list[Uuid] | None = Field(
         None,
-        description="Limit Flow and Flow Segment events to those with Flow that is collected by a Flow Collection in the given list of Flow Collection IDs",
+        description="Limit Flow and Flow Segment events to those with a Flow that is collected by a Flow Collection in the given list of Flow Collection IDs. An empty array limits events to Flows that are not collected by any Flow Collection.",
     )
     source_collected_by_ids: list[Uuid] | None = Field(
         None,
-        description="Limit Flow, Flow Segment and Source events to those with Source that is collected by a Source Collection in the given list of Source Collection IDs",
+        description="Limit Flow, Flow Segment and Source events to those with a Source that is collected by a Source Collection in the given list of Source Collection IDs. An empty array limits events to Sources that are not collected by any Source Collection.",
     )
     accept_get_urls: list[str] | None = Field(
         None,
@@ -815,9 +850,9 @@ class Collectionitem(BaseModel):
         ...,
         description="Source or Flow Identifier of the member of this collection. Sources MUST only collect Sources, and Flows MUST only collect Flows. Must already be registered in this service instance",
     )
-    role: str = Field(
-        ...,
-        description="A human-readable role of the element in this collection (e.g. 'R' to denote a right audio channel in a collection of mono audio Sources)",
+    role: str | None = Field(
+        None,
+        description="The purpose of this element in the collection, primarily intended to be human-readable.",
     )
 
 
@@ -862,6 +897,25 @@ class Deletionrequest(BaseModel):
     )
 
 
+class Flowaudio(Flowtechnical):
+    """
+    Describes an audio Flow
+    """
+
+    format: Format = Field(
+        ..., description="The primary content type URN for the Flow."
+    )
+    essence_parameters: EssenceParameters = Field(
+        ...,
+        description="Describes the parameters of the essence inside this audio Flow",
+        title="Audio Flow Essence Parameters",
+    )
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") = Field(
+        ...,
+        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+    )
+
+
 class FlowcollectionItem(Collectionitem):
     container_mapping: Containermapping | None = Field(
         None,
@@ -871,19 +925,19 @@ class FlowcollectionItem(Collectionitem):
 
 class Flowcollection(RootModel[list[FlowcollectionItem]]):
     """
-    Describes how Flows are collected into another Flow
+    Describes how Flows are collected into another Flow. Note that this is an ordered list.
     """
 
     root: list[FlowcollectionItem] = Field(
         ...,
-        description="Describes how Flows are collected into another Flow",
+        description="Describes how Flows are collected into another Flow. Note that this is an ordered list.",
         title="Flow Collection",
     )
 
 
-class Flowcore(BaseModel):
+class Flowcommon(BaseModel):
     """
-    Describes a Flow (common properties to all Flows, imported by type-specific specifications)
+    Describes the core fields of a Flow (common properties to all Flows, imported by flow-get and flow-put specifications)
     """
 
     id: Uuid = Field(..., description="Flow identifier")
@@ -910,11 +964,11 @@ class Flowcore(BaseModel):
     )
     metadata_version: str | None = Field(
         None,
-        description="A change to the Flow metadata, not including metadata_version, metadata_updated, segments_updated, or Segments, results in a new version. If the metadata_version for Flow instances is identical then the metadata is identical. Service implementations SHOULD set suitable default values for `metadata_version` whenever Flow metadata is changed and `metadata_version` is either not set by the client, or set to it's existing value. Service implementations MAY permit clients to edit the value, subject to suitable permissions-based limitations. Where media is transfered between TAMS service instances without changing the Flow metadata, clients SHOULD maintain the `metadata_version`. To support this, service implementations SHOULD always accept the setting of `metadata_version` by the client on initial Flow creation. Service implementations SHOULD update this field where metadata is updated via child endpoints. Note that this specification places no requirements on incremental versioning. Service implementations may, for example, choose to use hashes or date-time version identifiers.",
+        description="A change to the Flow metadata, not including metadata_version, metadata_updated, segments_updated or Segments, results in a new version. If the metadata_version for Flow instances is identical then the metadata is identical. Service implementations SHOULD set suitable default values for `metadata_version` whenever Flow metadata is changed and `metadata_version` is either not set by the client, or set to it's existing value. Service implementations MAY permit clients to edit the value, subject to suitable permissions-based limitations. Where media is transfered between TAMS service instances without changing the Flow metadata, clients SHOULD maintain the `metadata_version`. To support this, service implementations SHOULD always accept the setting of `metadata_version` by the client on initial Flow creation. Service implementations SHOULD update this field where metadata is updated via child endpoints. Note that this specification places no requirements on incremental versioning. Service implementations may, for example, choose to use hashes or date-time version identifiers.",
     )
     generation: conint(ge=0) | None = Field(
         None,
-        description='An indication of whether a particular Flow of a Source has been through more or fewer lossy encodings than another Flow of the same Source. This parameter provides a hint to clients as to which is the "highest quality" Flow available to them. A Flow with a higher generation may contain less of the original information than a Flow with a lower generation, although the absolute values generally have no particular meaning. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via lossless capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where a lossy transcode has been carried out on an existing Flow, the `generation` should be incremented by 1 on the transcoded Flow. Where the originating device outputs multiple qualities of the Source (for example an ingester generated a transcoded proxy and ingested it at the same time), `generation` should be set to represent the encoding processes each has been through.',
+        description='An indication of how many lossy encodings the Flow content has been through. This parameter provides a hint to clients as to which is the "highest qualty" Flow available to them. A Flow with a higher generation may contain less of the original information than a flow with a lower generation. Where a Flow is captured straight from the orginating device (e.g. camera/microphone) in its highest quality, and there is no possibility of the content becoming available in a higher quality (e.g. via capture from ST2110 or SDI), it SHOULD have a `generation` of `0`. Where the originating device outputs multiple qualities of the Source, `generation` should represent the encoding processes each has been through as accurately as possible.',
     )
     created: AwareDatetime | None = Field(
         None,
@@ -928,33 +982,18 @@ class Flowcore(BaseModel):
         None,
         description="The date-time the Flow Segments were updated in a given context, e.g. in the service instance. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
+    status: Flowstatus | None = None
     read_only: bool | None = Field(
         None,
         description="If set to 'true', service implementations SHOULD reject client requests to update Flow metadata (other than the read_only property), and Flow Segments. Service implementations should also reject requests to the [`/flows/{flowId}/storage`](#/operations/POST_flows-flowId-storage) endpoint for the Flow, and requests to delete the Flow.",
-    )
-    codec: Mimetype | None = Field(
-        None,
-        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
-    )
-    container: Mimetype | None = Field(
-        None,
-        description="The container MIME type for Flow Segments. Where the media format employs initialisation segments, this is the mime type of the media segments and NOT the initialisation segment(s). Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Where multiple types exist for a subtype (e.g. `video/mp4`, `audio/mp4`, `application/mp4`), the closest MIME type to the Flow `format` should be used (e.g. `audio/mp4` for a Flow `format` of `urn:x-nmos:format:audio`). Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use. Where the Flow does not reference any Media Object(s) directly (e.g. an empty Multi Flow that serves only to collect related mono-essence Flows that do reference Media Objects), this property MUST NOT be set.",
-    )
-    avg_bit_rate: conint(ge=0) | None = Field(
-        None,
-        description="The average bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.",
     )
     max_bit_rate: conint(ge=0) | None = Field(
         None,
         description="The maximum bit rate of the Flow Segments in 1000 bits/second. A precise definition can be found in the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote.",
     )
-    segment_duration: SegmentDuration | None = Field(
-        None,
-        description="The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.",
-    )
     timerange: Timerange | None = Field(
         None,
-        description="The timerange of samples available in the Flow, as described by the [TimeRange](#/schemas/timerange) type. Service implementations MUST ignore this if given in a PUT request, and instead manage it internally.",
+        description="The timerange of samples available in the Flow, as described by the [TimeRange](../schemas/timerange#top) type. Service implementations MUST ignore this if given in a PUT request, and instead manage it internally.",
     )
     flow_collection: Flowcollection | None = Field(
         None, description="List of Flows that are collected together by this Flow."
@@ -963,13 +1002,9 @@ class Flowcore(BaseModel):
         None,
         description="Flows that reference this Flow to include it in a collection. This attribute is intended to be read-only. Service implementations SHOULD ignore this if given in a PUT request, and instead manage it internally",
     )
-    container_mapping: Containermapping | None = Field(
-        None,
-        description="Describes the mapping of the Flow essence from the this Flow's container",
-    )
 
 
-class Flowdata(Flowcore):
+class Flowdata(Flowtechnical):
     """
     Describes a data Flow
     """
@@ -982,13 +1017,53 @@ class Flowdata(Flowcore):
         description="Describes the parameters of the essence inside this data Flow",
         title="Data Flow Essence Parameters",
     )
-    codec: Mimetype = Field(
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") = Field(
         ...,
         description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
     )
 
 
-class Flowimage(Flowcore):
+class Flowget1(Flowcommon):
+    """
+    Describes a Flow
+    """
+
+    profile_id: Uuid | None = Field(
+        None, description="Profile identifier that was used to create the flow."
+    )
+
+
+class Flowget2(Flowvideo, Flowget1):
+    """
+    Describes a Flow
+    """
+
+    profile_id: Uuid | None = Field(
+        None, description="Profile identifier that was used to create the flow."
+    )
+
+
+class Flowget3(Flowaudio, Flowget1):
+    """
+    Describes a Flow
+    """
+
+    profile_id: Uuid | None = Field(
+        None, description="Profile identifier that was used to create the flow."
+    )
+
+
+class Flowget5(Flowdata, Flowget1):
+    """
+    Describes a Flow
+    """
+
+    profile_id: Uuid | None = Field(
+        None, description="Profile identifier that was used to create the flow."
+    )
+
+
+class Flowimage(Flowtechnical):
     """
     Describes a still image Flow, for use by thumbnail tracks etc
     """
@@ -1001,24 +1076,85 @@ class Flowimage(Flowcore):
         description="Describes the parameters of the essence inside this image Flow",
         title="Image Flow Essence Parameters",
     )
-    codec: Mimetype = Field(
+    codec: constr(pattern=r"^[^\s/]+/[^\s/]+$") = Field(
         ...,
         description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
     )
 
 
-class Flowmulti(Flowcore):
+class Flowmulti(Flowtechnical):
     """
     Describes a multi-essence Flow
     """
 
     format: Format3 = Field(
-        ..., description="The primary content type URN for the Flow."
+        ..., description="The primary content type URN for the flow."
     )
     essence_parameters: EssenceParameters3 | None = Field(
         None,
         description="Describes the parameters of the essence inside this multi Flow",
         title="Multi Flow Essence Parameters",
+    )
+
+
+class Flowput1(BaseModel):
+    profile_id: Uuid = Field(
+        ...,
+        description="Profile identifier that was used to create the flow.  When supplying a profile_id no metadata which can be contained in a Profile should also be provided, doing so will result in a 400 validation error.  Trying to create a Flow using a Profile ID that does not exist should also provide a 400 validation error",
+    )
+
+
+class Flowput2(Flowcommon):
+    """
+    Describes a Flow
+    """
+
+
+class Flowput3(Flowput1, Flowput2):
+    """
+    Describes a Flow
+    """
+
+
+class Flowput4(Flowvideo, Flowput2):
+    """
+    Describes a Flow
+    """
+
+
+class Flowput5(Flowaudio, Flowput2):
+    """
+    Describes a Flow
+    """
+
+
+class Flowput6(Flowimage, Flowput2):
+    """
+    Describes a Flow
+    """
+
+
+class Flowput7(Flowdata, Flowput2):
+    """
+    Describes a Flow
+    """
+
+
+class Flowput8(Flowmulti, Flowput2):
+    """
+    Describes a Flow
+    """
+
+
+class Flowput(
+    RootModel[Flowput3 | Flowput4 | Flowput5 | Flowput6 | Flowput7 | Flowput8]
+):
+    """
+    Describes a Flow
+    """
+
+    root: Flowput3 | Flowput4 | Flowput5 | Flowput6 | Flowput7 | Flowput8 = Field(
+        ..., description="Describes a Flow", title="Flow"
     )
 
 
@@ -1156,70 +1292,6 @@ class Flowstoragepost(BaseModel):
     )
 
 
-class Flowvideo(Flowcore):
-    """
-    Describes a video Flow
-    """
-
-    format: Format4 = Field(
-        ..., description="The primary content type URN for the Flow."
-    )
-    essence_parameters: EssenceParameters4 = Field(
-        ...,
-        description="Describes the parameters of the essence inside this video Flow",
-        title="Video Flow Essence Parameters",
-    )
-    codec: Mimetype = Field(
-        ...,
-        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
-    )
-
-
-class GetUrl1(Storagebackend):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    storage_id: Uuid | None = Field(None, description="Storage Backend identifier")
-    url: str = Field(
-        ...,
-        description="A URL to which a GET request can be made to directly retrieve the contents of the Object. Clients should include credentials if the provide URL is on the same origin as the API endpoint. This URL SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details.",
-    )
-    presigned: bool | None = Field(
-        None,
-        description="If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed. The presigned URL SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).",
-    )
-    label: str | None = Field(
-        None,
-        description="Label identifying this URL. If the URL is controlled by the service instance, this is the Storage Backend's label. If the URL is uncontrolled, this is the label provided when a client registered the URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.",
-    )
-    controlled: bool | None = Field(
-        None,
-        description="If `true`, this URL is on a Storage Backend controlled by this service instance. If `false`, this URL is uncontrolled and does not have it's lifecycle managed by this instance. If this parameter is unset, assume `true`.",
-    )
-
-
-class Objectcore(BaseModel):
-    """
-    Provides the location and metadata of the files corresponding to a Object.
-    """
-
-    get_urls: list[GetUrl1] | None = Field(
-        None,
-        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage Backend metadata for controlled URLs should be populated by the TAMS instance based on the Storage Backend the Object instance resides in.",
-    )
-
-
-class Objectmediacore(Objectcore):
-    """
-    Provides the location and metadata of the media files corresponding to a Media Object.
-    """
-
-    key_frame_count: int | None = Field(
-        None,
-        description="The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point",
-    )
-
-
 class Objectsinstancespost1(BaseModel):
     """
     Request the duplication of a Object instance to a new Storage Backend, via it's `storage_id`.
@@ -1233,6 +1305,36 @@ class Objectsinstancespost(RootModel[Objectsinstancespost1 | Objectsinstancespos
         ...,
         description="Register a Object instance in the store.",
         title="Object registration",
+    )
+
+
+class Profile(BaseModel):
+    """
+    Describes a Profile
+    """
+
+    id: Uuid = Field(..., description="Profile identifier.")
+    label: str | None = Field(
+        None, description="Freeform string label for the Profile."
+    )
+    description: str | None = Field(
+        None, description="Freeform text describing the Profile."
+    )
+    created_by: str | None = Field(
+        None,
+        description="A string identifier for the entity that created the Profile. Implementations SHOULD set suitable default values for `created_by` based on the principal accessing the system, and MAY permit clients to edit the value, subject to suitable permissions-based limitations.",
+    )
+    created: AwareDatetime | None = Field(
+        None,
+        description="The date-time the Profile was created in a given context, e.g. in the store. Implementations SHOULD ignore this if given in a PUT request, and instead manage it internally.",
+    )
+    tags: Tags | None = Field(
+        None,
+        description="Key value is a freeform string.  As Profiles are considered immutable then this also applies to tags which cannot be updated after a Profile has been created.",
+    )
+    flow_metadata: Flowvideo | Flowaudio | Flowimage | Flowdata = Field(
+        ...,
+        description="The technical characteristics of the Profile.  This section will be mapped directly to all flows created using this Profile.",
     )
 
 
@@ -1321,6 +1423,29 @@ class Source(BaseModel):
     )
 
 
+class Storagebackend(BaseModel):
+    """
+    Provides technical, and logic metadata about a storage backend
+    """
+
+    store_type: StoreType | None = Field(
+        None,
+        description="The generic Storage Backend type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.",
+    )
+    provider: str | None = Field(
+        None, description="The cloud (or other) provider of the Storage Backend"
+    )
+    region: str | None = Field(
+        None, description="The region in the cloud this Storage Backend resides"
+    )
+    availability_zone: str | None = Field(
+        None,
+        description="The availability zone in the cloud region this Storage Backend resides. Note that many cloud providers randomize availability zone identifiers such that they are consistent within a cloud account, but not necessarily between accounts. Caution should be exercised when using this parameter.",
+    )
+    store_product: str | None = Field(None, description="The storage product name.")
+    tags: Tags | None = Field(None, description="Key value is a freeform string.")
+
+
 class StoragebackendslistItem(Storagebackend):
     id: Uuid = Field(..., description="Storage backend identifier")
     label: str | None = Field(
@@ -1373,22 +1498,78 @@ class Webhookput(Webhookwithid):
     )
 
 
-class Flowaudio(Flowcore):
+class Flowget4(Flowimage, Flowget1):
     """
-    Describes an audio Flow
+    Describes a Flow
     """
 
-    format: Format = Field(
-        ..., description="The primary content type URN for the Flow."
+    profile_id: Uuid | None = Field(
+        None, description="Profile identifier that was used to create the flow."
     )
-    essence_parameters: EssenceParameters = Field(
-        ...,
-        description="Describes the parameters of the essence inside this audio Flow",
-        title="Audio Flow Essence Parameters",
+
+
+class Flowget6(Flowmulti, Flowget1):
+    """
+    Describes a Flow
+    """
+
+    profile_id: Uuid | None = Field(
+        None, description="Profile identifier that was used to create the flow."
     )
-    codec: Mimetype = Field(
+
+
+class Flowget(RootModel[Flowget2 | Flowget3 | Flowget4 | Flowget5 | Flowget6]):
+    """
+    Describes a Flow
+    """
+
+    root: Flowget2 | Flowget3 | Flowget4 | Flowget5 | Flowget6 = Field(
+        ..., description="Describes a Flow", title="Flow"
+    )
+
+
+class GetUrl1(Storagebackend):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    storage_id: Uuid | None = Field(None, description="Storage Backend identifier")
+    url: str = Field(
         ...,
-        description="A MIME type identification of the (lossy or lossless) coding used for the Flow content. Note that the `type` component of the container MIME type (i.e. the component before the `/`) may be different to the `type` component of the codec MIME type. e.g. An audio Flow may have `audio/aac` coded content may be wrapped in a `video/mp2t` container. Mime types from the [IANA registry](https://www.iana.org/assignments/media-types/media-types.xhtml) should be preferred. Where multiple MIME types are possible, the most common should be preferred. Where this is insufficient, the maintainers of the TAMS repository may create an application note advising which MIME type to use.",
+        description="A URL to which a GET request can be made to directly retrieve the contents of the Object. Clients should include credentials if the provide URL is on the same origin as the API endpoint. This URL SHOULD support the inclusion of checksums in headers as supported by advertised Storage Backend product. See AppNote 0048 for more details.",
+    )
+    presigned: bool | None = Field(
+        None,
+        description="If `true`, this URL is pre-signed. If this parameter is unset, the URL is NOT pre-signed. The presigned URL SHALL remain valid for the timeframe advertised in [`min_presigned_url_timeout` at the `/service`](#/operations/GET_service) endpoint, which is subject to a specified minimum (see service endpoint schema).",
+    )
+    label: str | None = Field(
+        None,
+        description="Label identifying this URL. If the URL is controlled by the service instance, this is the Storage Backend's label. If the URL is uncontrolled, this is the label provided when a client registered the URL. If the 'label' is not set then this URL can't be filtered for using the 'accept_get_urls' API query parameter.",
+    )
+    controlled: bool | None = Field(
+        None,
+        description="If `true`, this URL is on a Storage Backend controlled by this service instance. If `false`, this URL is uncontrolled and does not have it's lifecycle managed by this instance. If this parameter is unset, assume `true`.",
+    )
+
+
+class Objectcore(BaseModel):
+    """
+    Provides the location and metadata of the files corresponding to a Object.
+    """
+
+    get_urls: list[GetUrl1] | None = Field(
+        None,
+        description="A list of URLs to which a GET request can be made to directly retrieve the contents of the Object. This is required by the `http_object_store` Storage Backend type, which is the only one currently described. Clients may choose any URL in the list and treat the content returned as identical, however servers may sort the list such that the preferred URL is first. Storage Backend metadata for controlled URLs should be populated by the TAMS instance based on the Storage Backend the Object instance resides in.",
+    )
+
+
+class Objectmediacore(Objectcore):
+    """
+    Provides the location and metadata of the media files corresponding to a Media Object.
+    """
+
+    key_frame_count: int | None = Field(
+        None,
+        description="The number of key frames in the Media Object. This should be set greater than zero when the Media Object contains key frames that serve as a stream access point",
     )
 
 
@@ -1478,10 +1659,4 @@ class Object(Objectmediacore):
         None,
         description="The Object containing the initialisation segment required to decode the parent Media Object.",
         title="Initialisation Object",
-    )
-
-
-class Flow(RootModel[Flowvideo | Flowaudio | Flowimage | Flowdata | Flowmulti]):
-    root: Flowvideo | Flowaudio | Flowimage | Flowdata | Flowmulti = Field(
-        ..., description="Describes a Flow", title="Flow"
     )

@@ -183,6 +183,63 @@ class TestUtils:
         with pytest.raises(BadRequestError):
             utils.parse_tag_parameters(params)
 
+    def test_parse_tag_parameters_custom_prefixes_isolate_namespaces(self):
+        """storage_backend_tag.{name} must parse only under its own prefixes and
+        never collide with the tag.{name} filters sharing the same request (the
+        objects endpoint uses both at once)."""
+        params = {
+            "tag.env": "prod",
+            "tag_exists.region": "true",
+            "storage_backend_tag.tier": "gold",
+            "storage_backend_tag_exists.zone": "false",
+        }
+        # Default prefixes see only the plain tag.* params.
+        values, exists = utils.parse_tag_parameters(params)
+        assert values == {"env": "prod"}
+        assert exists == {"region": True}
+        # Storage-backend prefixes see only their own params.
+        sb_values, sb_exists = utils.parse_tag_parameters(
+            params,
+            value_prefixes=("storage_backend_tag",),
+            exists_prefixes=("storage_backend_tag_exists",),
+        )
+        assert sb_values == {"tier": "gold"}
+        assert sb_exists == {"zone": False}
+
+    @pytest.mark.parametrize(
+        "item_tags,tag_values,tag_exists,expected",
+        [
+            # No filters -> everything matches
+            ({"env": "prod"}, {}, {}, True),
+            # String value, comma-separated OR
+            ({"env": "test"}, {"env": "prod,test"}, {}, True),
+            ({"env": "dev"}, {"env": "prod,test"}, {}, False),
+            # Array-valued tag: match on any member
+            ({"tier": ["silver", "bronze"]}, {"tier": "gold,silver"}, {}, True),
+            ({"tier": ["bronze"]}, {"tier": "gold,silver"}, {}, False),
+            # Whole-value match, never a substring
+            ({"env": "production"}, {"env": "prod"}, {}, False),
+            # Missing tag never satisfies a value filter
+            ({}, {"env": "prod"}, {}, False),
+            # Existence filters
+            ({"env": "prod"}, {}, {"env": True}, True),
+            ({}, {}, {"env": True}, False),
+            ({}, {}, {"env": False}, True),
+            ({"env": "prod"}, {}, {"env": False}, False),
+            # AND across tag names: every supplied filter must hold
+            ({"env": "prod", "tier": "gold"}, {"env": "prod"}, {"tier": True}, True),
+            ({"env": "prod"}, {"env": "prod"}, {"tier": True}, False),
+            # None item tags behaves as empty
+            (None, {}, {"env": False}, True),
+            (None, {"env": "prod"}, {}, False),
+        ],
+    )
+    def test_tags_match(self, item_tags, tag_values, tag_exists, expected):
+        assert utils.tags_match(item_tags, tag_values, tag_exists) is expected
+
+    def test_tags_match_strips_whitespace_around_values(self):
+        assert utils.tags_match({"env": "test"}, {"env": "prod, test"}, {}) is True
+
     def test_json_number_returns_float(self):
         input_float = "1.23"
         result = utils.json_number(input_float)
@@ -249,6 +306,32 @@ class TestUtils:
 
         # Ensure misc properties are included appropriately
         assert return_dict["properties"]["misc"] == query_parameters["misc"]
+
+    def test_parse_api_gw_parameters_tag_value_matches_array_member(self):
+        """A tag filter must match a member of an array-valued tag.
+
+        Tag values may be arrays from spec 8.2, but there is no array-specific
+        branch in parse_api_gw_parameters. It works because serialise_tags_dict
+        stores every value as JSON and the filter searches for the value wrapped
+        in quotes, which is a substring of the serialised array. That is an
+        implicit contract between two functions, so it is asserted directly
+        against json.dumps output rather than against a hand-written literal.
+        """
+        _, where_literals = utils.parse_api_gw_parameters(
+            {"tag_values": {"colour": "green"}}
+        )
+
+        assert where_literals == ['(t.`colour` CONTAINS "\\"green\\"")']
+
+        # The literal's operand is what CONTAINS is applied to in Neptune, so
+        # substring behaviour against the stored form can be checked here.
+        operand = json.loads(where_literals[0].split(" CONTAINS ", 1)[1][:-1])
+        assert operand in json.dumps(["red", "green"])  # member of an array
+        assert operand in json.dumps("green")  # unchanged for a scalar
+        # Quoting is what prevents a partial match; without it "green" would be
+        # found inside "greenish" and inside a same-prefixed sibling tag value.
+        assert operand not in json.dumps("greenish")
+        assert operand not in json.dumps(["greenish", "evergreen"])
 
     def test_filter_dict_removes_keys(self):
         input_dict = {"a": 1, "b": 2, "c": 3}

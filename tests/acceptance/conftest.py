@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import time
+import uuid
 from copy import deepcopy
 
 import boto3
@@ -168,6 +169,51 @@ def delete_requests():
 
 
 @pytest.fixture(scope="session")
+def stub_profile():
+    # Profiles are immutable and have no delete endpoint, so a fresh random id
+    # per session avoids the create test failing on a re-run against a persistent
+    # store. The label embeds the id so it is unique across runs, letting the
+    # label filter assert an exact match despite Profiles accumulating.
+    profile_id = str(uuid.uuid4())
+    return {
+        "id": profile_id,
+        "label": f"pytest - profile {profile_id}",
+        "description": "pytest - profile",
+        "tags": {"encoder": "test"},
+        "flow_metadata": {
+            "format": "urn:x-nmos:format:video",
+            "codec": "video/h264",
+            "container": "video/mp2t",
+            "essence_parameters": {
+                "frame_rate": {"numerator": 50, "denominator": 1},
+                "frame_width": 1920,
+                "frame_height": 1080,
+                "bit_depth": 8,
+                "interlace_mode": "progressive",
+                "component_type": "YCbCr",
+                "horiz_chroma_subs": 2,
+                "vert_chroma_subs": 1,
+                "avc_parameters": {"profile": 122, "level": 42, "flags": 0},
+            },
+        },
+    }
+
+
+@pytest.fixture(scope="session")
+def stub_profile_flow(stub_profile):
+    # A Flow created from stub_profile (§3.3). Profile-only PUT body: the technical
+    # metadata is materialised from the Profile's flow_metadata (video). Uses fresh
+    # ids so it doesn't collide with the stub flows/sources; created and deleted
+    # within its own test block.
+    return {
+        "id": "10000000-0000-1000-8000-0000000000f0",
+        "source_id": "00000000-0000-1000-8000-0000000000f0",
+        "profile_id": stub_profile["id"],
+        "label": "pytest - flow from profile",
+    }
+
+
+@pytest.fixture(scope="session")
 def stub_video_flow():
     return {
         "id": "10000000-0000-1000-8000-000000000000",
@@ -231,6 +277,11 @@ def stub_data_flow():
         "essence_parameters": {
             "data_type": "text",
         },
+        # The only Flow with a status (8.2 field), so ?status= identifies it
+        # uniquely. Deliberately not "ingesting" like the legacy flow_status tag
+        # every fixture carries, so a filter reading the tag rather than the
+        # field would return the wrong Flows.
+        "status": "closed_complete",
         "read_only": True,
         "collected_by": ["10000000-0000-1000-8000-000000000003"],
     }
@@ -269,6 +320,9 @@ def stub_multi_flow():
             "input_quality": "contribution",
             "flow_status": "ingesting",
             "test": "this",
+            # Array-valued tag (allowed from 8.2). Only present on the multi
+            # Flow, so tag.test_list identifies it uniquely.
+            "test_list": ["this", "that"],
         },
         "container": "video/mp2t",
         "flow_collection": [
@@ -364,6 +418,9 @@ def stub_multi_source():
             "input_quality": "contribution",
             "flow_status": "ingesting",
             "test": "this",
+            # Array-valued tag (allowed from 8.2). Only present on the multi
+            # Source, so tag.test_list identifies it uniquely.
+            "test_list": ["this", "that"],
         },
         "source_collection": [
             {"id": "00000000-0000-1000-8000-000000000000", "role": "video"},
@@ -430,7 +487,7 @@ def webhook_verification_lifecycle(
     1. Deploy webhook-api-gateway stack
     2. Get stack outputs (API URL, API Key, Log Group)
     3. Get API key value from API Gateway
-    4. Register webhooks with TAMS API (5 webhooks with different filters)
+    4. Register webhooks with TAMS API (7 webhooks with different filters)
     5. [Tests run]
     6. Cleanup webhook registrations
     7. Delete CloudFormation stack
@@ -498,6 +555,21 @@ def webhook_verification_lifecycle(
                 "config": {
                     "source_collected_by_ids": [stub_multi_source["id"]],
                     "verbose_storage": True,
+                },
+            },
+            # An empty list is not "no filter": per 8.2 it limits events to
+            # resources collected by nothing. Registered as separate webhooks so
+            # the delivered set can be asserted against the collected ones above.
+            {
+                "identifier": "test-events-uncollected-flow",
+                "config": {
+                    "flow_collected_by_ids": [],
+                },
+            },
+            {
+                "identifier": "test-events-uncollected-source",
+                "config": {
+                    "source_collected_by_ids": [],
                 },
             },
         ]

@@ -1,6 +1,8 @@
 # pylint: disable=too-many-lines
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from conftest import (
     ID_404,
     assert_equal_unordered,
@@ -369,6 +371,26 @@ def test_List_Flows_HEAD_200_codec(api_client_cognito):
     assert_json_response(response, 200, empty_body=True)
 
 
+def test_List_Flows_HEAD_200_collected_by_ids(api_client_cognito, stub_multi_flow):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"collected_by_ids": stub_multi_flow["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_List_Flows_HEAD_200_collected_by_ids_empty(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("HEAD", path, params={"collected_by_ids": ""})
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
 def test_List_Flows_HEAD_200_format(api_client_cognito):
     # Arrange
     path = "/flows"
@@ -450,6 +472,17 @@ def test_List_Flows_HEAD_200_source_id(api_client_cognito, stub_data_flow):
     assert_json_response(response, 200, empty_body=True)
 
 
+def test_List_Flows_HEAD_200_status(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"status": "closed_complete"}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
 def test_List_Flows_HEAD_200_tag_name(api_client_cognito):
     # Arrange
     path = "/flows"
@@ -500,6 +533,30 @@ def test_List_Flows_HEAD_400_codec(api_client_cognito):
     # Act
     response = api_client_cognito.request(
         "HEAD", path, params={"codec": "audio/aac", "timerange": "bad"}
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_List_Flows_HEAD_400_collected_by_ids(api_client_cognito, stub_multi_flow):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+        params={"collected_by_ids": stub_multi_flow["id"], "timerange": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_List_Flows_HEAD_400_collected_by_ids_malformed(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"collected_by_ids": "not-a-uuid"}
     )
     # Assert
     assert_json_response(response, 400, empty_body=True)
@@ -593,6 +650,15 @@ def test_List_Flows_HEAD_400_source_id(api_client_cognito, stub_data_flow):
     assert_json_response(response, 400, empty_body=True)
 
 
+def test_List_Flows_HEAD_400_status(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("HEAD", path, params={"status": "invalid"})
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
 def test_List_Flows_HEAD_400_tag_name(api_client_cognito):
     # Arrange
     path = "/flows"
@@ -670,6 +736,81 @@ def test_List_Flows_GET_200_codec(api_client_cognito, stub_audio_flow):
     response_json = remove_dynamic_props(response.json())
     assert 1 == len(response_json)
     assert_equal_unordered([stub_audio_flow], response_json)
+
+
+def test_List_Flows_GET_200_collected_by_ids(
+    api_client_cognito,
+    stub_multi_flow,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_image_flow,
+):
+    """List flows collected by the given Flow id"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"collected_by_ids": stub_multi_flow["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 4 == len(response_json)
+    assert_equal_unordered(
+        [stub_video_flow, stub_audio_flow, stub_data_flow, stub_image_flow],
+        response_json,
+    )
+
+
+def test_List_Flows_GET_200_collected_by_ids_multiple(
+    api_client_cognito,
+    stub_multi_flow,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_image_flow,
+):
+    """List flows collected by any of the given Flow ids
+
+    Multiple ids are OR-ed, so pairing the real collecting Flow with one that
+    collects nothing must not narrow the result set.
+    """
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": f"{stub_multi_flow['id']},{ID_404}"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 4 == len(response_json)
+    assert_equal_unordered(
+        [stub_video_flow, stub_audio_flow, stub_data_flow, stub_image_flow],
+        response_json,
+    )
+
+
+def test_List_Flows_GET_200_collected_by_ids_empty(
+    api_client_cognito, stub_multi_flow, stub_init_flow
+):
+    """List only flows that no other Flow collects
+
+    An empty value is a filter, not an absent one: it must return the
+    uncollected Flows rather than all six.
+    """
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"collected_by_ids": ""})
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 2 == len(response_json)
+    assert_equal_unordered([stub_multi_flow, stub_init_flow], response_json)
 
 
 def test_List_Flows_GET_200_format(api_client_cognito, stub_data_flow):
@@ -851,12 +992,54 @@ def test_List_Flows_GET_200_source_id(api_client_cognito, stub_data_flow):
     assert_equal_unordered([stub_data_flow], response_json)
 
 
+def test_List_Flows_GET_200_status(api_client_cognito, stub_data_flow):
+    """List flows with status query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"status": stub_data_flow["status"]}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 1 == len(response_json)
+    assert_equal_unordered([stub_data_flow], response_json)
+
+
 def test_List_Flows_GET_200_tag_name(api_client_cognito, stub_multi_flow):
     """List flows with tag.{name} query specified"""
     # Arrange
     path = "/flows"
     # Act
     response = api_client_cognito.request("GET", path, params={"tag.test": "this"})
+    # Assert
+    assert_json_response(response, 200)
+    response_json = remove_dynamic_props(response.json())
+    assert 1 == len(response_json)
+    assert_equal_unordered([stub_multi_flow], response_json)
+
+
+def test_List_Flows_GET_200_tag_name_array(api_client_cognito, stub_multi_flow):
+    """List flows with tag.{name} matching one member of an array-valued tag
+
+    Tag values may be arrays from 8.2. There is no array-specific code path:
+    tags are stored JSON-serialised, so ["this", "that"] is stored as the text
+    '["this", "that"]', and the filter searches for the quote-wrapped value
+    '"that"', which is a substring of it. The same quoting is what stops a
+    partial value matching, so a change to either half would silently break
+    membership -- and nothing else pins it, since every other tag filter test
+    uses a scalar.
+
+    "that" is used rather than "this" deliberately: matching a non-first member
+    shows this is genuine membership and not a prefix match on the serialised
+    form. It also avoids the value used by tag.test above, so a regression that
+    confused the two tags could not pass by coincidence.
+    """
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"tag.test_list": "that"})
     # Assert
     assert_json_response(response, 200)
     response_json = remove_dynamic_props(response.json())
@@ -909,6 +1092,38 @@ def test_List_Flows_GET_400_codec(api_client_cognito):
     # Act
     response = api_client_cognito.request(
         "GET", path, params={"codec": "audio/aac", "timerange": "bad"}
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_List_Flows_GET_400_collected_by_ids(api_client_cognito, stub_multi_flow):
+    """List flows with collected_by_ids query specified"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"collected_by_ids": stub_multi_flow["id"], "timerange": "bad"},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_List_Flows_GET_400_collected_by_ids_malformed(api_client_cognito):
+    """List flows with a collected_by_ids value that is not a UUID list"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"collected_by_ids": "not-a-uuid"}
     )
     # Assert
     assert_json_response(response, 400)
@@ -1035,6 +1250,16 @@ def test_List_Flows_GET_400_source_id(api_client_cognito, stub_data_flow):
     response_json = response.json()
     assert isinstance(response_json["message"], list)
     assert 0 < len(response_json["message"])
+
+
+def test_List_Flows_GET_400_status(api_client_cognito):
+    """List flows with an invalid status value returns 400"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"status": "invalid"})
+    # Assert
+    assert_json_response(response, 400)
 
 
 def test_List_Flows_GET_400_tag_name(api_client_cognito):
@@ -2076,6 +2301,75 @@ def test_Create_or_Update_Flow_Flow_Collection_PUT_204_update(
     )
 
 
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+def test_Flow_Flow_Collection_ordering(
+    api_client_cognito,
+    stub_multi_flow,
+    stub_multi_source,
+    stub_video_flow,
+    stub_audio_flow,
+    stub_data_flow,
+    stub_image_flow,
+    expect_webhooks,
+):
+    """flow_collection is an ordered list (§3.9): the order PUT is the order
+    returned, on both the sub-resource and the whole Flow, and the derived
+    source_collection follows the same order. Reverses then restores the
+    fixture order so downstream tests are unaffected."""
+    # Arrange
+    fc_path = f"/flows/{stub_multi_flow['id']}/flow_collection"
+    flow_to_source = {
+        flow["id"]: flow["source_id"]
+        for flow in (stub_video_flow, stub_audio_flow, stub_data_flow, stub_image_flow)
+    }
+    reversed_collection = list(reversed(stub_multi_flow["flow_collection"]))
+    expected_flow_ids = [item["id"] for item in reversed_collection]
+    expected_source_ids = [flow_to_source[flow_id] for flow_id in expected_flow_ids]
+
+    # Act: PUT the collection in reversed order
+    response = api_client_cognito.request("PUT", fc_path, json=reversed_collection)
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": {**stub_multi_flow, "flow_collection": reversed_collection}
+            },
+        },
+    )
+    # The sub-resource GET returns the collection in the reversed order.
+    fc_response = api_client_cognito.request("GET", fc_path)
+    assert_json_response(fc_response, 200)
+    assert expected_flow_ids == [item["id"] for item in fc_response.json()]
+    # The whole-Flow GET returns flow_collection in the same order.
+    flow_response = api_client_cognito.request("GET", f"/flows/{stub_multi_flow['id']}")
+    assert_json_response(flow_response, 200)
+    assert expected_flow_ids == [
+        item["id"] for item in flow_response.json()["flow_collection"]
+    ]
+    # The derived source_collection on the multi Source follows the same order.
+    source_response = api_client_cognito.request(
+        "GET", f"/sources/{stub_multi_source['id']}"
+    )
+    assert_json_response(source_response, 200)
+    assert expected_source_ids == [
+        item["id"] for item in source_response.json()["source_collection"]
+    ]
+
+    # Restore the fixture order for downstream tests.
+    restore = api_client_cognito.request(
+        "PUT", fc_path, json=stub_multi_flow["flow_collection"]
+    )
+    assert_json_response(restore, 204, empty_body=True)
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {"flow": stub_multi_flow},
+        },
+    )
+
+
 def test_Create_or_Update_Flow_Flow_Collection_PUT_400(
     api_client_cognito, stub_video_flow
 ):
@@ -2584,3 +2878,198 @@ def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
     assert_json_response(response, 404)
     response_json = response.json()
     assert "The requested flow does not exist." == response_json["message"]
+
+
+# ---- Flow creation from a Profile (§3.3) ----
+# stub_profile is created in test_01; these build a Flow from it (a profile-only
+# PUT body -> the Profile's flow_metadata is materialised onto the Flow), verify
+# the AppNote0020 link behaviours, then delete it -- a self-contained block at the
+# end of the file so it leaves no residue for later tests. Webhook expectations
+# are registered count-only (the Flow's id is not asserted against a body), which
+# keeps test_06's counts balanced without constructing materialised bodies.
+NONEXISTENT_PROFILE_ID = "20000000-0000-1000-8000-00000000000a"
+
+
+def test_Create_Flow_From_Profile_PUT_201(
+    api_client_cognito, stub_profile, stub_profile_flow, expect_webhooks
+):
+    """A profile-only PUT body materialises the Profile's flow_metadata onto the Flow."""
+    # Arrange
+    path = f"/flows/{stub_profile_flow['id']}"
+    # Act
+    response = api_client_cognito.request("PUT", path, json=stub_profile_flow)
+    # Assert
+    assert_json_response(response, 201)
+    response_json = response.json()
+    flow_metadata = stub_profile["flow_metadata"]
+    assert stub_profile["id"] == response_json["profile_id"]
+    assert flow_metadata["format"] == response_json["format"]
+    assert flow_metadata["codec"] == response_json["codec"]
+    assert flow_metadata["container"] == response_json["container"]
+    assert_equal_unordered(
+        flow_metadata["essence_parameters"], response_json["essence_parameters"]
+    )
+    expect_webhooks("sources/created", "flows/created")
+
+
+def test_Create_Flow_From_Profile_PUT_400_nonexistent(api_client_cognito):
+    """A profile_id that does not exist is a 400."""
+    # Arrange
+    flow_id = "10000000-0000-1000-8000-0000000000f1"
+    path = f"/flows/{flow_id}"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json={
+            "id": flow_id,
+            "source_id": "00000000-0000-1000-8000-0000000000f1",
+            "profile_id": NONEXISTENT_PROFILE_ID,
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+
+
+def test_Create_Flow_From_Profile_PUT_400_mutual_exclusion(
+    api_client_cognito, stub_profile
+):
+    """profile_id supplied together with technical metadata is a 400."""
+    # Arrange
+    flow_id = "10000000-0000-1000-8000-0000000000f2"
+    path = f"/flows/{flow_id}"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json={
+            "id": flow_id,
+            "source_id": "00000000-0000-1000-8000-0000000000f2",
+            "profile_id": stub_profile["id"],
+            "format": "urn:x-nmos:format:video",
+            "codec": "video/h264",
+            "essence_parameters": {
+                "frame_rate": {"numerator": 25, "denominator": 1},
+                "frame_width": 1920,
+                "frame_height": 1080,
+            },
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+
+
+# §3.5: profile_id filter on /flows. The GET-200 case needs a Flow linked to the
+# Profile, so it lives here in the create-from-Profile block (the linked Flow
+# created above, before it is unlinked/deleted below, is the only one linked to
+# stub_profile -> the filter returns exactly it). The HEAD/400 cases do not need
+# a matching Flow but are grouped here to keep the §3.5 tests together.
+def test_List_Flows_GET_200_profile_id(
+    api_client_cognito, stub_profile, stub_profile_flow
+):
+    """List Flows filtered by profile_id returns the profile-linked Flow."""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"profile_id": stub_profile["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
+    assert stub_profile_flow["id"] == response_json[0]["id"]
+    assert stub_profile["id"] == response_json[0]["profile_id"]
+
+
+def test_List_Flows_HEAD_200_profile_id(api_client_cognito, stub_profile):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"profile_id": stub_profile["id"]}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_List_Flows_GET_400_profile_id(api_client_cognito):
+    """List Flows with an invalid (non-UUID) profile_id returns 400"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"profile_id": "invalid"})
+    # Assert
+    assert_json_response(response, 400)
+
+
+def test_List_Flows_HEAD_400_profile_id(api_client_cognito):
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"profile_id": "invalid"}
+    )
+    # Assert
+    assert_json_response(response, 400, empty_body=True)
+
+
+def test_Flow_Avg_Bit_Rate_PUT_400_profile_linked(
+    api_client_cognito, stub_profile_flow
+):
+    """avg_bit_rate is inherited from the Profile: PUT is 400 while linked."""
+    # Arrange
+    path = f"/flows/{stub_profile_flow['id']}/avg_bit_rate"
+    # Act
+    response = api_client_cognito.request("PUT", path, json=5000000)
+    # Assert
+    assert_json_response(response, 400)
+
+
+def test_Flow_Max_Bit_Rate_PUT_204_profile_linked(
+    api_client_cognito, stub_profile_flow, expect_webhooks
+):
+    """max_bit_rate is Flow-owned: PUT is allowed even while linked to a Profile."""
+    # Arrange
+    path = f"/flows/{stub_profile_flow['id']}/max_bit_rate"
+    # Act
+    response = api_client_cognito.request("PUT", path, json=6000000)
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks("flows/updated")
+
+
+def test_Unlink_Flow_From_Profile_PUT_204(
+    api_client_cognito, stub_profile, stub_profile_flow, expect_webhooks
+):
+    """Sending profile_id as an empty string unlinks the Flow (AppNote0020)."""
+    # Arrange
+    path = f"/flows/{stub_profile_flow['id']}"
+    unlink_body = {
+        "id": stub_profile_flow["id"],
+        "source_id": stub_profile_flow["source_id"],
+        **stub_profile["flow_metadata"],
+        "profile_id": "",
+    }
+    # Act
+    response = api_client_cognito.request("PUT", path, json=unlink_body)
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks("flows/updated")
+    # The link is broken: profile_id is no longer present on the Flow.
+    get_response = api_client_cognito.request("GET", path)
+    assert_json_response(get_response, 200)
+    assert "profile_id" not in get_response.json()
+
+
+def test_Delete_Flow_From_Profile_DELETE_204(
+    api_client_cognito, stub_profile_flow, expect_webhooks
+):
+    """Clean up the profile-created Flow (no segments -> synchronous delete)."""
+    # Arrange
+    path = f"/flows/{stub_profile_flow['id']}"
+    # Act
+    response = api_client_cognito.request("DELETE", path)
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    expect_webhooks("flows/deleted", "sources/deleted")

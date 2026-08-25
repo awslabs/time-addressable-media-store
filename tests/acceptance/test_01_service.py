@@ -1,5 +1,7 @@
 import pytest
 import requests
+
+# pylint: disable=no-name-in-module
 from conftest import (
     ID_404,
     REGION,
@@ -8,6 +10,7 @@ from conftest import (
     assert_headers_present,
     assert_json_response,
     create_storage_label,
+    remove_dynamic_props,
 )
 
 pytestmark = [
@@ -32,6 +35,11 @@ pytestmark = [
         ("/service/webhooks/{webhookId}", "DELETE"),
         ("/service/storage-backends", "GET"),
         ("/service/storage-backends", "HEAD"),
+        ("/service/profiles", "GET"),
+        ("/service/profiles", "HEAD"),
+        ("/service/profiles/{profileId}", "GET"),
+        ("/service/profiles/{profileId}", "HEAD"),
+        ("/service/profiles/{profileId}", "POST"),
     ],
 )
 def test_auth_401(verb, path, api_endpoint):
@@ -771,3 +779,234 @@ def test_Service_StorageBackends_GET_200_reverse_order(api_client_cognito):
     assert "True" == response.headers["X-Paging-Reverse-Order"]
     labels = [backend["label"] for backend in response.json()]
     assert labels == sorted(labels, reverse=True)
+
+
+# Storage Backend tags are set out of band directly on the DynamoDB record (there
+# is no API to set them), so a freshly deployed backend carries none. A positive
+# tag match is therefore not provable here -- only that a filter correctly
+# includes the untagged backend (tag_exists=false) or excludes it (any value
+# filter, or tag_exists=true). Real discrimination is covered by the functional
+# tier, whose fixture creates two tagged backends.
+def test_Service_StorageBackends_HEAD_200_tag_exists_false(api_client_cognito):
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD", path, params={"tag_exists.anything": "false"}
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_Service_StorageBackends_GET_200_tag_exists_false(api_client_cognito):
+    """tag_exists=false matches the untagged deployed backend, so it is returned."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.anything": "false"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert 1 == len(response.json())
+
+
+def test_Service_StorageBackends_GET_200_tag_exists_true_empty(api_client_cognito):
+    """tag_exists=true excludes the untagged deployed backend, giving an empty list."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.anything": "true"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert 0 == len(response.json())
+
+
+def test_Service_StorageBackends_GET_200_tag_value_empty(api_client_cognito):
+    """A tag value filter excludes the untagged deployed backend."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"tag.anything": "value"})
+    # Assert
+    assert_json_response(response, 200)
+    assert 0 == len(response.json())
+
+
+def test_Service_StorageBackends_GET_400_bad_tag_exists(api_client_cognito):
+    """A non-boolean tag_exists value is a 400."""
+    # Arrange
+    path = "/service/storage-backends"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"tag_exists.anything": "notabool"}
+    )
+    # Assert
+    assert_json_response(response, 400)
+
+
+# ---- Profiles (§3.2) ----
+# stub_profile has a fresh random id and unique label per session; Profiles are
+# immutable and cannot be deleted, so these must not assume an empty store or a
+# fixed id. Tests below the create test depend on it having run (file order).
+def test_Create_Profile_POST_201(api_client_cognito, stub_profile):
+    # Arrange
+    path = f"/service/profiles/{stub_profile['id']}"
+    # Act
+    response = api_client_cognito.request("POST", path, json=stub_profile)
+    # Assert
+    assert_json_response(response, 201)
+    response_json = response.json()
+    assert "created" in response_json
+    assert "created_by" in response_json
+    assert_equal_unordered(stub_profile, remove_dynamic_props(response_json))
+
+
+def test_Create_Profile_POST_400_immutable(api_client_cognito, stub_profile):
+    """Profiles are immutable: re-creating an existing one is a 400."""
+    # Arrange
+    path = f"/service/profiles/{stub_profile['id']}"
+    # Act
+    response = api_client_cognito.request("POST", path, json=stub_profile)
+    # Assert
+    assert_json_response(response, 400)
+
+
+def test_Create_Profile_POST_404_id_mismatch(api_client_cognito, stub_profile):
+    """A body id that differs from the path id is a 404."""
+    # Arrange
+    path = f"/service/profiles/{ID_404}"
+    # Act
+    response = api_client_cognito.request("POST", path, json=stub_profile)
+    # Assert
+    assert_json_response(response, 404)
+
+
+def test_Create_Profile_POST_400_invalid(api_client_cognito):
+    """A Profile body without flow_metadata is invalid."""
+    # Arrange
+    path = f"/service/profiles/{ID_404}"
+    # Act
+    response = api_client_cognito.request(
+        "POST", path, json={"id": ID_404, "label": "no metadata"}
+    )
+    # Assert
+    assert_json_response(response, 400)
+
+
+def test_Get_Profile_HEAD_200(api_client_cognito, stub_profile):
+    # Arrange
+    path = f"/service/profiles/{stub_profile['id']}"
+    # Act
+    response = api_client_cognito.request("HEAD", path)
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_Get_Profile_GET_200(api_client_cognito, stub_profile):
+    # Arrange
+    path = f"/service/profiles/{stub_profile['id']}"
+    # Act
+    response = api_client_cognito.request("GET", path)
+    # Assert
+    assert_json_response(response, 200)
+    assert_equal_unordered(stub_profile, remove_dynamic_props(response.json()))
+
+
+def test_Get_Profile_HEAD_404(api_client_cognito):
+    # Arrange
+    path = f"/service/profiles/{ID_404}"
+    # Act
+    response = api_client_cognito.request("HEAD", path)
+    # Assert
+    assert_json_response(response, 404, empty_body=True)
+
+
+def test_Get_Profile_GET_404(api_client_cognito):
+    # Arrange
+    path = f"/service/profiles/{ID_404}"
+    # Act
+    response = api_client_cognito.request("GET", path)
+    # Assert
+    assert_json_response(response, 404)
+
+
+def test_List_Profiles_HEAD_200(api_client_cognito):
+    # Arrange
+    path = "/service/profiles"
+    # Act
+    response = api_client_cognito.request("HEAD", path)
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_List_Profiles_GET_200(api_client_cognito, stub_profile):
+    """The created Profile appears in the unfiltered list."""
+    # Arrange
+    path = "/service/profiles"
+    # Act
+    response = api_client_cognito.request("GET", path)
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert isinstance(response_json, list)
+    assert stub_profile["id"] in [profile["id"] for profile in response_json]
+
+
+def test_List_Profiles_GET_200_label(api_client_cognito, stub_profile):
+    """The Profile's session-unique label filters to exactly it."""
+    # Arrange
+    path = "/service/profiles"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={"label": stub_profile["label"]}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 1 == len(response_json)
+    assert_equal_unordered(stub_profile, remove_dynamic_props(response_json[0]))
+
+
+def test_List_Profiles_GET_200_format(api_client_cognito, stub_profile):
+    """format filters Profiles: the video Profile matches video, not audio."""
+    # Arrange
+    path = "/service/profiles"
+    # Act
+    match = api_client_cognito.request(
+        "GET", path, params={"format": "urn:x-nmos:format:video"}
+    )
+    no_match = api_client_cognito.request(
+        "GET", path, params={"format": "urn:x-nmos:format:audio"}
+    )
+    # Assert
+    assert_json_response(match, 200)
+    assert_json_response(no_match, 200)
+    assert stub_profile["id"] in [profile["id"] for profile in match.json()]
+    assert stub_profile["id"] not in [profile["id"] for profile in no_match.json()]
+
+
+def test_List_Profiles_GET_200_codec(api_client_cognito, stub_profile):
+    """codec filters Profiles: the h264 Profile matches h264, not aac."""
+    # Arrange
+    path = "/service/profiles"
+    # Act
+    match = api_client_cognito.request("GET", path, params={"codec": "video/h264"})
+    no_match = api_client_cognito.request("GET", path, params={"codec": "audio/aac"})
+    # Assert
+    assert_json_response(match, 200)
+    assert_json_response(no_match, 200)
+    assert stub_profile["id"] in [profile["id"] for profile in match.json()]
+    assert stub_profile["id"] not in [profile["id"] for profile in no_match.json()]
+
+
+def test_List_Profiles_GET_400_format(api_client_cognito):
+    """An invalid format enum value is a 400."""
+    # Arrange
+    path = "/service/profiles"
+    # Act
+    response = api_client_cognito.request("GET", path, params={"format": "invalid"})
+    # Assert
+    assert_json_response(response, 400)

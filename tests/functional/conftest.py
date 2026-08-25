@@ -222,6 +222,10 @@ def service_table():
             "description": "An example Time Addressable Media Store",
         }
     )
+    # tags are set out of band directly on the DynamoDB record (there is no API
+    # to set them); the two backends carry different tags so filter tests can
+    # discriminate. "env" is an array value to exercise array-member matching,
+    # and only the default backend has it, so tag_exists.env separates the two.
     table.put_item(
         Item={
             "record_type": "storage-backend",
@@ -232,6 +236,7 @@ def service_table():
             "store_product": "s3",
             "store_type": "http_object_store",
             "default_storage": True,
+            "tags": {"tier": "gold", "env": ["prod", "shared"]},
         }
     )
     table.put_item(
@@ -243,6 +248,7 @@ def service_table():
             "region": "alternative-region",
             "store_product": "s3",
             "store_type": "http_object_store",
+            "tags": {"tier": "silver"},
         }
     )
     yield table

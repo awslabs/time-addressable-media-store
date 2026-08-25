@@ -3,7 +3,14 @@ import json
 from http import HTTPStatus
 
 import pytest
-from conftest import ID_404, STORE_NAME
+
+# pylint: disable=no-name-in-module
+from conftest import (
+    ALTERNATIVE_STORAGE_ID,
+    DEFAULT_STORAGE_ID,
+    ID_404,
+    STORE_NAME,
+)
 
 pytestmark = [
     pytest.mark.functional,
@@ -1266,3 +1273,80 @@ def test_Service_StorageBackends_reverse_order(
     assert response_headers.get("X-Paging-Reverse-Order")[0] == expected_header
     labels = [backend["label"] for backend in response_body]
     assert labels == sorted(labels, reverse=reverse_order is not None)
+
+
+@pytest.mark.parametrize(
+    "query_params,expected_ids",
+    [
+        # tag value: whole-value match, one backend each
+        ({"tag.tier": "gold"}, {DEFAULT_STORAGE_ID}),
+        ({"tag.tier": "silver"}, {ALTERNATIVE_STORAGE_ID}),
+        # comma-separated list is OR, so it spans both
+        ({"tag.tier": "gold,silver"}, {DEFAULT_STORAGE_ID, ALTERNATIVE_STORAGE_ID}),
+        # array-valued tag matches on a member
+        ({"tag.env": "shared"}, {DEFAULT_STORAGE_ID}),
+        # match is a whole value, never a substring
+        ({"tag.tier": "gol"}, set()),
+        # no backend carries this value
+        ({"tag.tier": "bronze"}, set()),
+        # existence separates the env-tagged backend from the other
+        ({"tag_exists.env": "true"}, {DEFAULT_STORAGE_ID}),
+        ({"tag_exists.env": "false"}, {ALTERNATIVE_STORAGE_ID}),
+    ],
+)
+# pylint: disable=redefined-outer-name
+def test_Service_StorageBackends_GET_200_tag_filter(
+    lambda_context, api_event_factory, api_service, query_params, expected_ids
+):
+    """tag.{name} / tag_exists.{name} filter Storage Backends on their DynamoDB tags."""
+    # Arrange
+    event = api_event_factory(
+        "GET", "/service/storage-backends", query_params=query_params
+    )
+
+    # Act
+    response = api_service.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    response_body = json.loads(response["body"])
+    assert {backend["id"] for backend in response_body} == expected_ids
+    # X-Paging-Count reflects the filtered result, not the whole set
+    assert response["multiValueHeaders"]["X-Paging-Count"][0] == str(len(expected_ids))
+
+
+# pylint: disable=redefined-outer-name
+def test_Service_StorageBackends_HEAD_200_tag_filter(
+    lambda_context, api_event_factory, api_service
+):
+    """HEAD reports the filtered count in X-Paging-Count with no body."""
+    # Arrange
+    event = api_event_factory(
+        "HEAD", "/service/storage-backends", query_params={"tag.tier": "gold"}
+    )
+
+    # Act
+    response = api_service.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    assert response["multiValueHeaders"]["X-Paging-Count"][0] == "1"
+
+
+# pylint: disable=redefined-outer-name
+def test_Service_StorageBackends_GET_400_bad_tag_exists(
+    lambda_context, api_event_factory, api_service
+):
+    """A non-boolean tag_exists value is a 400."""
+    # Arrange
+    event = api_event_factory(
+        "GET",
+        "/service/storage-backends",
+        query_params={"tag_exists.env": "notabool"},
+    )
+
+    # Act
+    response = api_service.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value

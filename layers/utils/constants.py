@@ -18,6 +18,7 @@ RETURN_LITERAL = {
     "flow": "flow {.*, source_id: s.id, essence_parameters: e {.*}, tags: t {.*}, flow_collection: collect(DISTINCT c {.*, id: fc.id}), collected_by: collect(DISTINCT cb.id)}",
     "delete_request": "delete_request {.*, error: CASE WHEN e.type IS NULL THEN NULL ELSE e {.*} END}",
     "webhook": "webhook {.*, tags: t {.*}}",
+    "profile": "profile {.*, tags: t {.*}, flow_metadata: fm {.*, essence_parameters: e {.*}}}",
 }
 MIN_OBJECT_TIMEOUT_SECS = 3600
 MIN_PRESIGNED_URL_TIMEOUT_SECS = 3600
