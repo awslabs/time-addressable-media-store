@@ -326,19 +326,25 @@ def delete_flow_by_id(
     # Get flow timerange, if timerange is empty delete flow sync, otherwise return a delete request
     flow_timerange = TimeRange.from_str(get_flow_timerange(flow_id))
     if flow_timerange.is_empty():
+        # Resolve the event resources (source + collection membership) while the
+        # Flow still exists; deleting it first would drop the collected-by
+        # resources that webhook collection filters match on. The sources/deleted
+        # event takes only the source-typed entries so it doesn't route to
+        # flow-filtered webhooks.
+        event_resources = get_event_resources(item)
         source_id = delete_flow(flow_id)
         if source_id:
             publish_event(
                 f"{record_type}s/deleted",
                 {f"{record_type}_id": flow_id},
-                get_event_resources(item),
+                event_resources,
             )
         # Delete source if no longer referenced by any other flows
         if check_delete_source(source_id):
             publish_event(
                 "sources/deleted",
                 {"source_id": source_id},
-                enhance_resources([f"tams:source:{source_id}"]),
+                [r for r in event_resources if r.startswith("tams:source")],
             )
         return None, HTTPStatus.NO_CONTENT.value  # 204
     # Create flow delete-request

@@ -50,20 +50,24 @@ def record_handler(
         )
         # Delete the flow
         source_id = delete_flow(body["flow_id"])
+        # The Flow (and its collection edges) are now gone, so re-resolving would
+        # drop the collected-by resources that webhook collection filters match
+        # on. Reuse the set resolved before deletion above (flow + source +
+        # flow/source collected-by); the sources/deleted event takes only the
+        # source-typed entries so it doesn't route to flow-filtered webhooks.
+        deleted_resources = body["segments_deleted_resources"]
         if source_id:
             publish_event(
                 "flows/deleted",
                 {"flow_id": body["flow_id"]},
-                enhance_resources(
-                    [f"tams:flow:{body['flow_id']}", f"tams:source:{source_id}"]
-                ),
+                deleted_resources,
             )
         # Delete source if no longer referenced by any other flows
         if check_delete_source(source_id):
             publish_event(
                 "sources/deleted",
                 {"source_id": source_id},
-                enhance_resources([f"tams:source:{source_id}"]),
+                [r for r in deleted_resources if r.startswith("tams:source")],
             )
     # Now proceed with deleting the flow segments
     body["status"] = "started"

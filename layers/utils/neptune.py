@@ -857,6 +857,13 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
         existing_dict.get("source_id")
         and flow_dict["source_id"] != existing_dict["source_id"]
     ):
+        # Resolve the old source's collected-by resources before removing the
+        # represents edge (and possibly deleting the source), so a sources/deleted
+        # event keeps the resources webhook collection filters match on. This
+        # yields only source-typed resources (no flow was passed).
+        old_source_resources = enhance_resources(
+            [f"tams:source:{existing_dict['source_id']}"]
+        )
         # Delete the old represents edge
         query_delete = (
             qb.match()
@@ -872,7 +879,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
             publish_event(
                 "sources/deleted",
                 {"source_id": existing_dict["source_id"]},
-                enhance_resources([f"tams:source:{existing_dict['source_id']}"]),
+                old_source_resources,
             )
     # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
     return query_node("flow", flow_dict["id"])
