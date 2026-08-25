@@ -1,6 +1,10 @@
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 DEFAULT_PAGE_LIMIT = 30
 MAX_PAGE_LIMIT = 300
+# Upper bound on the number of raw Neptune pages GET /flows will scan while the
+# timerange post-filter is discarding every result. Prevents a store full of
+# non-matching Flows from stalling the request past the API Gateway 29s limit.
+MAX_TIMERANGE_FILTER_PAGES = 10
 DELETE_BATCH_SIZE = 100
 MAX_MESSAGE_SIZE = 250000
 LAMBDA_TIME_REMAINING = 5000

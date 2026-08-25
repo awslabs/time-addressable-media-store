@@ -135,43 +135,56 @@ def get_flows(
     )
     reverse_order = bool(param_reverse_order)
     custom_headers = {}
-    items, next_page, limit_used = query_flows(
-        {
-            "source_id": param_source_id,
-            "timerange": param_timerange,
-            "format": param_format.value if param_format else None,
-            "codec": param_codec,
-            "profile_id": param_profile_id,
-            "label": param_label,
-            "tag_values": param_tag_values,
-            "tag_exists": param_tag_exists,
-            "frame_width": param_frame_width,
-            "frame_height": param_frame_height,
-            "init_segments": param_init_segments,
-            "reverse_order": reverse_order,
-            "sort_by": param_sort_by.value if param_sort_by else None,
-            "status": param_status.value if param_status else None,
-            "collected_by_ids": param_collected_by_ids,
-            "page": param_page,
-            "limit": param_limit,
-        }
-    )
+    query_params = {
+        "source_id": param_source_id,
+        "timerange": param_timerange,
+        "format": param_format.value if param_format else None,
+        "codec": param_codec,
+        "profile_id": param_profile_id,
+        "label": param_label,
+        "tag_values": param_tag_values,
+        "tag_exists": param_tag_exists,
+        "frame_width": param_frame_width,
+        "frame_height": param_frame_height,
+        "init_segments": param_init_segments,
+        "reverse_order": reverse_order,
+        "sort_by": param_sort_by.value if param_sort_by else None,
+        "status": param_status.value if param_status else None,
+        "collected_by_ids": param_collected_by_ids,
+        "page": param_page,
+        "limit": param_limit,
+    }
+    items, next_page, limit_used = query_flows(query_params)
     if param_timerange:
+        # A Flow's timerange isn't stored on the Neptune node -- it's derived
+        # from the segments table -- so timerange filtering happens here in
+        # Python after the DB page is fetched. If every result on the page is
+        # discarded, `next_page` is still set, so returning it as-is produces
+        # an empty body with a Link header (issue #125). Skip fully-filtered
+        # pages until we find matches or run out, bounded by
+        # MAX_TIMERANGE_FILTER_PAGES so a store with many non-matching Flows
+        # can't stall past the API Gateway 29s limit; on the bound the empty
+        # page + Link is still returned and the client can continue manually.
         timerange_filter = TimeRange.from_str(param_timerange)
-        if timerange_filter.is_empty():
-            items = [
-                item
-                for item in items
-                if TimeRange.from_str(get_flow_timerange(item["id"])).is_empty()
-            ]
-        else:
-            items = [
-                item
-                for item in items
-                if not TimeRange.from_str(get_flow_timerange(item["id"]))
-                .intersect_with(timerange_filter)
-                .is_empty()
-            ]
+
+        def _matches_timerange(item):
+            item_tr = TimeRange.from_str(get_flow_timerange(item["id"]))
+            if timerange_filter.is_empty():
+                return item_tr.is_empty()
+            return not item_tr.intersect_with(timerange_filter).is_empty()
+
+        items = [item for item in items if _matches_timerange(item)]
+        pages_scanned = 1
+        while (
+            not items
+            and next_page
+            and pages_scanned < constants.MAX_TIMERANGE_FILTER_PAGES
+        ):
+            page_items, next_page, limit_used = query_flows(
+                {**query_params, "page": next_page}
+            )
+            items = [item for item in page_items if _matches_timerange(item)]
+            pages_scanned += 1
     if next_page:
         custom_headers["X-Paging-NextKey"] = str(next_page)
         custom_headers["Link"] = generate_link_url(app.current_event, str(next_page))
