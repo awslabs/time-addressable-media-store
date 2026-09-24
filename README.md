@@ -44,7 +44,7 @@ To build and deploy your application for the first time, run the following in yo
 
 ```bash
 sam build --use-container
-sam deploy --guided
+sam deploy --guided --config-env <dev/prod>
 ```
 
 **NOTE: The Neptune database takes approximately 20mins to create. Neptune also requires a VPC which is why there are VPC parameters mentioned below.**
