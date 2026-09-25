@@ -1,12 +1,15 @@
 version = 0.1
 
+[dev.build.parameters]
+template_file = "template.yaml"
+
 [dev.deploy.parameters]
 stack_name = "tams-api-dev"
 resolve_s3 = true
 s3_prefix = "tams-dev"
 region = "eu-west-1"
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "VpcId=\"vpc-0d47a388c8c81be12\" VpcAZs=\"eu-west-1a,eu-west-1b\" PrivateSubnetIds=\"subnet-094c3f66b5e86debf,subnet-09655fc43093c1c51\" NeptuneDBInstanceClass=\"db.t4g.medium\" NeptuneServerlessConfiguration=\"1,128\" DeployWaf=\"No\" JwtIssuerUrl=\"\" LambdaAuthorizerArn=\"\""
+parameter_overrides = "VpcId=\"vpc-0d47a388c8c81be12\" VpcAZs=\"eu-west-1a,eu-west-1b\" PrivateSubnetIds=\"subnet-094c3f66b5e86debf,subnet-09655fc43093c1c51\" NeptuneDBInstanceClass=\"db.t4g.medium\" NeptuneServerlessConfiguration=\"1,128\" DeployWaf=\"No\" JwtIssuerUrl=\"\" LambdaAuthorizerArn=\"arn:aws:lambda:eu-west-1:703405601617:function:tams-entra-authorizer-dev-authorizer\""
 image_repositories = []
 tags = [
     "Owner=Alex Jones",
@@ -14,13 +17,16 @@ tags = [
     "Product=TAMS"
 ]
 
+[prod.build.parameters]
+template_file = "template.yaml"
+
 [prod.deploy.parameters]
 stack_name = "tams-api"
 resolve_s3 = true
 s3_prefix = "tams"
 region = "eu-west-1"
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "VpcId=\"vpc-0d47a388c8c81be12\" VpcAZs=\"eu-west-1a,eu-west-1b\" PrivateSubnetIds=\"subnet-094c3f66b5e86debf,subnet-09655fc43093c1c51\" NeptuneDBInstanceClass=\"db.t4g.medium\" NeptuneServerlessConfiguration=\"1,128\" DeployWaf=\"No\" JwtIssuerUrl=\"\" LambdaAuthorizerArn=\"\""
+parameter_overrides = "VpcId=\"vpc-0d47a388c8c81be12\" VpcAZs=\"eu-west-1a,eu-west-1b\" PrivateSubnetIds=\"subnet-094c3f66b5e86debf,subnet-09655fc43093c1c51\" NeptuneDBInstanceClass=\"db.t4g.medium\" NeptuneServerlessConfiguration=\"1,128\" DeployWaf=\"No\" JwtIssuerUrl=\"\" LambdaAuthorizerArn=\"arn:aws:lambda:eu-west-1:703405601617:function:tams-entra-authorizer-prod-authorizer\""
 image_repositories = []
 tags = [
     "Owner=Alex Jones",
@@ -28,5 +34,31 @@ tags = [
     "Product=TAMS"
 ]
 
+[default.global.parameters]
+region = "eu-west-1"
+
 [dev.global.parameters]
 region = "eu-west-1"
+
+[prod.global.parameters]
+region = "eu-west-1"
+
+[dev-auth.build.parameters]
+template_file = "entra_authorizer.yaml"
+
+[dev-auth.deploy.parameters]
+stack_name = "tams-entra-authorizer-dev"
+resolve_s3 = true
+capabilities = ["CAPABILITY_IAM"]
+parameter_overrides = "TenantId=\"be189d14-1d13-4148-9edf-47fff7e918a8\" AllowedAudiences=\"api://8ab97629-3017-4d9e-907d-a7201a4ffd25\" LogLevel=\"DEBUG\""
+
+[prod-auth.build.parameters]
+template_file = "entra_authorizer.yaml"
+
+[prod-auth.deploy.parameters]
+stack_name = "tams-entra-authorizer-prod"
+resolve_s3 = true
+capabilities = ["CAPABILITY_IAM"]
+parameter_overrides = "TenantId=\"be189d14-1d13-4148-9edf-47fff7e918a8\" AllowedAudiences=\"api://8ab97629-3017-4d9e-907d-a7201a4ffd25\" LogLevel=\"INFO\""
+
+
