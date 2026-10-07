@@ -53,6 +53,7 @@ from utils import (
     get_username,
     model_dump,
     parse_tag_parameters,
+    raise_validation_error,
     tags_match,
 )
 
@@ -420,4 +421,4 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
-    raise BadRequestError(ex.errors())  # 400
+    raise_validation_error(ex, app.current_event.http_method)

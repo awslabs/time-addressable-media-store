@@ -542,8 +542,8 @@ def test_Create_Flow_Segment_POST_200_list_partial(
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 1 == len(response_json)
-    assert "BadRequestError" == response_json[0]["error"]["type"]
+    assert 1 == len(response_json["failed_segments"])
+    assert "BadRequestError" == response_json["failed_segments"][0]["error"]["type"]
     expect_webhooks(
         (
             {
@@ -596,7 +596,7 @@ def test_Create_Flow_Segment_POST_200_list_failed(
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 2 == len(response_json)
+    assert 2 == len(response_json["failed_segments"])
 
 
 def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(

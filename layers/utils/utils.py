@@ -15,6 +15,10 @@ from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     ForbiddenError,
+    NotFoundError,
+)
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
 )
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import (
@@ -269,6 +273,13 @@ def remove_null(obj: dict | list) -> None:
             remove_null(i)
     elif isinstance(obj, dict):
         for k, v in list(obj.items()):
+            # essence_parameters is required, even when empty, for all but multi Flows
+            if (
+                k == "essence_parameters"
+                and v == {}
+                and obj.get("format") != "urn:x-nmos:format:multi"
+            ):
+                continue
             if v is None or v == {} or v == []:
                 obj.pop(k)
             elif isinstance(v, str):
@@ -418,6 +429,24 @@ def deserialise_neptune_obj(obj: dict) -> dict:
 
 
 @tracer.capture_method(capture_response=False)
+def parse_essence_parameter(
+    key: str, value, essence_properties: dict, where_literals: list
+) -> None:
+    """Adds an essence parameter filter as a property match or where literal"""
+    match essence_params[key]:
+        case "int":
+            essence_properties[key] = int(value)
+        case "float":
+            essence_properties[key] = float(value)
+        case "bool":
+            if value if isinstance(value, bool) else str(value).lower() == "true":
+                essence_properties[key] = True
+            else:
+                # Omitted boolean essence parameters are treated as false
+                where_literals.append(f"(e.{key} IS NULL OR e.{key} = false)")
+
+
+@tracer.capture_method(capture_response=False)
 def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     """Parses API Gateway parameters into the structure used by OpenCypher query"""
     where_literals = []
@@ -425,16 +454,9 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     for key, value in query_parameters.items():
         if value is not None:
             if key in essence_params:
-                if essence_params[key] == "int":
-                    return_dict["essence_properties"][key] = int(value)
-                elif essence_params[key] == "float":
-                    return_dict["essence_properties"][key] = float(value)
-                elif essence_params[key] == "bool":
-                    return_dict["essence_properties"][key] = (
-                        value
-                        if isinstance(value, bool)
-                        else str(value).lower() == "true"
-                    )
+                parse_essence_parameter(
+                    key, value, return_dict["essence_properties"], where_literals
+                )
             elif key == "tag_values":
                 for tag_name, tag_value in value.items():
                     prop_name = opencypher_property_name(tag_name)
@@ -453,6 +475,21 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
             else:
                 return_dict["properties"][key] = value
     return return_dict, where_literals
+
+
+@tracer.capture_method(capture_response=False)
+def raise_validation_error(ex: RequestValidationError, http_method: str) -> None:
+    """Raises the TAMS error for a request validation failure.
+
+    A malformed path ID on a GET, HEAD or DELETE is reported as 404, since TAMS
+    defines no 400 response for most of those operations.
+    """
+    errors = ex.errors()
+    if http_method in ("GET", "HEAD", "DELETE") and all(
+        error.get("loc", [None])[0] == "path" for error in errors
+    ):
+        raise NotFoundError("The requested ID in the path is invalid.")  # 404
+    raise BadRequestError(errors)  # 400
 
 
 @tracer.capture_method(capture_response=False)

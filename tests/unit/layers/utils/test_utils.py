@@ -7,6 +7,10 @@ import pytest
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     ForbiddenError,
+    NotFoundError,
+)
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
 )
 from mediatimestamp.immutable import TimeRange, Timestamp
 
@@ -307,6 +311,25 @@ class TestUtils:
         # Ensure misc properties are included appropriately
         assert return_dict["properties"]["misc"] == query_parameters["misc"]
 
+    def test_parse_api_gw_parameters_bool_true_is_property_match(self):
+        return_dict, where_literals = utils.parse_api_gw_parameters(
+            {"init_segments": True}
+        )
+
+        assert return_dict["essence_properties"] == {"init_segments": True}
+        assert where_literals == []
+
+    @pytest.mark.parametrize("value", [False, "false"])
+    def test_parse_api_gw_parameters_bool_false_matches_omitted(self, value):
+        return_dict, where_literals = utils.parse_api_gw_parameters(
+            {"init_segments": value}
+        )
+
+        assert "init_segments" not in return_dict["essence_properties"]
+        assert where_literals == [
+            "(e.init_segments IS NULL OR e.init_segments = false)"
+        ]
+
     def test_parse_api_gw_parameters_tag_value_matches_array_member(self):
         """A tag filter must match a member of an array-valued tag.
 
@@ -340,6 +363,57 @@ class TestUtils:
         result = utils.filter_dict(input_dict, keys_to_remove)
 
         assert result == {"b": 2}
+
+    @pytest.mark.parametrize("http_method", ["GET", "HEAD", "DELETE"])
+    def test_raise_validation_error_path_is_404(self, http_method):
+        ex = RequestValidationError([{"loc": ("path", "flowId"), "msg": "bad"}])
+
+        with pytest.raises(NotFoundError):
+            utils.raise_validation_error(ex, http_method)
+
+    @pytest.mark.parametrize(
+        "http_method, loc",
+        [
+            ("PUT", ("path", "flowId")),
+            ("POST", ("path", "flowId")),
+            ("GET", ("query", "limit")),
+        ],
+    )
+    def test_raise_validation_error_is_400(self, http_method, loc):
+        ex = RequestValidationError([{"loc": loc, "msg": "bad"}])
+
+        with pytest.raises(BadRequestError):
+            utils.raise_validation_error(ex, http_method)
+
+    def test_raise_validation_error_mixed_locations_is_400(self):
+        ex = RequestValidationError(
+            [
+                {"loc": ("path", "flowId"), "msg": "bad"},
+                {"loc": ("query", "limit"), "msg": "bad"},
+            ]
+        )
+
+        with pytest.raises(BadRequestError):
+            utils.raise_validation_error(ex, "GET")
+
+    def test_remove_null_preserves_empty_essence_parameters(self):
+        obj = {
+            "format": "urn:x-nmos:format:data",
+            "essence_parameters": {"unc_parameters": {}},
+            "tags": {},
+            "label": None,
+        }
+
+        utils.remove_null(obj)
+
+        assert obj == {"format": "urn:x-nmos:format:data", "essence_parameters": {}}
+
+    def test_remove_null_removes_empty_essence_parameters_for_multi(self):
+        obj = {"format": "urn:x-nmos:format:multi", "essence_parameters": {}}
+
+        utils.remove_null(obj)
+
+        assert obj == {"format": "urn:x-nmos:format:multi"}
 
     @patch("utils.s3")
     def test_get_presigned_url(self, mock_s3):

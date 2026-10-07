@@ -41,7 +41,14 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, Flowsegmentpost, Timerange, Uuid
+from schema import (
+    Deletionrequest,
+    Flowsegment,
+    Flowsegmentbulkfailure,
+    Flowsegmentpost,
+    Timerange,
+    Uuid,
+)
 from segment_get_urls import populate_get_urls
 from typing_extensions import Annotated
 from utils import (
@@ -52,6 +59,7 @@ from utils import (
     parse_tag_parameters,
     publish_event,
     put_message,
+    raise_validation_error,
 )
 
 tracer = Tracer()
@@ -214,7 +222,10 @@ def post_flow_segments_by_id(
         if len(failed_segments) == 0:
             return None, HTTPStatus.CREATED.value  # 201
         else:
-            return model_dump(failed_segments), HTTPStatus.OK.value  # 200
+            return (
+                model_dump(Flowsegmentbulkfailure(failed_segments=failed_segments)),
+                HTTPStatus.OK.value,
+            )  # 200
     # Handle single segment requests separately to retain backwards compatibility with previous version of API where list of segments not available.
     else:
         segment_result = process_single_segment(item, flow_segment)
@@ -293,7 +304,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
-    raise BadRequestError(ex.errors())  # 400
+    raise_validation_error(ex, app.current_event.http_method)
 
 
 @tracer.capture_method(capture_response=False)

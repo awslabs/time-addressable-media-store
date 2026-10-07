@@ -994,9 +994,11 @@ def test_Webhook_Details_200(
     ["HEAD", "GET"],
 )
 # pylint: disable=redefined-outer-name
-def test_Webhook_Details_400(lambda_context, api_event_factory, api_service, method):
+def test_Webhook_Details_404_bad_id(
+    lambda_context, api_event_factory, api_service, method
+):
     """
-    Verifies that HEAD/GET requests with invalid webhook ID return 400 Bad Request.
+    Verifies that HEAD/GET requests with a malformed webhook ID return 404 Not Found.
     """
     # Arrange
     event = api_event_factory(method, "/service/webhooks/bad-id")
@@ -1007,11 +1009,9 @@ def test_Webhook_Details_400(lambda_context, api_event_factory, api_service, met
     response_body = json.loads(response["body"])
 
     # Assert
-    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
+    assert response["statusCode"] == HTTPStatus.NOT_FOUND.value
     assert response_headers.get("Content-Type")[0] == "application/json"
-    assert isinstance(response_body["message"], list)
-    assert len(response_body["message"]) > 0
-    assert response_body["message"][0]["type"] == "string_pattern_mismatch"
+    assert response_body["message"] == "The requested ID in the path is invalid."
 
 
 @pytest.mark.parametrize(

@@ -10,10 +10,7 @@ from aws_lambda_powertools.event_handler import (
     Response,
     content_types,
 )
-from aws_lambda_powertools.event_handler.exceptions import (
-    BadRequestError,
-    NotFoundError,
-)
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
@@ -39,6 +36,7 @@ from utils import (
     opencypher_property_name,
     parse_tag_parameters,
     publish_event,
+    raise_validation_error,
 )
 
 tracer = Tracer()
@@ -334,7 +332,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
-    raise BadRequestError(ex.errors())  # 400
+    raise_validation_error(ex, app.current_event.http_method)
 
 
 @tracer.capture_method(capture_response=False)

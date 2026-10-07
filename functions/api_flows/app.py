@@ -80,6 +80,7 @@ from utils import (
     parse_tag_parameters,
     publish_event,
     put_message,
+    raise_validation_error,
     validate_frame_rate,
 )
 
@@ -937,7 +938,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
-    raise BadRequestError(ex.errors())  # 400
+    raise_validation_error(ex, app.current_event.http_method)
 
 
 @tracer.capture_method(capture_response=False)
