@@ -13,24 +13,28 @@ class TestBuildOrderBy:
 
     build_order_by feeds cymple's order_by, which applies the ASC/DESC keyword
     only to the LAST column. Every column except the id tie-breaker must
-    therefore carry its direction inline, and id takes the returned `ascending`
-    flag. These tests assert both the column list and the flag so a regression
+    therefore carry its direction inline, and id takes the returned flag.
+    These tests assert both the column list and the flag so a regression
     to the broken single-direction form is caught.
 
     The leading `(col IS NULL)` term implements the spec fallback rule: records
     with an unset sort value sort after those with one by default, and before
-    when reverse_order is set. Its direction depends only on reverse_order.
+    when reverse_order is set. Its direction depends only on reverse_order, as
+    does the id fallback/tie-breaker (ascending unless reversed).
     """
 
     def test_datetime_default_is_descending(self):
-        # created is a datetime key -> newest first (DESC) by default
-        cols, ascending = build_order_by("source", None, False, {"created", "updated"})
+        # created is a datetime key -> newest first (DESC) by default, while
+        # the id fallback stays ascending
+        cols, id_ascending = build_order_by(
+            "source", None, False, {"created", "updated"}
+        )
         assert cols == [
             "(source.created IS NULL) ASC",
             "source.created DESC",
             "source.id",
         ]
-        assert ascending is False
+        assert id_ascending is True
 
     def test_string_default_is_ascending(self):
         # label is a string key -> alphabetical (ASC) by default
@@ -45,7 +49,7 @@ class TestBuildOrderBy:
         assert ascending is True
 
     def test_reverse_flips_datetime_default(self):
-        cols, ascending = build_order_by(
+        cols, id_ascending = build_order_by(
             "source", "created", True, {"created", "updated"}
         )
         assert cols == [
@@ -53,7 +57,7 @@ class TestBuildOrderBy:
             "source.created ASC",
             "source.id",
         ]
-        assert ascending is True
+        assert id_ascending is False
 
     def test_reverse_flips_string_default(self):
         cols, ascending = build_order_by(
@@ -67,7 +71,7 @@ class TestBuildOrderBy:
         assert ascending is False
 
     def test_sort_by_none_uses_default_col(self):
-        cols, ascending = build_order_by(
+        cols, id_ascending = build_order_by(
             "flow", None, False, {"created", "metadata_updated"}
         )
         assert cols == [
@@ -75,7 +79,7 @@ class TestBuildOrderBy:
             "flow.created DESC",
             "flow.id",
         ]
-        assert ascending is False
+        assert id_ascending is True
 
     def test_explicit_default_col_for_fixed_key(self):
         # Webhooks have a single fixed string key (url) supplied via default_col
@@ -100,16 +104,18 @@ class TestBuildOrderBy:
         ]
         assert ascending is False
 
-    def test_tie_breaker_direction_matches_ascending_flag(self):
+    @pytest.mark.parametrize("reverse_order", [False, True])
+    def test_id_fallback_direction_depends_only_on_reverse_order(self, reverse_order):
         # The id tie-breaker is the LAST column and has no inline direction; it
-        # must resolve (via the ascending flag) to the same direction as the
-        # primary column so pagination order is a total order.
-        cols, ascending = build_order_by(
-            "delete_request", "expiry", False, {"created", "expiry"}
+        # resolves via the returned flag. Unset records fall back to id order,
+        # ascending unless reversed, even when the primary key is DESC (e.g.
+        # delete requests without an expiry sorted by expiry).
+        cols, id_ascending = build_order_by(
+            "delete_request", "expiry", reverse_order, {"created", "expiry"}
         )
         assert cols[-1] == "delete_request.id"
-        assert cols[1].endswith("DESC")
-        assert ascending is False
+        assert cols[1].endswith("ASC" if reverse_order else "DESC")
+        assert id_ascending is not reverse_order
 
     def test_id_always_present_as_secondary_key(self):
         for sort_by in [None, "created", "updated", "label"]:

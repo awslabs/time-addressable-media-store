@@ -256,6 +256,10 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
                 args["KeyConditionExpression"],
                 Key("timerange_end").lte(exact_timerange_end),
             )
+            # Drop the boundary segment when it starts after the requested range.
+            args["FilterExpression"] = get_timerange_expression(
+                Attr, TimeRangeBoundary.START, timerange_filter
+            )
     return args
 
 

@@ -479,6 +479,36 @@ class TestDynamoDB:
         assert between_values[0] == between_values[1] == 1
 
     @patch("dynamodb.segments_table")
+    def test_get_key_and_args_end_only_filters_boundary_segment(
+        self, mock_segments_table
+    ):
+        """An end-only timerange (e.g. "_0:0)") bounds the sort key at the end of
+        the first segment reaching the filter end, and retains the end boundary as
+        a FilterExpression so that segment is dropped when it starts after the
+        requested range (regression test)."""
+        boundary_end_ns = 1_000_000_002
+        mock_segments_table.query.return_value = {
+            "Items": [{"timerange_end": boundary_end_ns}]
+        }
+        parameters = {"timerange": "_0:0)"}
+
+        result = dynamodb.get_key_and_args("test-flow", parameters)
+
+        key_expr, key_names, key_values = parse_dynamo_expression(
+            result["KeyConditionExpression"]
+        )
+        assert "<=" in key_expr
+        assert set(key_names.values()) == {"flow_id", "timerange_end"}
+        assert boundary_end_ns in key_values.values()
+        filter_expr, filter_names, filter_values = parse_dynamo_expression(
+            result["FilterExpression"]
+        )
+        assert set(filter_names.values()) == {"timerange_start"}
+        # Exclusive end: the segment must start strictly before 0.
+        assert "<" in filter_expr and "<=" not in filter_expr
+        assert 0 in filter_values.values()
+
+    @patch("dynamodb.segments_table")
     def test_get_key_and_args_object_id_and_timerange_ands_filters(
         self, mock_segments_table
     ):

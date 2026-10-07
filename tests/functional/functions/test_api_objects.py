@@ -193,6 +193,42 @@ def test_GET_object_returns_200_with_complete_flow_references_when_object_exists
 
 
 # pylint: disable=redefined-outer-name
+def test_GET_object_decodes_percent_encoded_object_id(
+    lambda_context,
+    api_event_factory,
+    segments_table,
+    sample_timerange,
+    multiple_flow_ids,
+    api_objects,
+):
+    """
+    Verifies that an Object ID containing "/" and a literal "%2F" is found when
+    requested percent-encoded, as API Gateway passes the path undecoded.
+    """
+    # Arrange
+    object_id = f"encoded/{uuid.uuid4()}/literal%2F.ts"
+    segments_table.put_item(
+        Item={
+            "flow_id": multiple_flow_ids[0],
+            "timerange_end": sample_timerange["end"] + 1_000_000_000,
+            "object_id": object_id,
+            "timerange": "[6:0_7:0)",
+        }
+    )
+    encoded_object_id = object_id.replace("%", "%25").replace("/", "%2F")
+    event = api_event_factory("GET", f"/objects/{encoded_object_id}")
+
+    # Act
+    response = api_objects.lambda_handler(event, lambda_context)
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    assert response_body.get("id") == object_id
+    assert response_body.get("referenced_by_flows") == [multiple_flow_ids[0]]
+
+
+# pylint: disable=redefined-outer-name
 def test_GET_object_returns_limited_flow_references_with_pagination_headers_when_limit_specified(
     lambda_context, api_event_factory, test_object_id, multiple_flow_ids, api_objects
 ):
@@ -264,6 +300,7 @@ def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_p
     assert response_headers.get("Content-Type")[0] == "application/json"
     assert response_headers.get("Link") is None
     assert response_headers.get("X-Paging-NextKey") is None
+    assert response_headers.get("X-Paging-Limit")[0] == "1"
     assert response_body.get("id") == test_object_id
     assert len(response_body.get("referenced_by_flows")) == 1
     assert response_body.get("referenced_by_flows")[0] == multiple_flow_ids[1]

@@ -1,6 +1,7 @@
 # pylint: disable=too-many-lines
 import base64
 import json
+from urllib.parse import quote
 
 import pytest
 import requests
@@ -21,6 +22,9 @@ from conftest import (
 pytestmark = [
     pytest.mark.acceptance,
 ]
+
+# Contains "/" and a literal "%2F" so the Object path must be percent-encoded
+EXTERNAL_OBJECT_ID = "test/456/literal%2F.ts"
 
 
 @pytest.mark.parametrize(
@@ -649,7 +653,7 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
 ):
     # Arrange
     path = f"/flows/{stub_multi_flow['id']}/segments"
-    object_id = "test-456"
+    object_id = EXTERNAL_OBJECT_ID
     segment = {
         "object_id": object_id,
         "timerange": "[5:0_6:0)",
@@ -718,7 +722,7 @@ def test_List_Flow_Segments_GET_200_with_get_urls_external(
         "GET",
         path,
         params={
-            "object_id": "test-456",
+            "object_id": EXTERNAL_OBJECT_ID,
             "accept_get_urls": "something-external",
         },
     )
@@ -726,6 +730,24 @@ def test_List_Flow_Segments_GET_200_with_get_urls_external(
     assert_json_response(response, 200)
     response_json = response.json()
     assert 1 == len(response_json)
+
+
+def test_Get_Media_Object_Information_GET_200_encoded_id(
+    api_client_cognito, stub_multi_flow
+):
+    """An Object ID containing "/" and "%" is found when percent-encoded in the path"""
+    # Arrange
+    path = f"/objects/{quote(EXTERNAL_OBJECT_ID, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert EXTERNAL_OBJECT_ID == response_json["id"]
+    assert [stub_multi_flow["id"]] == response_json["referenced_by_flows"]
 
 
 def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
@@ -770,7 +792,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
         "DELETE",
         path,
         params={
-            "object_id": "test-456",
+            "object_id": EXTERNAL_OBJECT_ID,
         },
     )
     # Assert

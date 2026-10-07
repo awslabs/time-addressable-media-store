@@ -443,13 +443,17 @@ def build_order_by(
     Records whose sort value is unset (NULL) sort after those with a value by
     default, and before them when `reverse_order` is set (per the spec fallback
     rule). This is achieved with a leading `(col IS NULL)` term whose direction
-    depends only on `reverse_order`, independent of the value direction; within
-    the NULL group the `id` tie-breaker then provides a total order.
+    depends only on `reverse_order`, independent of the value direction.
 
-    Returns `(columns, ascending)` for `order_by`. Note cymple's `order_by`
+    Within the NULL group the spec falls back to sorting by `id`, which as a
+    string key is ascending by default and descending when `reverse_order` is
+    set, regardless of the primary key's direction. The same `id` direction
+    breaks ties between equal values.
+
+    Returns `(columns, id_ascending)` for `order_by`. Note cymple's `order_by`
     applies the ASC/DESC keyword only to the LAST column, so every column except
     the `id` tie-breaker carries its direction inline and `id` takes the
-    `ascending` flag. See the cymple-order-by-multicolumn limitation.
+    returned flag. See the cymple-order-by-multicolumn limitation.
     """
     col = sort_by or default_col
     # Datetime keys default newest-first (DESC); string keys default ascending (ASC)
@@ -464,7 +468,7 @@ def build_order_by(
         f"({ref_name}.{col} IS NULL) {null_direction}",
         f"{ref_name}.{col} {direction}",
         f"{ref_name}.id",
-    ], ascending
+    ], not reverse_order
 
 
 @tracer.capture_method(capture_response=False)
