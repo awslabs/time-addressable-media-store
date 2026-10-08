@@ -479,6 +479,21 @@ class TestDynamoDB:
         assert between_values[0] == between_values[1] == 1
 
     @patch("dynamodb.segments_table")
+    def test_get_key_and_args_exclusive_single_timestamp_is_empty(
+        self, mock_segments_table
+    ):
+        """ "(1000000000:1)" holds no time; mediatimestamp would read it as the
+        instant "[1000000000:1]", so it must be treated as the empty range and
+        bound the key to the clamped empty window (regression test)."""
+        mock_segments_table.query.return_value = {"Items": []}
+
+        result = dynamodb.get_key_and_args("test-flow", {"timerange": "(1000000000:1)"})
+
+        _, _, key_values = parse_dynamo_expression(result["KeyConditionExpression"])
+        between_values = [v for v in key_values.values() if isinstance(v, int)]
+        assert between_values == [1, 1]
+
+    @patch("dynamodb.segments_table")
     def test_get_key_and_args_end_only_filters_boundary_segment(
         self, mock_segments_table
     ):

@@ -260,6 +260,45 @@ def test_GET_object_returns_limited_flow_references_with_pagination_headers_when
 
 
 # pylint: disable=redefined-outer-name
+def test_GET_object_returns_empty_flow_references_on_page_past_the_last(
+    lambda_context,
+    api_event_factory,
+    test_object_id,
+    sample_timerange,
+    multiple_flow_ids,
+    api_objects,
+):
+    """
+    Verifies that a page beyond the last flow reference still returns the
+    required referenced_by_flows property, as an empty list.
+    """
+    # Arrange
+    event = api_event_factory(
+        "GET",
+        f"/objects/{test_object_id}",
+        query_params={
+            "limit": "1",
+            "page": create_pagination_token(
+                {
+                    "flow_id": multiple_flow_ids[-1],
+                    "timerange_end": sample_timerange["end"],
+                    "object_id": test_object_id,
+                }
+            ),
+        },
+    )
+
+    # Act
+    response = api_objects.lambda_handler(event, lambda_context)
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.OK.value
+    assert response_body.get("id") == test_object_id
+    assert response_body.get("referenced_by_flows") == []
+
+
+# pylint: disable=redefined-outer-name
 def test_GET_object_returns_next_page_of_flow_references_when_pagination_token_provided(
     lambda_context,
     api_event_factory,

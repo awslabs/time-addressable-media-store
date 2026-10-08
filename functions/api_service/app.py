@@ -54,7 +54,10 @@ from utils import (
     model_dump,
     parse_tag_parameters,
     raise_validation_error,
+    reject_null_body_fields,
     tags_match,
+    validate_frame_rate,
+    validate_raw_essence_parameters,
 )
 
 tracer = Tracer()
@@ -62,6 +65,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 
 record_type = "webhook"
@@ -398,6 +402,12 @@ def post_profile_by_id(
         raise BadRequestError(
             "Bad request. The requested Profile already exists and Profiles are immutable."
         )  # 400
+    flow_metadata = model_dump(profile).get("flow_metadata", {})
+    if flow_metadata.get("format") == Contentformat.urn_x_nmos_format_video.value:
+        validate_frame_rate(flow_metadata.get("essence_parameters", {}))
+    validate_raw_essence_parameters(
+        flow_metadata.get("codec"), flow_metadata.get("essence_parameters", {})
+    )
     # Profile.created is an AwareDatetime, so set a timezone-aware value; it
     # round-trips through Neptune and is re-validated when the Profile is rebuilt.
     profile.created = datetime.now(timezone.utc)

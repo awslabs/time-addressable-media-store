@@ -42,6 +42,7 @@ from utils import (
     model_dump,
     parse_tag_parameters,
     put_message,
+    reject_null_body_fields,
 )
 
 tracer = Tracer()
@@ -49,6 +50,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 
 duplication_queue = os.environ["DUPLICATION_QUEUE_URL"]
@@ -201,10 +203,11 @@ def get_objects_by_id(
         timerange = None
         key_frame_count = None
     else:
-        timerange = (
-            get_item.get("Item", {}).get("timerange")
-            or items[0].get("object_timerange")
-            or items[0]["timerange"]
+        # A page beyond the last flow reference has no items to fall back on
+        timerange = get_item.get("Item", {}).get("timerange") or (
+            (items[0].get("object_timerange") or items[0]["timerange"])
+            if items
+            else None
         )
         key_frame_count = next(
             (
@@ -238,7 +241,10 @@ def get_objects_by_id(
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump(schema_item),
+        # referenced_by_flows is required, even when this page holds no references
+        body=model_dump(
+            schema_item, preserve_empty_list_fields={"referenced_by_flows"}
+        ),
         headers=custom_headers,
     )
 

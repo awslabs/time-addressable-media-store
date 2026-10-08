@@ -609,3 +609,77 @@ def test_POST_storage_returns_400_when_flow_missing_required_container_attribute
         response_body.get("message")
         == "Bad request. Invalid flow storage request JSON or the flow 'container' is not set. If object_ids supplied, some or all already exist."
     )
+
+
+@pytest.mark.parametrize(
+    "property_name,body_value",
+    [
+        ("read_only", "true"),
+        ("read_only", 1),
+        ("max_bit_rate", True),
+        ("max_bit_rate", "128"),
+        ("max_bit_rate", -1),
+        ("avg_bit_rate", True),
+        ("avg_bit_rate", "128"),
+        ("avg_bit_rate", -1),
+    ],
+)
+# pylint: disable=redefined-outer-name
+def test_PUT_flow_property_returns_400_when_body_type_is_coerced(
+    lambda_context, api_event_factory, api_flows, property_name, body_value
+):
+    """
+    Verifies that single-value Flow properties reject values of the wrong JSON
+    type rather than coercing them (e.g. the string "true" for a boolean).
+    """
+    # Arrange
+    event = api_event_factory(
+        "PUT",
+        f"/flows/{uuid.uuid4()}/{property_name}",
+        json_body=body_value,
+    )
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
+    assert response_body["message"][0]["loc"][0] == "body"
+
+
+@pytest.mark.parametrize(
+    "property_name,body_value",
+    [
+        ("read_only", True),
+        ("max_bit_rate", 128),
+        ("max_bit_rate", 0),
+        ("avg_bit_rate", 128),
+        ("avg_bit_rate", 0),
+    ],
+)
+# pylint: disable=redefined-outer-name,unused-argument
+def test_PUT_flow_property_accepts_correct_body_type(
+    lambda_context,
+    api_event_factory,
+    api_flows,
+    mock_neptune_client,
+    property_name,
+    body_value,
+):
+    """
+    Verifies that correctly typed values pass validation and reach the handler,
+    which returns 404 as the Flow does not exist.
+    """
+    # Arrange
+    event = api_event_factory(
+        "PUT",
+        f"/flows/{uuid.uuid4()}/{property_name}",
+        json_body=body_value,
+    )
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.NOT_FOUND.value

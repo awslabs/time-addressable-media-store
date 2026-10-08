@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import re
 import urllib.parse
 import uuid
 from collections import defaultdict
@@ -28,9 +29,11 @@ from botocore.config import Config
 from mediatimestamp.immutable import TimeRange, Timestamp
 from params import essence_params
 from pydantic import BaseModel
-from schema import FailedSegment, Flowsegmentpost
+from schema import FailedSegment, Flowsegmentpost, Urltaglist
 
 tracer = Tracer()
+
+URL_TAG_LIST_PATTERN = re.compile(Urltaglist.model_fields["root"].metadata[0].pattern)
 
 events = boto3.client("events")
 sqs = boto3.client("sqs")
@@ -253,6 +256,18 @@ def model_dump(
     return model_dict
 
 
+def parse_timerange(value: str) -> TimeRange:
+    """Parses a client-supplied TimeRange string.
+
+    mediatimestamp ignores the brackets on a single-timestamp range, reading e.g.
+    "(5:0)" or "[5:0)" as the instant "[5:0]". A single timestamp with an
+    exclusive bracket contains no time, so it is returned as the empty range.
+    """
+    if "_" not in value and (value.startswith("(") or value.endswith(")")):
+        return TimeRange.never()
+    return TimeRange.from_str(value)
+
+
 @tracer.capture_method(capture_response=False)
 def pop_outliers(timerange: TimeRange, items: list) -> list:
     """Remove ends of a list of Timerange items if they do not fully cover the supplied Timerange"""
@@ -320,6 +335,17 @@ def parse_tag_parameters(
         except ValueError:
             continue  # Key's without a "." cannot be tag keys so continue
         if key_prefix in value_prefixes:
+            if not URL_TAG_LIST_PATTERN.match(value):
+                raise BadRequestError(
+                    [
+                        {
+                            "type": "string_pattern_mismatch",
+                            "loc": ["query", key],
+                            "msg": f"String should match pattern '{URL_TAG_LIST_PATTERN.pattern}'",
+                            "input": value,
+                        }
+                    ]
+                )  # 400
             values[key_name] = value
         elif key_prefix in exists_prefixes:
             if value.lower() in ("true", "false"):
@@ -477,6 +503,50 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     return return_dict, where_literals
 
 
+def find_null_path(obj, path: tuple = ()) -> tuple | None:
+    """Returns the path to the first null value in a parsed JSON document, or None"""
+    if obj is None:
+        return path
+    if isinstance(obj, dict):
+        items = obj.items()
+    elif isinstance(obj, list):
+        items = enumerate(obj)
+    else:
+        return None
+    for key, value in items:
+        null_path = find_null_path(value, (*path, key))
+        if null_path is not None:
+            return null_path
+    return None
+
+
+def reject_null_body_fields(app, next_middleware):
+    """Powertools middleware rejecting explicit nulls in POST/PUT request bodies.
+
+    No TAMS schema is nullable: optional fields may be omitted but never null.
+    The generated models cannot tell the two apart, so this enforces it.
+    """
+    event = app.current_event
+    if event.http_method in ("POST", "PUT") and event.body:
+        try:
+            body = event.json_body
+        except ValueError:
+            body = None  # Invalid JSON is reported by request validation
+        null_path = find_null_path(body) if body is not None else None
+        if null_path is not None:
+            raise BadRequestError(
+                [
+                    {
+                        "type": "null_not_allowed",
+                        "loc": ["body", *null_path],
+                        "msg": "Input should not be null; omit optional fields instead",
+                        "input": None,
+                    }
+                ]
+            )  # 400
+    return next_middleware(app)
+
+
 @tracer.capture_method(capture_response=False)
 def raise_validation_error(ex: RequestValidationError, http_method: str) -> None:
     """Raises the TAMS error for a request validation failure.
@@ -610,6 +680,35 @@ def validate_frame_rate(video_essence_parameters: dict) -> None:
         raise BadRequestError(
             "When vfr is false or omitted, the frame rate of the Flow is fixed and frame_rate MUST be set."
         )  # 400
+
+
+@tracer.capture_method(capture_response=False)
+def validate_raw_essence_parameters(
+    codec: str | None, essence_parameters: dict
+) -> None:
+    """Enforce the uncompressed (raw) codec rules the TAMS schema can only state in descriptions"""
+    if codec not in constants.RAW_CODECS:
+        return
+    bit_depth = essence_parameters.get("bit_depth")
+    if bit_depth is None:
+        raise BadRequestError(
+            f"When codec is {codec}, essence_parameters.bit_depth MUST be set."
+        )  # 400
+    if codec == "audio/x-raw-float" and bit_depth not in (32, 64):
+        raise BadRequestError(
+            f"When codec is {codec}, essence_parameters.bit_depth MUST be 32 or 64."
+        )  # 400
+    unc_type = essence_parameters.get("unc_parameters", {}).get("unc_type")
+    if unc_type is None:
+        raise BadRequestError(
+            f"When codec is {codec}, essence_parameters.unc_parameters.unc_type MUST be set."
+        )  # 400
+    if unc_type in constants.YUV_UNC_TYPES:
+        for key in ("horiz_chroma_subs", "vert_chroma_subs"):
+            if essence_parameters.get(key) is None:
+                raise BadRequestError(
+                    f"When unc_type is {unc_type}, essence_parameters.{key} MUST be set."
+                )  # 400
 
 
 @tracer.capture_method(capture_response=False)

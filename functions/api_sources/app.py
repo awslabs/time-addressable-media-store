@@ -37,6 +37,7 @@ from utils import (
     parse_tag_parameters,
     publish_event,
     raise_validation_error,
+    reject_null_body_fields,
 )
 
 tracer = Tracer()
@@ -44,6 +45,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 
 record_type = "source"

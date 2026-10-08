@@ -187,6 +187,26 @@ class TestUtils:
         with pytest.raises(BadRequestError):
             utils.parse_tag_parameters(params)
 
+    @pytest.mark.parametrize("value", [",", "a,", ",a", "a,,b"])
+    @pytest.mark.parametrize("prefix", ["tag", "flow_tag"])
+    def test_parse_tag_parameters_throws_on_empty_list_item(self, prefix, value):
+        with pytest.raises(BadRequestError):
+            utils.parse_tag_parameters({f"{prefix}.xyz": value})
+
+    def test_parse_tag_parameters_throws_on_empty_list_item_custom_prefix(self):
+        with pytest.raises(BadRequestError):
+            utils.parse_tag_parameters(
+                {"storage_backend_tag.xyz": ","},
+                value_prefixes=("storage_backend_tag",),
+                exists_prefixes=("storage_backend_tag_exists",),
+            )
+
+    @pytest.mark.parametrize("value", ["a", "a,b", "a b,c"])
+    def test_parse_tag_parameters_accepts_valid_list(self, value):
+        values, _ = utils.parse_tag_parameters({"tag.xyz": value})
+
+        assert values == {"xyz": value}
+
     def test_parse_tag_parameters_custom_prefixes_isolate_namespaces(self):
         """storage_backend_tag.{name} must parse only under its own prefixes and
         never collide with the tag.{name} filters sharing the same request (the
@@ -757,3 +777,115 @@ class TestUtils:
         entity = {"tags": {"auth_classes": ["class1"]}}
         # Act
         utils.require_auth_classes_tag_update_permission(mock_context, entity, [])
+
+    @pytest.mark.parametrize(
+        "codec, essence_parameters",
+        [
+            # Not a raw codec: nothing is required
+            ("audio/aac", {"sample_rate": 48000}),
+            (None, {}),
+            (
+                "audio/x-raw-int",
+                {"bit_depth": 16, "unc_parameters": {"unc_type": "interleaved"}},
+            ),
+            (
+                "audio/x-raw-float",
+                {"bit_depth": 32, "unc_parameters": {"unc_type": "planar"}},
+            ),
+            (
+                "video/raw",
+                {
+                    "bit_depth": 10,
+                    "unc_parameters": {"unc_type": "v210"},
+                    "horiz_chroma_subs": 2,
+                    "vert_chroma_subs": 1,
+                },
+            ),
+            # RGB and planar packing do not require chroma subsampling
+            ("video/raw", {"bit_depth": 8, "unc_parameters": {"unc_type": "RGB"}}),
+            ("video/raw", {"bit_depth": 8, "unc_parameters": {"unc_type": "planar"}}),
+        ],
+    )
+    def test_validate_raw_essence_parameters_accepts(self, codec, essence_parameters):
+        utils.validate_raw_essence_parameters(codec, essence_parameters)
+
+    @pytest.mark.parametrize(
+        "codec, essence_parameters, missing",
+        [
+            (
+                "audio/x-raw-int",
+                {"unc_parameters": {"unc_type": "interleaved"}},
+                "bit_depth",
+            ),
+            ("audio/x-raw-int", {"bit_depth": 16}, "unc_type"),
+            (
+                "audio/x-raw-float",
+                {"unc_parameters": {"unc_type": "interleaved"}},
+                "bit_depth",
+            ),
+            (
+                "audio/x-raw-float",
+                {"bit_depth": 24, "unc_parameters": {"unc_type": "interleaved"}},
+                "32 or 64",
+            ),
+            ("video/raw", {"unc_parameters": {"unc_type": "RGB"}}, "bit_depth"),
+            ("video/raw", {"bit_depth": 8}, "unc_type"),
+            (
+                "video/raw",
+                {
+                    "bit_depth": 8,
+                    "unc_parameters": {"unc_type": "UYVY"},
+                    "vert_chroma_subs": 1,
+                },
+                "horiz_chroma_subs",
+            ),
+            (
+                "video/raw",
+                {
+                    "bit_depth": 8,
+                    "unc_parameters": {"unc_type": "UYVY"},
+                    "horiz_chroma_subs": 2,
+                },
+                "vert_chroma_subs",
+            ),
+        ],
+    )
+    def test_validate_raw_essence_parameters_rejects(
+        self, codec, essence_parameters, missing
+    ):
+        with pytest.raises(BadRequestError) as ex:
+            utils.validate_raw_essence_parameters(codec, essence_parameters)
+
+        assert missing in str(ex.value)
+
+    @pytest.mark.parametrize(
+        "body, expected",
+        [
+            ({"a": 1, "b": {"c": [1, "x"]}}, None),
+            ([], None),
+            ("text", None),
+            ({"status": None}, ("status",)),
+            ({"a": {"b": None}}, ("a", "b")),
+            ([{"id": "x", "role": None}], (0, "role")),
+            ({"ids": ["a", None]}, ("ids", 1)),
+        ],
+    )
+    def test_find_null_path(self, body, expected):
+        assert utils.find_null_path(body) == expected
+
+    @pytest.mark.parametrize("value", ["(1:0)", "[1:0)", "(1:0]", "()"])
+    def test_parse_timerange_exclusive_single_timestamp_is_empty(self, value):
+        assert utils.parse_timerange(value).is_empty()
+
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            ("[1:0]", "[1:0]"),
+            ("1:0", "[1:0]"),
+            ("(1:0_2:0)", "(1:0_2:0)"),
+            ("_0:0)", "_0:0)"),
+            ("_", "_"),
+        ],
+    )
+    def test_parse_timerange_defers_to_mediatimestamp(self, value, expected):
+        assert str(utils.parse_timerange(value)) == expected

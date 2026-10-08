@@ -57,9 +57,11 @@ from utils import (
     generate_link_url,
     model_dump,
     parse_tag_parameters,
+    parse_timerange,
     publish_event,
     put_message,
     raise_validation_error,
+    reject_null_body_fields,
 )
 
 tracer = Tracer()
@@ -67,6 +69,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
@@ -111,6 +114,12 @@ def get_flow_segments_by_id(
         Uuid(root=flow_id)
     except ValidationError as ex:
         raise NotFoundError("The flow ID in the path is invalid.") from ex  # 404
+    # Parsed before any early return so HEAD rejects malformed filters as GET does
+    sb_tag_values, sb_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters,
+        value_prefixes=("storage_backend_tag",),
+        exists_prefixes=("storage_backend_tag_exists",),
+    )
     if not check_node_exists("flow", flow_id):
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
@@ -174,11 +183,6 @@ def get_flow_segments_by_id(
             item.setdefault("object_timerange", item["timerange"])
         else:
             item.pop("object_timerange", None)
-    sb_tag_values, sb_tag_exists = parse_tag_parameters(
-        app.current_event.query_string_parameters,
-        value_prefixes=("storage_backend_tag",),
-        exists_prefixes=("storage_backend_tag_exists",),
-    )
     populate_get_urls(
         items,
         param_accept_get_urls,
@@ -256,7 +260,7 @@ def delete_flow_segments_by_id(
         )  # 403
     timerange_to_delete = TimeRange.from_str(get_flow_timerange(flow_id))
     if param_timerange:
-        timerange_to_delete = TimeRange.from_str(param_timerange)
+        timerange_to_delete = parse_timerange(param_timerange)
     deletion_request_dict = None
     if param_object_id:
         # Not able to handle return of Delete Request as delete requests do not support "object_id" query parameter

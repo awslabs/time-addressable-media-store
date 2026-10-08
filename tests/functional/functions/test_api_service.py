@@ -1,5 +1,6 @@
 # pylint: disable=too-many-lines
 import json
+import uuid
 from http import HTTPStatus
 
 import pytest
@@ -191,6 +192,36 @@ def test_Update_Service_Information_POST_400(
     assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
     assert response_headers.get("Content-Type")[0] == "application/json"
     assert response_body.get("message")[0]["msg"] == "Input should be a valid string"
+
+
+# pylint: disable=redefined-outer-name,unused-argument
+def test_Register_Webhook_URL_POST_400_null_field(
+    lambda_context,
+    api_event_factory,
+    api_service,
+    mock_neptune_client,
+    stub_webhook_basic,
+):
+    """
+    Verifies that a POST request with an explicit null for an optional field
+    returns 400 Bad Request rather than treating it as omitted.
+    """
+    # Arrange
+    event = api_event_factory(
+        "POST",
+        "/service/webhooks",
+        json_body={**stub_webhook_basic, "status": None},
+    )
+
+    # Act
+    response = api_service.lambda_handler(event, lambda_context)
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
+    assert response_body["message"][0]["type"] == "null_not_allowed"
+    assert response_body["message"][0]["loc"] == ["body", "status"]
+    assert not mock_neptune_client.execute_open_cypher_query.called
 
 
 # pylint: disable=redefined-outer-name
@@ -1350,3 +1381,36 @@ def test_Service_StorageBackends_GET_400_bad_tag_exists(
 
     # Assert
     assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
+
+
+# pylint: disable=redefined-outer-name,unused-argument
+def test_Create_Profile_POST_400_video_without_frame_rate(
+    lambda_context, api_event_factory, api_service, mock_neptune_client
+):
+    """
+    Verifies that a video Profile without frame_rate (and without vfr) is
+    rejected, applying the same rule as video Flows.
+    """
+    # Arrange
+    profile_id = str(uuid.uuid4())
+    event = api_event_factory(
+        "POST",
+        f"/service/profiles/{profile_id}",
+        json_body={
+            "id": profile_id,
+            "flow_metadata": {
+                "format": "urn:x-nmos:format:video",
+                "codec": "video/h264",
+                "container": "video/mp2t",
+                "essence_parameters": {"frame_width": 1280, "frame_height": 720},
+            },
+        },
+    )
+
+    # Act
+    response = api_service.lambda_handler(event, lambda_context)
+    response_body = json.loads(response["body"])
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.BAD_REQUEST.value
+    assert "frame_rate MUST be set" in response_body["message"]

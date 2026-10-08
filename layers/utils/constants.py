@@ -29,3 +29,8 @@ MIN_PRESIGNED_URL_TIMEOUT_SECS = 3600
 SERVICE_INFO_ID = "1"
 DDB_MAX_RETRIES = 3
 ADMIN_SCOPE = "tams-api/admin"
+# Uncompressed codecs that require bit_depth and unc_parameters.unc_type
+RAW_CODECS = {"audio/x-raw-int", "audio/x-raw-float", "video/raw"}
+# Packed YUV unc_types that require horiz_chroma_subs and vert_chroma_subs.
+# "planar" is excluded as it may hold either YUV or RGB components.
+YUV_UNC_TYPES = {"YUYV", "UYVY", "AYUV", "v210", "v216"}

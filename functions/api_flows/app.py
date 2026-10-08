@@ -48,6 +48,7 @@ from neptune import (
     set_node_property,
     validate_flow_collection,
 )
+from pydantic import StrictBool, StrictInt
 from schema import (
     Contentformat,
     Deletionrequest,
@@ -78,10 +79,13 @@ from utils import (
     model_dump,
     opencypher_property_name,
     parse_tag_parameters,
+    parse_timerange,
     publish_event,
     put_message,
     raise_validation_error,
+    reject_null_body_fields,
     validate_frame_rate,
+    validate_raw_essence_parameters,
 )
 
 tracer = Tracer()
@@ -89,6 +93,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 
 record_type = "flow"
@@ -166,7 +171,7 @@ def get_flows(
         # MAX_TIMERANGE_FILTER_PAGES so a store with many non-matching Flows
         # can't stall past the API Gateway 29s limit; on the bound the empty
         # page + Link is still returned and the client can continue manually.
-        timerange_filter = TimeRange.from_str(param_timerange)
+        timerange_filter = parse_timerange(param_timerange)
 
         def _matches_timerange(item):
             item_tr = TimeRange.from_str(get_flow_timerange(item["id"]))
@@ -227,7 +232,7 @@ def get_flow_by_id(
         item["timerange"] = get_flow_timerange(flow_id)
     # Update timerange if timerange parameter supplied
     if param_timerange and param_include_timerange:
-        timerange_filter = TimeRange.from_str(param_timerange)
+        timerange_filter = parse_timerange(param_timerange)
         item["timerange"] = str(
             timerange_filter.intersect_with(TimeRange.from_str(item["timerange"]))
         )
@@ -275,6 +280,10 @@ def put_flow_by_id(
     # Validate vfr vs frame_rate essence_parameters as pydantic model not able to enforce conditions
     if flow.root.format.value == Contentformat.urn_x_nmos_format_video.value:
         validate_frame_rate(model_dump(flow.root.essence_parameters))
+    flow_root_dict = model_dump(flow.root)
+    validate_raw_essence_parameters(
+        flow_root_dict.get("codec"), flow_root_dict.get("essence_parameters", {})
+    )
     try:
         existing_item = query_node(record_type, flow_id)
         if existing_item.get("read_only"):
@@ -693,7 +702,7 @@ def get_flow_max_bit_rate(
 @app.put("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
 def put_flow_max_bit_rate(
-    max_bit_rate: Annotated[int, Body()],
+    max_bit_rate: Annotated[StrictInt, Body(ge=0)],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -761,7 +770,7 @@ def get_flow_avg_bit_rate(
 @app.put("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
 def put_flow_avg_bit_rate(
-    avg_bit_rate: Annotated[int, Body()],
+    avg_bit_rate: Annotated[StrictInt, Body(ge=0)],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -837,7 +846,7 @@ def get_flow_read_only(
 @app.put("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
 def put_flow_read_only(
-    read_only: Annotated[bool, Body()],
+    read_only: Annotated[StrictBool, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     if not check_node_exists(record_type, flow_id):

@@ -24,6 +24,7 @@ from neptune import (
 from schema import Flowsegmentpost
 from utils import (
     calculate_object_timerange,
+    parse_timerange,
     pop_outliers,
     publish_event,
     put_message,
@@ -177,7 +178,7 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
         }
     # Parse timerange filter out of parameters
     timerange_filter = (
-        TimeRange.from_str(parameters["timerange"])
+        parse_timerange(parameters["timerange"])
         if parameters.get("timerange")
         else None
     )
