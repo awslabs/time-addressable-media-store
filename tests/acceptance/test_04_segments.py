@@ -1443,6 +1443,31 @@ def test_List_Flow_Segments_GET_200_timerange(api_client_cognito, stub_video_flo
     assert 2 == len(response_json)
 
 
+def test_List_Flow_Segments_GET_200_follow_link_with_timerange(
+    api_client_cognito, stub_video_flow
+):
+    """The Link header URL is usable as-is and keeps the timerange filter"""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    first_page = api_client_cognito.request(
+        "GET",
+        path,
+        params={"timerange": "[3:5_4:5)", "limit": 1},
+    )
+    assert_json_response(first_page, 200)
+    next_url = first_page.links["next"]["url"]
+    # Act
+    response = requests.get(
+        next_url, headers=api_client_cognito.default_headers, timeout=30
+    )
+    # Assert
+    assert_json_response(response, 200)
+    timeranges = [
+        segment["timerange"] for segment in first_page.json() + response.json()
+    ]
+    assert ["[3:0_4:0)", "[4:0_5:0)"] == timeranges
+
+
 def test_List_Flow_Segments_GET_200_include_object_timerange(
     api_client_cognito, stub_multi_flow
 ):

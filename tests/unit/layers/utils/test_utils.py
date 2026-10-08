@@ -889,3 +889,34 @@ class TestUtils:
     )
     def test_parse_timerange_defers_to_mediatimestamp(self, value, expected):
         assert str(utils.parse_timerange(value)) == expected
+
+    def test_generate_link_url_encodes_query_values(self):
+        event = MagicMock()
+        event.request_context.domain_name = "api.example.com"
+        event.request_context.path = "/Prod/flows/abc/segments"
+        event.query_string_parameters = {
+            "timerange": "[0:0_5:0)",
+            "flow_tag.reference/x": "alpha,beta",
+            "label": "a b&c+d%e#f",
+            "page": "old-page",
+        }
+
+        result = utils.generate_link_url(event, "eyJhIjogMX0=+/")
+
+        assert result == (
+            "<https://api.example.com/Prod/flows/abc/segments?"
+            "timerange=%5B0%3A0_5%3A0%29"
+            "&flow_tag.reference%2Fx=alpha,beta"
+            "&label=a%20b%26c%2Bd%25e%23f"
+            '&page=eyJhIjogMX0%3D%2B%2F>; rel="next"'
+        )
+
+    def test_generate_link_url_without_query_parameters(self):
+        event = MagicMock()
+        event.request_context.domain_name = "api.example.com"
+        event.request_context.path = "/Prod/flows"
+        event.query_string_parameters = None
+
+        result = utils.generate_link_url(event, "30")
+
+        assert result == '<https://api.example.com/Prod/flows?page=30>; rel="next"'

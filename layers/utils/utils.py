@@ -71,17 +71,18 @@ def generate_link_url(current_event: APIGatewayProxyEvent, page_value: str) -> s
     """Generates a link URL relative to the API Gateway request that calls it"""
     host = current_event.request_context.domain_name
     path = current_event.request_context.path
-    query_string = (
-        "&".join(
-            f"{k}={v}"
-            for k, v in current_event.query_string_parameters.items()
-            if k != "page"
-        )
-        + "&"
-        if current_event.query_string_parameters
-        else ""
+    # API Gateway supplies decoded query values, so re-encode them; commas are
+    # left as-is since they only ever separate list values
+    params = {
+        k: v
+        for k, v in (current_event.query_string_parameters or {}).items()
+        if k != "page"
+    }
+    params["page"] = page_value
+    query_string = urllib.parse.urlencode(
+        params, quote_via=urllib.parse.quote, safe=","
     )
-    return f'<https://{host}{path}?{query_string}page={urllib.parse.quote_plus(page_value)}>; rel="next"'
+    return f'<https://{host}{path}?{query_string}>; rel="next"'
 
 
 @tracer.capture_method(capture_response=False)
