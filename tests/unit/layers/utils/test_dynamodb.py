@@ -478,6 +478,35 @@ class TestDynamoDB:
         assert len(between_values) == 2
         assert between_values[0] == between_values[1] == 1
 
+    @patch("dynamodb.get_key_and_args")
+    @patch("dynamodb.segments_table")
+    def test_get_overlapping_timerange_returns_segment_extent(
+        self, mock_segments_table, mock_get_key_and_args
+    ):
+        """The extent of the overlapping segments is returned, not the filter
+        clipped to the flow: segments overhanging the filter widen the result.
+        An empty filtered page is skipped by following LastEvaluatedKey."""
+        mock_get_key_and_args.side_effect = lambda *_: {}
+        mock_segments_table.query.side_effect = [
+            {"Items": [], "LastEvaluatedKey": {"timerange_end": 1}},
+            {"Items": [{"timerange": "[8:500000000_9:500000000)"}]},
+            {"Items": [{"timerange": "[9:500000000_10:500000000)"}]},
+        ]
+
+        result = dynamodb.get_overlapping_timerange("test-flow", "[9:0_10:0)")
+
+        assert result == "[8:500000000_10:500000000)"
+
+    @patch("dynamodb.get_key_and_args")
+    @patch("dynamodb.segments_table")
+    def test_get_overlapping_timerange_no_overlap_is_empty(
+        self, mock_segments_table, mock_get_key_and_args
+    ):
+        mock_get_key_and_args.side_effect = lambda *_: {}
+        mock_segments_table.query.return_value = {"Items": []}
+
+        assert dynamodb.get_overlapping_timerange("test-flow", "[9:0_10:0)") == "()"
+
     @patch("dynamodb.segments_table")
     def test_get_key_and_args_exclusive_single_timestamp_is_empty(
         self, mock_segments_table

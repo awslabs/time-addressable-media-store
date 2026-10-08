@@ -134,6 +134,33 @@ def get_flow_timerange(flow_id: str) -> str:
 
 
 @tracer.capture_method(capture_response=False)
+def get_overlapping_timerange(flow_id: str, timerange: str) -> str:
+    """Get the extent of the segments in a flow that overlap the specified timerange"""
+
+    def _first_overlapping(reverse_order: bool) -> dict | None:
+        args = get_key_and_args(
+            flow_id,
+            {"timerange": timerange, "reverse_order": reverse_order, "limit": 1},
+        )
+        # A FilterExpression can drop the only item read, so keep paging
+        query = segments_table.query(**args)
+        while not query["Items"] and "LastEvaluatedKey" in query:
+            args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+            query = segments_table.query(**args)
+        return query["Items"][0] if query["Items"] else None
+
+    first_segment = _first_overlapping(reverse_order=False)
+    if first_segment is None:
+        return "()"
+    last_segment = _first_overlapping(reverse_order=True)
+    return str(
+        TimeRange.from_str(first_segment["timerange"]).extend_to_encompass_timerange(
+            TimeRange.from_str(last_segment["timerange"])
+        )
+    )
+
+
+@tracer.capture_method(capture_response=False)
 def get_timerange_expression(
     expression_type: Type[Attr] | Type[Key],
     boundary: TimeRangeBoundary,

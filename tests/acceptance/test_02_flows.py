@@ -1,4 +1,6 @@
 # pylint: disable=too-many-lines
+from urllib.parse import quote
+
 import pytest
 import requests
 
@@ -15,6 +17,9 @@ from conftest import (
 pytestmark = [
     pytest.mark.acceptance,
 ]
+
+# Contains "/" so the tag name must be percent-encoded in a path
+ENCODED_TAG_NAME = "pytest/encoded"
 
 
 @pytest.mark.parametrize(
@@ -1689,6 +1694,56 @@ def test_Create_or_Update_Flow_Tag_PUT_204_update(
     )
 
 
+def test_Create_or_Update_Flow_Tag_PUT_204_encoded_name(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    """A tag name containing "/" is stored decoded when percent-encoded in the path"""
+    # Arrange
+    tag_value = "test"
+    path = f"/flows/{stub_multi_flow['id']}/tags/{quote(ENCODED_TAG_NAME, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=tag_value,
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    stub_multi_flow["tags"][ENCODED_TAG_NAME] = tag_value
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {"flow": stub_multi_flow},
+        },
+    )
+
+
+def test_Flow_Tag_Value_GET_200_encoded_name(api_client_cognito, stub_multi_flow):
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/tags/{quote(ENCODED_TAG_NAME, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert "test" == response.json()
+
+
+def test_List_Flows_GET_200_encoded_tag_name(api_client_cognito, stub_multi_flow):
+    """The decoded tag name is the one matched by a tag.{name} filter"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={f"tag.{ENCODED_TAG_NAME}": "test"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert [stub_multi_flow["id"]] == [flow["id"] for flow in response.json()]
+
+
 def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
     # Arrange
     path = f"/flows/{stub_multi_flow['id']}/tags/pytest"
@@ -1752,6 +1807,29 @@ def test_Delete_Flow_Tag_DELETE_204(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     del stub_multi_flow["tags"][tag_name]
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_multi_flow,
+            },
+        },
+    )
+
+
+def test_Delete_Flow_Tag_DELETE_204_encoded_name(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/tags/{quote(ENCODED_TAG_NAME, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    del stub_multi_flow["tags"][ENCODED_TAG_NAME]
     expect_webhooks(
         {
             "event_type": "flows/updated",

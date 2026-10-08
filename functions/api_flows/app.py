@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import Optional
+from urllib.parse import unquote
 
 # pylint: disable=no-member
 import constants
@@ -28,6 +29,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import (
     get_default_storage_backend,
     get_flow_timerange,
+    get_overlapping_timerange,
     get_storage_backend,
     storage_table,
 )
@@ -229,12 +231,11 @@ def get_flow_by_id(
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if param_include_timerange:
-        item["timerange"] = get_flow_timerange(flow_id)
-    # Update timerange if timerange parameter supplied
-    if param_timerange and param_include_timerange:
-        timerange_filter = parse_timerange(param_timerange)
-        item["timerange"] = str(
-            timerange_filter.intersect_with(TimeRange.from_str(item["timerange"]))
+        # With a timerange parameter, report the extent of the overlapping Segments
+        item["timerange"] = (
+            get_overlapping_timerange(flow_id, param_timerange)
+            if param_timerange
+            else get_flow_timerange(flow_id)
         )
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
@@ -409,6 +410,8 @@ def get_flow_tag_value(
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
+    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
+    tag_name = unquote(tag_name)
     try:
         tags = query_node_tags(record_type, flow_id)
     except ValueError as e:
@@ -427,6 +430,8 @@ def put_flow_tag_value(
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
+    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
+    tag_name = unquote(tag_name)
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
@@ -456,6 +461,8 @@ def delete_flow_tag_value(
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
+    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
+    tag_name = unquote(tag_name)
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:

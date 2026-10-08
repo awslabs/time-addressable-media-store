@@ -2,6 +2,7 @@ import json
 import os
 from http import HTTPStatus
 from typing import Optional
+from urllib.parse import unquote
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -147,6 +148,8 @@ def get_source_tag_value(
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
+    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
+    tag_name = unquote(tag_name)
     try:
         tags = query_node_tags(record_type, source_id)
     except ValueError as e:
@@ -165,6 +168,8 @@ def put_source_tag_value(
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
+    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
+    tag_name = unquote(tag_name)
     if not check_node_exists(record_type, source_id):
         raise NotFoundError(
             "The requested Source does not exist, or the tag name in the path is invalid."
@@ -190,6 +195,8 @@ def delete_source_tag(
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
     tag_name: Annotated[str, Path(alias="name")],
 ):
+    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
+    tag_name = unquote(tag_name)
     try:
         item = query_node(record_type, source_id)
     except ValueError as e:
