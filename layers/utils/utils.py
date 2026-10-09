@@ -1,12 +1,12 @@
 import json
 import math
 import os
-import re
 import urllib.parse
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from itertools import batched
+from typing import Annotated
 
 import boto3
 
@@ -28,12 +28,14 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
 from botocore.config import Config
 from mediatimestamp.immutable import TimeRange, Timestamp
 from params import essence_params
-from pydantic import BaseModel
+from pydantic import AfterValidator, BaseModel, ValidationError
 from schema import FailedSegment, Flowsegmentpost, Urltaglist
 
 tracer = Tracer()
 
-URL_TAG_LIST_PATTERN = re.compile(Urltaglist.model_fields["root"].metadata[0].pattern)
+# API Gateway passes the path still percent-encoded (e.g. "/" as %2F), so string
+# path parameters that may contain such characters use this type to decode them
+DecodedPathStr = Annotated[str, AfterValidator(urllib.parse.unquote)]
 
 events = boto3.client("events")
 sqs = boto3.client("sqs")
@@ -341,17 +343,15 @@ def parse_tag_parameters(
         except ValueError:
             continue  # Key's without a "." cannot be tag keys so continue
         if key_prefix in value_prefixes:
-            if not URL_TAG_LIST_PATTERN.match(value):
+            try:
+                Urltaglist.model_validate(value)
+            except ValidationError as ex:
                 raise BadRequestError(
                     [
-                        {
-                            "type": "string_pattern_mismatch",
-                            "loc": ["query", key],
-                            "msg": f"String should match pattern '{URL_TAG_LIST_PATTERN.pattern}'",
-                            "input": value,
-                        }
+                        {**error, "loc": ["query", key]}
+                        for error in ex.errors(include_url=False, include_context=False)
                     ]
-                )  # 400
+                ) from ex  # 400
             values[key_name] = value
         elif key_prefix in exists_prefixes:
             if value.lower() in ("true", "false"):
@@ -562,7 +562,7 @@ def raise_validation_error(ex: RequestValidationError, http_method: str) -> None
     """
     errors = ex.errors()
     if http_method in ("GET", "HEAD", "DELETE") and all(
-        error.get("loc", [None])[0] == "path" for error in errors
+        (error.get("loc") or [None])[0] == "path" for error in errors
     ):
         raise NotFoundError("The requested ID in the path is invalid.")  # 404
     raise BadRequestError(errors)  # 400

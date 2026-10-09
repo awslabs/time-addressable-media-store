@@ -7,8 +7,7 @@ from aws_lambda_powertools.utilities.data_classes.event_bridge_event import (
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import get_default_storage_backend, get_storage_backend, get_store_name
 from neptune import get_matching_webhooks, set_node_property_base
-from schema import Storagebackend
-from segment_get_urls import populate_get_urls
+from segment_get_urls import populate_get_urls, verbose_storage_fields
 from utils import filter_dict, model_dump, put_message
 
 tracer = Tracer()
@@ -88,19 +87,20 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
         for segment in event.detail["segments"]:
             if not segment.get("storage_ids") and not segment.get("get_urls"):
                 segment["storage_ids"] = [default_storage_backend["id"]]
-        # Get storage metadata mapping, reduced to the Storage Backend schema so
-        # internal record fields (e.g. bucket_name) are not added to get_urls
+        # Get storage metadata mapping
+        storage_ids = {
+            storage_id
+            for segment in event.detail["segments"]
+            for storage_id in segment.get("storage_ids", [])
+        } - {default_storage_backend["id"]}
         storage_mapping = {
-            storage_id: model_dump(Storagebackend(**storage_backend))
-            for storage_id, storage_backend in {
-                default_storage_backend["id"]: default_storage_backend,
-                **{
-                    storage_id: get_storage_backend(storage_id)
-                    for segment in event.detail["segments"]
-                    for storage_id in segment.get("storage_ids", [])
-                    if storage_id != default_storage_backend["id"]
-                },
-            }.items()
+            default_storage_backend["id"]: verbose_storage_fields(
+                default_storage_backend
+            ),
+            **{
+                storage_id: verbose_storage_fields(get_storage_backend(storage_id))
+                for storage_id in storage_ids
+            },
         }
         # Add ALL get_urls to event
         populate_get_urls(event.detail["segments"], include_storage_id=True)

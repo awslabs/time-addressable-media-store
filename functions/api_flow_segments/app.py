@@ -335,6 +335,13 @@ def check_overlapping_segments(flow_id, segment_timerange):
 def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
+    segment_timerange = parse_timerange(item_dict["timerange"])
+    if segment_timerange.is_empty():
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The timerange of the segment MUST NOT be empty.",
+        )
     validation = validate_object_id(flow_segment, flow["id"])
     if not validation["valid"]:
         return generate_failed_segment(
@@ -359,7 +366,6 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             "Bad request. This Flow uses initialisation segments so every Flow Segment MUST reference an init_object_id.",
         )
-    segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
         return generate_failed_segment(
             flow_segment.object_id,

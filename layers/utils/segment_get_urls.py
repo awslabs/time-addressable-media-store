@@ -108,6 +108,13 @@ def get_storage_backends(
     return {k: v for k, v in storage_backends.items() if k in filter_ids}
 
 
+def verbose_storage_fields(storage_backend: dict) -> dict:
+    """Returns the Storage Backend fields added to a verbose get_url, reduced to
+    the Storage Backend schema so internal record fields (e.g. bucket_name) are
+    not exposed."""
+    return model_dump(Storagebackend(**storage_backend))
+
+
 @tracer.capture_method(capture_response=False)
 def create_segment_access_urls(
     segment: dict,
@@ -133,7 +140,7 @@ def create_segment_access_urls(
     if verbose_storage:
         direct_url = {
             **direct_url,
-            **model_dump(Storagebackend(**storage_backend)),
+            **verbose_storage_fields(storage_backend),
             "storage_id": storage_backend["id"],
             "controlled": True,
         }

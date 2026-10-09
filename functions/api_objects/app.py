@@ -3,7 +3,6 @@ import json
 import os
 from http import HTTPStatus
 from typing import Optional
-from urllib.parse import unquote
 
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.event_handler import (
@@ -37,6 +36,7 @@ from schema import Object, Objectsinstancespost, Uuid
 from segment_get_urls import populate_get_urls
 from typing_extensions import Annotated
 from utils import (
+    DecodedPathStr,
     generate_link_url,
     get_unique_get_urls,
     model_dump,
@@ -61,7 +61,7 @@ s3_queue = os.environ["S3_QUEUE_URL"]
 @app.get("/objects/<objectId>")
 @tracer.capture_method(capture_response=False)
 def get_objects_by_id(
-    object_id: Annotated[str, Path(alias="objectId")],
+    object_id: Annotated[DecodedPathStr, Path(alias="objectId")],
     param_verbose_storage: Annotated[
         Optional[bool], Query(alias="verbose_storage")
     ] = None,
@@ -79,8 +79,6 @@ def get_objects_by_id(
     param_page: Annotated[Optional[str], Query(alias="page")] = None,
     param_limit: Annotated[Optional[int], Query(alias="limit", gt=0)] = None,
 ):
-    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
-    object_id = unquote(object_id)
     param_tag_values, param_tag_exists = parse_tag_parameters(
         app.current_event.query_string_parameters
     )
@@ -253,10 +251,8 @@ def get_objects_by_id(
 @tracer.capture_method(capture_response=False)
 def post_objects_by_id(
     object_instance: Annotated[Objectsinstancespost, Body()],
-    object_id: Annotated[str, Path(alias="objectId")],
+    object_id: Annotated[DecodedPathStr, Path(alias="objectId")],
 ):
-    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
-    object_id = unquote(object_id)
     items, is_init_object = resolve_object_segments(object_id)
     if len(items) == 0:
         raise NotFoundError("The Object does not exist.")  # 404
@@ -313,12 +309,10 @@ def post_objects_by_id(
 @app.delete("/objects/<objectId>/instances")
 @tracer.capture_method(capture_response=False)
 def delete_objects_by_id(
-    object_id: Annotated[str, Path(alias="objectId")],
+    object_id: Annotated[DecodedPathStr, Path(alias="objectId")],
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_storage_id: Annotated[Optional[str], Query(alias="storage_id")] = None,
 ):
-    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
-    object_id = unquote(object_id)
     if not param_label and not param_storage_id:
         raise BadRequestError(
             "One of 'label' or 'storage_id' query parameters must be specified."

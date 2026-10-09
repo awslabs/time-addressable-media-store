@@ -1794,6 +1794,27 @@ def test_Create_Flow_Segment_POST_400_overlap(
     )
 
 
+@pytest.mark.parametrize("timerange", ["()", "(100:0)", "[100:0)"])
+def test_Create_Flow_Segment_POST_400_empty_timerange(
+    api_client_cognito, media_objects, stub_multi_flow, timerange
+):
+    """An empty timerange, including an exclusive single timestamp, is rejected"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"object_id": media_objects[5]["object_id"], "timerange": timerange},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    assert (
+        "Bad request. The timerange of the segment MUST NOT be empty."
+        == response.json()["message"]
+    )
+
+
 def test_Create_Flow_Segment_POST_400_incorrect_flow(
     api_client_cognito, media_objects, stub_multi_flow
 ):

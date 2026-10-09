@@ -253,13 +253,16 @@ class TestMetadataVersion:
         self, mock_execute, mock_base, mock_query_node
     ):
         """Emptying the collection has no edge SET to carry the metadata, so it
-        is applied separately (regression: nothing was updated)"""
+        is set in the edge-delete query (regression: nothing was updated)"""
         neptune.set_flow_collection("flow-id", "user", [])
 
-        props = mock_base.call_args.args[2]
-        assert {"flow.metadata_updated", "flow.metadata_version"} <= props.keys()
-        assert props["flow.updated_by"] == "user"
-        assert not mock_query_node.called
+        mock_execute.assert_called_once()
+        query = mock_execute.call_args.args[0]
+        assert query.index("DELETE c") < query.index("WITH f SET")
+        assert "f.metadata_updated" in query and "f.metadata_version" in query
+        assert 'f.updated_by = "user"' in query
+        assert not mock_base.called
+        assert mock_query_node.called
 
     @patch("neptune.query_node")
     @patch("neptune.set_node_property_base")

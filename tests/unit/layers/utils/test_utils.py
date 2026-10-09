@@ -397,6 +397,7 @@ class TestUtils:
             ("PUT", ("path", "flowId")),
             ("POST", ("path", "flowId")),
             ("GET", ("query", "limit")),
+            ("GET", ()),
         ],
     )
     def test_raise_validation_error_is_400(self, http_method, loc):

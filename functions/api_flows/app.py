@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import Optional
-from urllib.parse import unquote
 
 # pylint: disable=no-member
 import constants
@@ -73,6 +72,7 @@ from schema import (
 from schema_extra import FlowsSortBy
 from typing_extensions import Annotated
 from utils import (
+    DecodedPathStr,
     base_delete_request_dict,
     direct_s3_url,
     generate_link_url,
@@ -415,10 +415,8 @@ def get_flow_tags(flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATT
 @tracer.capture_method(capture_response=False)
 def get_flow_tag_value(
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
-    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
-    tag_name = unquote(tag_name)
     try:
         tags = query_node_tags(record_type, flow_id)
     except ValueError as e:
@@ -435,10 +433,8 @@ def get_flow_tag_value(
 def put_flow_tag_value(
     tag_value: Annotated[str | list[str], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
-    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
-    tag_name = unquote(tag_name)
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:
@@ -466,10 +462,8 @@ def put_flow_tag_value(
 @tracer.capture_method(capture_response=False)
 def delete_flow_tag_value(
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
-    # API Gateway passes the path still percent-encoded (e.g. "/" as %2F)
-    tag_name = unquote(tag_name)
     try:
         item = query_node(record_type, flow_id)
     except ValueError as e:

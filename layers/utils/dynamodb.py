@@ -137,11 +137,11 @@ def get_flow_timerange(flow_id: str) -> str:
 def get_overlapping_timerange(flow_id: str, timerange: str) -> str:
     """Get the extent of the segments in a flow that overlap the specified timerange"""
 
+    # Built once, as building may itself query DynamoDB for the timerange end
+    base_args = get_key_and_args(flow_id, {"timerange": timerange, "limit": 1})
+
     def _first_overlapping(reverse_order: bool) -> dict | None:
-        args = get_key_and_args(
-            flow_id,
-            {"timerange": timerange, "reverse_order": reverse_order, "limit": 1},
-        )
+        args = {**base_args, "ScanIndexForward": not reverse_order}
         # A FilterExpression can drop the only item read, so keep paging
         query = segments_table.query(**args)
         while not query["Items"] and "LastEvaluatedKey" in query:

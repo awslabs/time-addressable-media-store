@@ -1142,17 +1142,15 @@ def set_flow_collection(
         .delete(ref_name="c")
     )
     # Create the base set query
-    query_collection = generate_flow_collection_query(
-        flow_collection, {f"f.{k}": v for k, v in metadata_props.items()}
-    )
+    set_dict = {f"f.{k}": v for k, v in metadata_props.items()}
+    query_collection = generate_flow_collection_query(flow_collection, set_dict)
     if query_collection:
         query = query + query_collection
+    elif set_dict:
+        # Emptying the collection has no edge SET to carry the metadata, so set
+        # it in the same query to keep it atomic with the edge delete
+        query = query + qb.with_("f").set(set_dict)
     execute_open_cypher_query(query.get())
-    # Emptying the collection has no SET to carry the metadata, so apply it here
-    if not query_collection and metadata_props:
-        return set_node_property_base(
-            "flow", flow_id, {f"flow.{k}": v for k, v in metadata_props.items()}
-        )
     # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
     return query_node("flow", flow_id)
 
