@@ -342,6 +342,18 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             "Bad request. The timerange of the segment MUST NOT be empty.",
         )
+    if segment_timerange.start is None or segment_timerange.end is None:
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The timerange of the segment MUST have a finite start and end.",
+        )
+    if not segment_timerange.includes_start():
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The timerange start of the segment MUST be inclusive.",
+        )
     validation = validate_object_id(flow_segment, flow["id"])
     if not validation["valid"]:
         return generate_failed_segment(

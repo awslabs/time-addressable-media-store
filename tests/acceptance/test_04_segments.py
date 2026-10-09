@@ -1815,6 +1815,50 @@ def test_Create_Flow_Segment_POST_400_empty_timerange(
     )
 
 
+@pytest.mark.parametrize("timerange", ["[100:0_", "_101:0)", "_"])
+def test_Create_Flow_Segment_POST_400_unbounded_timerange(
+    api_client_cognito, media_objects, stub_multi_flow, timerange
+):
+    """A Segment timerange must have both a finite start and finite end"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"object_id": media_objects[5]["object_id"], "timerange": timerange},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    assert (
+        "Bad request. The timerange of the segment MUST have a finite start and end."
+        == response.json()["message"]
+    )
+
+
+def test_Create_Flow_Segment_POST_400_exclusive_timerange_start(
+    api_client_cognito, media_objects, stub_multi_flow
+):
+    """A Segment timerange must have an inclusive start"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": media_objects[5]["object_id"],
+            "timerange": "(100:0_101:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+    assert (
+        "Bad request. The timerange start of the segment MUST be inclusive."
+        == response.json()["message"]
+    )
+
+
 def test_Create_Flow_Segment_POST_400_incorrect_flow(
     api_client_cognito, media_objects, stub_multi_flow
 ):
