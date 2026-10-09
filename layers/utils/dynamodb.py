@@ -203,6 +203,9 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
             "flow_id": flow_id,
             "timerange_end": int(parameters["page"]),
         }
+        # A start key on the object-id-index must also carry its own key
+        if parameters.get("object_id"):
+            args["ExclusiveStartKey"]["object_id"] = parameters["object_id"]
     # Parse timerange filter out of parameters
     timerange_filter = (
         parse_timerange(parameters["timerange"])

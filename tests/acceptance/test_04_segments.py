@@ -1388,6 +1388,25 @@ def test_List_Flow_Segments_GET_200_object_id(
     assert object_id == response_json[0]["object_id"]
 
 
+def test_List_Flow_Segments_GET_200_object_id_page(
+    api_client_cognito, media_objects, stub_video_flow
+):
+    """A page key combined with object_id is accepted rather than crashing the
+    object-id-index query (regression: DynamoDB rejected the start key as invalid)"""
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"object_id": object_id, "limit": 1, "page": "0"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert isinstance(response.json(), list)
+
+
 def test_List_Flow_Segments_GET_200_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange

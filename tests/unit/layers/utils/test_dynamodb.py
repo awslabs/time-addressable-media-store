@@ -328,6 +328,21 @@ class TestDynamoDB:
             "timerange_end": int(parameters["page"]),
         }
 
+    def test_get_key_and_args_pagination_with_object_id(self):
+        """A start key on the object-id-index must include the index key as well
+        as the table key, or DynamoDB rejects it (regression test)."""
+        flow_id = "test-flow"
+        parameters = {"limit": 1, "page": "21999999999", "object_id": "test-object"}
+
+        result = dynamodb.get_key_and_args(flow_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        assert result["ExclusiveStartKey"] == {
+            "flow_id": flow_id,
+            "timerange_end": 21999999999,
+            "object_id": "test-object",
+        }
+
     def test_get_key_and_args_max_limit(self):
         flow_id = "test-flow"
         parameters = {"limit": constants.MAX_PAGE_LIMIT + 100}
