@@ -442,7 +442,7 @@ def build_order_by(
 
     Records whose sort value is unset (NULL) sort after those with a value by
     default, and before them when `reverse_order` is set (per the spec fallback
-    rule). This is achieved with a leading `(col IS NULL)` term whose direction
+    rule). This is achieved with a leading "is NULL" (0/1) term whose direction
     depends only on `reverse_order`, independent of the value direction.
 
     Within the NULL group the spec falls back to sorting by `id`, which as a
@@ -461,12 +461,16 @@ def build_order_by(
     if reverse_order:
         ascending = not ascending
     direction = "ASC" if ascending else "DESC"
-    # (col IS NULL) is False(0) for values, True(1) for NULLs: ASC puts NULLs
-    # last (default), DESC puts them first (reverse_order).
+    # 0 for values, 1 for NULLs: ASC puts NULLs last (default), DESC puts them
+    # first (reverse_order).
     null_direction = "DESC" if reverse_order else "ASC"
+    # NULLs are kept out of every sort key: Neptune does not order them stably,
+    # so SKIP/LIMIT pages repeated and dropped records. Unset values all sort as
+    # the same constant (every sort column is a string), leaving id to order them.
+    is_null = f"{ref_name}.{col} IS NULL"
     return [
-        f"({ref_name}.{col} IS NULL) {null_direction}",
-        f"{ref_name}.{col} {direction}",
+        f"CASE WHEN {is_null} THEN 1 ELSE 0 END {null_direction}",
+        f"CASE WHEN {is_null} THEN '' ELSE {ref_name}.{col} END {direction}",
         f"{ref_name}.id",
     ], not reverse_order
 

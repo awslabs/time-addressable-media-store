@@ -17,7 +17,7 @@ class TestBuildOrderBy:
     These tests assert both the column list and the flag so a regression
     to the broken single-direction form is caught.
 
-    The leading `(col IS NULL)` term implements the spec fallback rule: records
+    The leading "is NULL" (0/1) term implements the spec fallback rule: records
     with an unset sort value sort after those with one by default, and before
     when reverse_order is set. Its direction depends only on reverse_order, as
     does the id fallback/tie-breaker (ascending unless reversed).
@@ -30,8 +30,8 @@ class TestBuildOrderBy:
             "source", None, False, {"created", "updated"}
         )
         assert cols == [
-            "(source.created IS NULL) ASC",
-            "source.created DESC",
+            "CASE WHEN source.created IS NULL THEN 1 ELSE 0 END ASC",
+            "CASE WHEN source.created IS NULL THEN '' ELSE source.created END DESC",
             "source.id",
         ]
         assert id_ascending is True
@@ -42,8 +42,8 @@ class TestBuildOrderBy:
             "source", "label", False, {"created", "updated"}
         )
         assert cols == [
-            "(source.label IS NULL) ASC",
-            "source.label ASC",
+            "CASE WHEN source.label IS NULL THEN 1 ELSE 0 END ASC",
+            "CASE WHEN source.label IS NULL THEN '' ELSE source.label END ASC",
             "source.id",
         ]
         assert ascending is True
@@ -53,8 +53,8 @@ class TestBuildOrderBy:
             "source", "created", True, {"created", "updated"}
         )
         assert cols == [
-            "(source.created IS NULL) DESC",
-            "source.created ASC",
+            "CASE WHEN source.created IS NULL THEN 1 ELSE 0 END DESC",
+            "CASE WHEN source.created IS NULL THEN '' ELSE source.created END ASC",
             "source.id",
         ]
         assert id_ascending is False
@@ -64,8 +64,8 @@ class TestBuildOrderBy:
             "source", "label", True, {"created", "updated"}
         )
         assert cols == [
-            "(source.label IS NULL) DESC",
-            "source.label DESC",
+            "CASE WHEN source.label IS NULL THEN 1 ELSE 0 END DESC",
+            "CASE WHEN source.label IS NULL THEN '' ELSE source.label END DESC",
             "source.id",
         ]
         assert ascending is False
@@ -75,8 +75,8 @@ class TestBuildOrderBy:
             "flow", None, False, {"created", "metadata_updated"}
         )
         assert cols == [
-            "(flow.created IS NULL) ASC",
-            "flow.created DESC",
+            "CASE WHEN flow.created IS NULL THEN 1 ELSE 0 END ASC",
+            "CASE WHEN flow.created IS NULL THEN '' ELSE flow.created END DESC",
             "flow.id",
         ]
         assert id_ascending is True
@@ -87,8 +87,8 @@ class TestBuildOrderBy:
             "webhook", None, False, set(), default_col="url"
         )
         assert cols == [
-            "(webhook.url IS NULL) ASC",
-            "webhook.url ASC",
+            "CASE WHEN webhook.url IS NULL THEN 1 ELSE 0 END ASC",
+            "CASE WHEN webhook.url IS NULL THEN '' ELSE webhook.url END ASC",
             "webhook.id",
         ]
         assert ascending is True
@@ -98,8 +98,8 @@ class TestBuildOrderBy:
             "webhook", None, True, set(), default_col="url"
         )
         assert cols == [
-            "(webhook.url IS NULL) DESC",
-            "webhook.url DESC",
+            "CASE WHEN webhook.url IS NULL THEN 1 ELSE 0 END DESC",
+            "CASE WHEN webhook.url IS NULL THEN '' ELSE webhook.url END DESC",
             "webhook.id",
         ]
         assert ascending is False
@@ -117,20 +117,35 @@ class TestBuildOrderBy:
         assert cols[1].endswith("ASC" if reverse_order else "DESC")
         assert id_ascending is not reverse_order
 
+    @pytest.mark.parametrize("reverse_order", [False, True])
+    def test_sort_keys_never_yield_null(self, reverse_order):
+        # Neptune does not order NULLs stably under SKIP/LIMIT, so every sort
+        # key must map an unset value to a constant (regression: pages repeated
+        # and dropped records when sorting on a sometimes-unset column).
+        cols, _ = build_order_by(
+            "flow", "metadata_updated", reverse_order, {"created", "metadata_updated"}
+        )
+        assert cols[0].startswith("CASE WHEN flow.metadata_updated IS NULL THEN 1")
+        assert cols[1].startswith(
+            "CASE WHEN flow.metadata_updated IS NULL THEN '' ELSE flow.metadata_updated END"
+        )
+
     def test_id_always_present_as_secondary_key(self):
         for sort_by in [None, "created", "updated", "label"]:
             cols, _ = build_order_by("source", sort_by, False, {"created", "updated"})
             assert cols[-1] == "source.id"
 
     def test_null_group_sorts_last_by_default(self):
-        # (col IS NULL) is False(0) for values, True(1) for NULLs: ASC keeps
+        # The leading term is 0 for values and 1 for NULLs: ASC keeps
         # NULLs last when not reversed, regardless of the value direction.
         for sort_by, datetime_cols in [
             ("label", {"created", "updated"}),
             ("created", {"created", "updated"}),
         ]:
             cols, _ = build_order_by("source", sort_by, False, datetime_cols)
-            assert cols[0] == f"(source.{sort_by} IS NULL) ASC"
+            assert (
+                cols[0] == f"CASE WHEN source.{sort_by} IS NULL THEN 1 ELSE 0 END ASC"
+            )
 
     def test_null_group_sorts_first_when_reversed(self):
         for sort_by, datetime_cols in [
@@ -138,7 +153,9 @@ class TestBuildOrderBy:
             ("created", {"created", "updated"}),
         ]:
             cols, _ = build_order_by("source", sort_by, True, datetime_cols)
-            assert cols[0] == f"(source.{sort_by} IS NULL) DESC"
+            assert (
+                cols[0] == f"CASE WHEN source.{sort_by} IS NULL THEN 1 ELSE 0 END DESC"
+            )
 
 
 class TestCollectedByWhereLiteral:

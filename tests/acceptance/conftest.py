@@ -754,6 +754,44 @@ def assert_equal_unordered(obj1, obj2):
         raise AssertionError(f"Objects are not equal:\n{diff}")
 
 
+def assert_stable_sorted_listing(
+    api_client, path, sort_by, reverse_order, expected_count, limit=2
+):
+    """Walk every page of a listing sorted on a datetime key and assert each record
+    appears exactly once, in the spec order: records with a value newest first
+    (ties by id), then records without one by id; reverse_order reverses it all."""
+    seen = []
+    page = None
+    while True:
+        params = {
+            "sort_by": sort_by,
+            "reverse_order": str(reverse_order).lower(),
+            "limit": limit,
+        }
+        if page:
+            params["page"] = page
+        response = api_client.request("GET", path, params=params)
+        assert_json_response(response, 200)
+        seen.extend(response.json())
+        page = response.headers.get("X-Paging-NextKey")
+        if not page:
+            break
+    ids = [record["id"] for record in seen]
+    assert len(ids) == len(set(ids)), f"Repeated records across pages: {ids}"
+    assert expected_count == len(ids)
+    by_id = sorted(seen, key=lambda record: record["id"])
+    with_value = sorted(
+        (record for record in by_id if record.get(sort_by)),
+        key=lambda record: record[sort_by],
+        reverse=True,
+    )
+    without_value = [record for record in by_id if not record.get(sort_by)]
+    expected = [record["id"] for record in with_value + without_value]
+    if reverse_order:
+        expected.reverse()
+    assert expected == ids
+
+
 def assert_json_response(response, status_code, empty_body=False):
     """Assert that response has expected status code and JSON content-type."""
     assert status_code == response.status_code

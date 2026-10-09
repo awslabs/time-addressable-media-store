@@ -871,8 +871,9 @@ def test_List_Webhook_URLs_GET_200_reverse_order(
     # NULL-group direction depends only on reverse_order (nulls last by default,
     # first when reversed); url and id follow the value direction.
     assert (
-        f"ORDER BY (webhook.url IS NULL) {expected_direction}, "
-        f"webhook.url {expected_direction}, webhook.id" in query
+        f"ORDER BY CASE WHEN webhook.url IS NULL THEN 1 ELSE 0 END {expected_direction}, "
+        f"CASE WHEN webhook.url IS NULL THEN '' ELSE webhook.url END {expected_direction}, "
+        "webhook.id" in query
     )
 
 
