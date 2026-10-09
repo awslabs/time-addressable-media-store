@@ -17,6 +17,7 @@ WEBHOOK_IGNORED_VALUE_FIELDS = {
         "event_timestamp",
         "event.flow.created_by",
         "event.flow.created",
+        "event.flow.metadata_version",
     ],
     "flows/updated": [
         "event_timestamp",
@@ -24,6 +25,7 @@ WEBHOOK_IGNORED_VALUE_FIELDS = {
         "event.flow.created",
         "event.flow.updated_by",
         "event.flow.metadata_updated",
+        "event.flow.metadata_version",
     ],
     "flows/deleted": ["event_timestamp"],
     "flows/segments_added": ["event_timestamp"],

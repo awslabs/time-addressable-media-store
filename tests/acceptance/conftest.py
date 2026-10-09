@@ -23,6 +23,7 @@ DYNAMIC_PROPS = [
     "updated",
     "updated_by",
     "metadata_updated",
+    "metadata_version",
     "segments_updated",
 ]
 ID_404 = "00000000-0000-1000-8000-00000000000a"

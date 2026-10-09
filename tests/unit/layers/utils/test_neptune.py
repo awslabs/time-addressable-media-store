@@ -1,3 +1,6 @@
+from unittest.mock import patch
+
+import neptune
 import pytest
 
 # pylint: disable=no-name-in-module
@@ -219,3 +222,53 @@ class TestCollectedByWhereLiteral:
             literal = collected_by_where_literal(value, self.NOT_COLLECTED, self.by_id)
             assert literal.startswith("(")
             assert literal.endswith(")")
+
+
+class TestMetadataVersion:
+    """Flow child endpoints and flow_collection changes must issue a new
+    metadata_version alongside metadata_updated; Sources have no such field."""
+
+    @patch("neptune.set_node_property_base")
+    def test_set_node_property_flow_sets_new_metadata_version(self, mock_base):
+        neptune.set_node_property("flow", "flow-id", "user", {"flow.label": "x"})
+        neptune.set_node_property("flow", "flow-id", "user", {"flow.label": "y"})
+
+        props = [call.args[2] for call in mock_base.call_args_list]
+        versions = [p["flow.metadata_version"] for p in props]
+        assert all(versions) and versions[0] != versions[1]
+        assert all("flow.metadata_updated" in p for p in props)
+
+    @patch("neptune.set_node_property_base")
+    def test_set_node_property_source_has_no_metadata_version(self, mock_base):
+        neptune.set_node_property("source", "source-id", "user", {"source.label": "x"})
+
+        props = mock_base.call_args.args[2]
+        assert not any("metadata_version" in key for key in props)
+        assert "source.updated" in props
+
+    @patch("neptune.query_node")
+    @patch("neptune.set_node_property_base")
+    @patch("neptune.execute_open_cypher_query")
+    def test_set_flow_collection_empty_still_updates_metadata(
+        self, mock_execute, mock_base, mock_query_node
+    ):
+        """Emptying the collection has no edge SET to carry the metadata, so it
+        is applied separately (regression: nothing was updated)"""
+        neptune.set_flow_collection("flow-id", "user", [])
+
+        props = mock_base.call_args.args[2]
+        assert {"flow.metadata_updated", "flow.metadata_version"} <= props.keys()
+        assert props["flow.updated_by"] == "user"
+        assert not mock_query_node.called
+
+    @patch("neptune.query_node")
+    @patch("neptune.set_node_property_base")
+    @patch("neptune.execute_open_cypher_query")
+    def test_set_flow_collection_without_metadata_update(
+        self, mock_execute, mock_base, mock_query_node
+    ):
+        neptune.set_flow_collection("flow-id", "temp", [], update_metadata=False)
+
+        query = mock_execute.call_args.args[0]
+        assert "metadata" not in query and "updated_by" not in query
+        assert not mock_base.called

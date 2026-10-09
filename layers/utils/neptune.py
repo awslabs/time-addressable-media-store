@@ -24,6 +24,7 @@ from utils import (
     filter_dict,
     get_default_value,
     model_dump,
+    new_metadata_version,
     opencypher_property_name,
     parse_api_gw_parameters,
     publish_event,
@@ -801,7 +802,7 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
         if existing_flow_collection and DeepDiff(
             flow_collection, existing_flow_collection, ignore_order=False
         ):
-            set_flow_collection(flow_dict["id"], "temp", [])
+            set_flow_collection(flow_dict["id"], "temp", [], update_metadata=False)
         null_tags = {
             k: None for k in existing_dict.get("tags", {}).keys() - tags.keys()
         }
@@ -1103,12 +1104,33 @@ def set_node_property(
         .strftime(constants.DATETIME_FORMAT),
         f"{record_type}.updated_by": username,
     }
+    # Every Flow child endpoint changes Flow metadata, so it gets a new version
+    if record_type == "flow":
+        meta_props["flow.metadata_version"] = new_metadata_version()
     return set_node_property_base(record_type, record_id, meta_props)
 
 
 @tracer.capture_method(capture_response=False)
-def set_flow_collection(flow_id: str, username: str, flow_collection: list) -> dict:
-    """Set the specfified flow to have the specified flow_collection and set flow metadata_updated and updated_by properties"""
+def set_flow_collection(
+    flow_id: str, username: str, flow_collection: list, update_metadata: bool = True
+) -> dict:
+    """Set the specfified flow to have the specified flow_collection and set flow
+    metadata_updated, metadata_version and updated_by properties.
+
+    update_metadata=False only replaces the collection, for callers (merge_flow)
+    that set the Flow's metadata properties themselves.
+    """
+    metadata_props = (
+        {
+            "metadata_updated": datetime.now()
+            .astimezone(timezone.utc)
+            .strftime(constants.DATETIME_FORMAT),
+            "metadata_version": new_metadata_version(),
+            "updated_by": username,
+        }
+        if update_metadata
+        else {}
+    )
     # Create initial query that deletes all collect_by edges for this flow
     query = (
         qb.match()
@@ -1121,17 +1143,16 @@ def set_flow_collection(flow_id: str, username: str, flow_collection: list) -> d
     )
     # Create the base set query
     query_collection = generate_flow_collection_query(
-        flow_collection,
-        {
-            "f.metadata_updated": datetime.now()
-            .astimezone(timezone.utc)
-            .strftime(constants.DATETIME_FORMAT),
-            "f.updated_by": username,
-        },
+        flow_collection, {f"f.{k}": v for k, v in metadata_props.items()}
     )
     if query_collection:
         query = query + query_collection
     execute_open_cypher_query(query.get())
+    # Emptying the collection has no SET to carry the metadata, so apply it here
+    if not query_collection and metadata_props:
+        return set_node_property_base(
+            "flow", flow_id, {f"flow.{k}": v for k, v in metadata_props.items()}
+        )
     # Too complex to try and get OpenCypher to return the object in the same query so calling the DB to get it separately
     return query_node("flow", flow_id)
 

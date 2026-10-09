@@ -66,6 +66,11 @@ def base_delete_request_dict(
     }
 
 
+def new_metadata_version() -> str:
+    """Returns a new Flow metadata_version: a random UUID, unique to each change"""
+    return str(uuid.uuid4())
+
+
 @tracer.capture_method(capture_response=False)
 def generate_link_url(current_event: APIGatewayProxyEvent, page_value: str) -> str:
     """Generates a link URL relative to the API Gateway request that calls it"""

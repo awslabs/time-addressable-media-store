@@ -130,7 +130,7 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(
@@ -165,7 +165,7 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(remove_fields(stub_data_flow, "collected_by"), response_json)
@@ -198,7 +198,7 @@ def test_Create_or_Replace_Flow_PUT_201_IMAGE(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(
@@ -233,7 +233,7 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_multi_flow, response_json)
@@ -298,6 +298,54 @@ def test_Create_or_Replace_Flow_PUT_204(
             "event": {"flow": stub_multi_flow},
         },
     )
+
+
+def test_Create_or_Replace_Flow_PUT_204_metadata_version(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    """A client-supplied metadata_version is kept unless it matches the existing
+    one; a PUT without one, or with the existing one, gets a new version"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}"
+
+    def put_and_get_version(body):
+        response = api_client_cognito.request("PUT", path, json=body)
+        assert_json_response(response, 204, empty_body=True)
+        return api_client_cognito.request("GET", path).json()["metadata_version"]
+
+    # Act
+    client_version = put_and_get_version(
+        {**stub_multi_flow, "metadata_version": "pytest-version"}
+    )
+    same_version = put_and_get_version(
+        {**stub_multi_flow, "metadata_version": "pytest-version"}
+    )
+    omitted_version = put_and_get_version(stub_multi_flow)
+    # Assert
+    assert "pytest-version" == client_version
+    assert same_version not in ("", "pytest-version")
+    assert omitted_version not in ("", same_version)
+    expect_webhooks("flows/updated", "flows/updated", "flows/updated")
+
+
+def test_Flow_Child_Endpoint_PUT_204_new_metadata_version(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    """Changing Flow metadata via a child endpoint issues a new metadata_version"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}"
+    tag_path = f"{path}/tags/pytest_version"
+    before = api_client_cognito.request("GET", path).json()["metadata_version"]
+    # Act
+    put_response = api_client_cognito.request("PUT", tag_path, json="x")
+    after_put = api_client_cognito.request("GET", path).json()["metadata_version"]
+    delete_response = api_client_cognito.request("DELETE", tag_path)
+    after_delete = api_client_cognito.request("GET", path).json()["metadata_version"]
+    # Assert
+    assert_json_response(put_response, 204, empty_body=True)
+    assert_json_response(delete_response, 204, empty_body=True)
+    assert len({before, after_put, after_delete}) == 3
+    expect_webhooks("flows/updated", "flows/updated")
 
 
 def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):

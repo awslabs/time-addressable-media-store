@@ -79,6 +79,7 @@ from utils import (
     generate_presigned_url,
     get_username,
     model_dump,
+    new_metadata_version,
     opencypher_property_name,
     parse_tag_parameters,
     parse_timerange,
@@ -318,6 +319,12 @@ def put_flow_by_id(
         flow.root.created_by = username
     if not flow.root.updated_by and existing_item:
         flow.root.updated_by = username
+    # Keep a client-supplied metadata_version on creation, or on update when it
+    # differs from the existing one; otherwise each change gets a new version
+    if not flow.root.metadata_version or flow.root.metadata_version == (
+        existing_item.get("metadata_version")
+    ):
+        flow.root.metadata_version = new_metadata_version()
     flow_dict = model_dump(flow)
     if supplied_profile_id:
         flow_dict["profile_id"] = supplied_profile_id
