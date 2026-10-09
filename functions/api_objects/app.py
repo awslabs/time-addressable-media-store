@@ -288,14 +288,7 @@ def post_objects_by_id(
     elif hasattr(object_instance.root, "url"):
         storage_backends = list_storage_backends()
         storage_labels = set(item["label"] for item in storage_backends)
-        presigned_labels = set(
-            item["label"].replace(":s3:", ":s3.presigned:")
-            for item in storage_backends
-            if ":s3:" in item["label"]
-        )
-        if object_instance.root.label and object_instance.root.label in (
-            storage_labels | presigned_labels
-        ):
+        if object_instance.root.label and object_instance.root.label in storage_labels:
             raise BadRequestError(
                 "The specified label is already in use by a storage backend."
             )  # 400

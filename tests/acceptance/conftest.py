@@ -832,8 +832,9 @@ def remove_dynamic_props(records):
     return records
 
 
-def create_storage_label(suffix=""):
-    return f"aws.{REGION}:s3{f'.{suffix}' if suffix else ''}:{STORE_NAME}"
+def create_storage_label():
+    """The Storage Backend label, carried by both its direct and pre-signed get_urls"""
+    return f"aws.{REGION}:s3:{STORE_NAME}"
 
 
 def is_presigned_url(url):
@@ -849,7 +850,7 @@ def default_get_urls():
         },
         {
             "presigned": True,
-            "label": create_storage_label("presigned"),
+            "label": create_storage_label(),
         },
     ]
 

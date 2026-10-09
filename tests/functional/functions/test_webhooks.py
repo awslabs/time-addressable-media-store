@@ -68,10 +68,8 @@ def generate_opencyher_query(event_type, where_conditions):
 
 # Constants for test parameters
 SAMPLE_FLOW_ID = str(uuid.uuid4())
-SAMPLE_LABELS = [
-    f"aws.eu-west-1:s3:{STORE_NAME}",
-    f"aws.eu-west-1:s3.presigned:{STORE_NAME}",
-]
+# Both controlled get_urls (direct and pre-signed) carry the Storage Backend label
+SAMPLE_LABEL = f"aws.eu-west-1:s3:{STORE_NAME}"
 INVALID_STORAGE_ID = str(uuid.uuid4())
 
 
@@ -232,22 +230,7 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
-                "accept_get_urls": SAMPLE_LABELS[:1],
-            },
-            {
-                "event_type": "flows/segments_added",
-                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
-            },
-            [f"tams:flow:{SAMPLE_FLOW_ID}"],
-            {"message": 1, "get_url": 1},
-            id="accept_get_urls-single-matched",
-        ),
-        pytest.param(
-            {
-                "status": "started",
-                "events": ["flows/segments_added"],
-                "url": "test-url",
-                "accept_get_urls": SAMPLE_LABELS,
+                "accept_get_urls": [SAMPLE_LABEL],
             },
             {
                 "event_type": "flows/segments_added",
@@ -255,14 +238,15 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
-            id="accept_get_urls-double-both",
+            id="accept_get_urls-single-matched",
         ),
         pytest.param(
             {
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
-                "accept_get_urls": [SAMPLE_LABELS[0], "dummy"],
+                "accept_get_urls": [SAMPLE_LABEL],
+                "presigned": True,
             },
             {
                 "event_type": "flows/segments_added",
@@ -270,6 +254,21 @@ INVALID_STORAGE_ID = str(uuid.uuid4())
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
+            id="accept_get_urls-matched-presigned-only",
+        ),
+        pytest.param(
+            {
+                "status": "started",
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+                "accept_get_urls": [SAMPLE_LABEL, "dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
+            [f"tams:flow:{SAMPLE_FLOW_ID}"],
+            {"message": 1, "get_url": 2},
             id="accept_get_urls-double-one",
         ),
         pytest.param(
@@ -394,15 +393,16 @@ def test_segments_added_using_controlled_storage(
         assert "label" in get_url
         # Check verbose option
         if webhook_item.get("verbose_storage", False):
-            assert "record_type" in get_url
-            assert "id" in get_url
             assert "provider" in get_url
             assert "region" in get_url
             assert "store_product" in get_url
             assert "store_type" in get_url
-            assert "default_storage" in get_url
             assert "storage_id" in get_url
             assert "controlled" in get_url
+            # Internal storage backend record fields must not leak into get_urls
+            # (regression: they failed the get_url schema and broke delivery)
+            for internal in ("record_type", "id", "default_storage", "bucket_name"):
+                assert internal not in get_url
 
     assert message_body["event"] == event
 
@@ -569,22 +569,7 @@ def test_segments_added_using_controlled_storage(
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
-                "accept_get_urls": SAMPLE_LABELS[:1],
-            },
-            {
-                "event_type": "flows/segments_added",
-                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
-            },
-            [f"tams:flow:{SAMPLE_FLOW_ID}"],
-            {"message": 1, "get_url": 1},
-            id="accept_get_urls-single-matched",
-        ),
-        pytest.param(
-            {
-                "status": "started",
-                "events": ["flows/segments_added"],
-                "url": "test-url",
-                "accept_get_urls": SAMPLE_LABELS,
+                "accept_get_urls": [SAMPLE_LABEL],
             },
             {
                 "event_type": "flows/segments_added",
@@ -592,14 +577,15 @@ def test_segments_added_using_controlled_storage(
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 2},
-            id="accept_get_urls-double-both",
+            id="accept_get_urls-single-matched",
         ),
         pytest.param(
             {
                 "status": "started",
                 "events": ["flows/segments_added"],
                 "url": "test-url",
-                "accept_get_urls": [SAMPLE_LABELS[0], "dummy"],
+                "accept_get_urls": [SAMPLE_LABEL],
+                "presigned": True,
             },
             {
                 "event_type": "flows/segments_added",
@@ -607,6 +593,21 @@ def test_segments_added_using_controlled_storage(
             },
             [f"tams:flow:{SAMPLE_FLOW_ID}"],
             {"message": 1, "get_url": 1},
+            id="accept_get_urls-matched-presigned-only",
+        ),
+        pytest.param(
+            {
+                "status": "started",
+                "events": ["flows/segments_added"],
+                "url": "test-url",
+                "accept_get_urls": [SAMPLE_LABEL, "dummy"],
+            },
+            {
+                "event_type": "flows/segments_added",
+                "conditions": {"flow_ids": SAMPLE_FLOW_ID},
+            },
+            [f"tams:flow:{SAMPLE_FLOW_ID}"],
+            {"message": 1, "get_url": 2},
             id="accept_get_urls-double-one",
         ),
         pytest.param(
@@ -729,15 +730,16 @@ def test_segments_added_using_legacy_storage(
         assert "label" in get_url
         # Check verbose option
         if webhook_item.get("verbose_storage", False):
-            assert "record_type" in get_url
-            assert "id" in get_url
             assert "provider" in get_url
             assert "region" in get_url
             assert "store_product" in get_url
             assert "store_type" in get_url
-            assert "default_storage" in get_url
             assert "storage_id" in get_url
             assert "controlled" in get_url
+            # Internal storage backend record fields must not leak into get_urls
+            # (regression: they failed the get_url schema and broke delivery)
+            for internal in ("record_type", "id", "default_storage", "bucket_name"):
+                assert internal not in get_url
 
     assert message_body["event"] == event
 

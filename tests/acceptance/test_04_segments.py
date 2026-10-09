@@ -1274,7 +1274,34 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_single(
         assert "object_id" in record
         assert "timerange" in record
         assert "get_urls" in record
+        # The direct and pre-signed URLs both carry the Storage Backend label
+        assert 2 == len(record["get_urls"])
+        assert {create_storage_label()} == {u["label"] for u in record["get_urls"]}
+        assert [True] == [
+            u["presigned"] for u in record["get_urls"] if "presigned" in u
+        ]
+
+
+def test_List_Flow_Segments_GET_200_accept_get_urls_single_presigned(
+    api_client_cognito, stub_video_flow
+):
+    """The presigned parameter, not the label, selects the pre-signed URL"""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"accept_get_urls": create_storage_label(), "presigned": "true"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 30 == len(response_json)
+    for record in response_json:
         assert 1 == len(record["get_urls"])
+        assert record["get_urls"][0]["presigned"] is True
+        assert create_storage_label() == record["get_urls"][0]["label"]
 
 
 def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
@@ -1286,9 +1313,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
     response = api_client_cognito.request(
         "GET",
         path,
-        params={
-            "accept_get_urls": f"{create_storage_label()},{create_storage_label('presigned')}"
-        },
+        params={"accept_get_urls": f"{create_storage_label()},no_match"},
     )
     # Assert
     assert_json_response(response, 200)
@@ -1989,9 +2014,9 @@ def test_Get_Media_Object_Information_GET_200_get_urls(
     assert_json_response(response, 200)
     response_json = response.json()
     assert "get_urls" in response_json
-    assert 1 == len(response_json["get_urls"])
-    assert "label" in response_json["get_urls"][0]
-    assert label == response_json["get_urls"][0]["label"]
+    # The direct and pre-signed URLs both carry the Storage Backend label
+    assert 2 == len(response_json["get_urls"])
+    assert {label} == {get_url["label"] for get_url in response_json["get_urls"]}
 
 
 def test_Get_Media_Object_Information_GET_200_get_urls_no_match(
