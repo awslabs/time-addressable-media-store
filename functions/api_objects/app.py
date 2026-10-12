@@ -93,27 +93,39 @@ def get_objects_by_id(
     # from; otherwise try the media index first and fall back to init.
     if param_page is not None and page_targets_init_index(param_page):
         is_init_object = True
-        items, last_evaluated_key, limit_used = query_segments_by_init_object_id(
-            object_id,
-            limit=param_limit,
-            page=param_page,
-        )
+        query_segments = query_segments_by_init_object_id
     else:
         is_init_object = False
-        items, last_evaluated_key, limit_used = query_segments_by_object_id(
+        query_segments = query_segments_by_object_id
+    items, last_evaluated_key, limit_used = query_segments(
+        object_id,
+        limit=param_limit,
+        page=param_page,
+    )
+    if not items and param_page is None:
+        is_init_object = True
+        query_segments = query_segments_by_init_object_id
+        items, last_evaluated_key, limit_used = query_segments(
             object_id,
             limit=param_limit,
-            page=param_page,
         )
-        if len(items) == 0 and param_page is None:
-            items, last_evaluated_key, limit_used = query_segments_by_init_object_id(
-                object_id,
-                limit=param_limit,
+    # An empty page does not distinguish a page beyond the final reference
+    # from a nonexistent Object. Query the same index without the cursor to
+    # verify existence and recover Object-global metadata.
+    metadata_items = items
+    if not metadata_items and param_page is not None:
+        metadata_items, _, _ = query_segments(object_id, limit=1)
+        if not metadata_items:
+            alternate_query = (
+                query_segments_by_object_id
+                if is_init_object
+                else query_segments_by_init_object_id
             )
-            if items:
-                is_init_object = True
-            else:
-                raise NotFoundError("The requested Object does not exist.")  # 404
+            alternate_items, _, _ = alternate_query(object_id, limit=1)
+            if alternate_items:
+                raise BadRequestError("Invalid page parameter value")  # 400
+    if not metadata_items:
+        raise NotFoundError("The requested Object does not exist.")  # 404
     custom_headers = {}
     if last_evaluated_key:
         next_key = base64.b64encode(
@@ -139,19 +151,23 @@ def get_objects_by_id(
         # uncontrolled instances in init_get_urls.
         combined_item = {
             "object_id": object_id,
-            "get_urls": get_unique_get_urls(items, attribute="init_get_urls"),
+            "get_urls": get_unique_get_urls(metadata_items, attribute="init_get_urls"),
             "storage_ids": list(
-                {sid for item in items for sid in item.get("init_storage_ids", [])}
+                {
+                    sid
+                    for item in metadata_items
+                    for sid in item.get("init_storage_ids", [])
+                }
             ),
         }
     else:
         combined_item = {
             "object_id": object_id,
-            "get_urls": get_unique_get_urls(items),
+            "get_urls": get_unique_get_urls(metadata_items),
             "storage_ids": list(
                 {
                     storage_id
-                    for item in items
+                    for item in metadata_items
                     for storage_id in item.get("storage_ids", [])
                 }
             ),
@@ -171,11 +187,15 @@ def get_objects_by_id(
     init_object_id = None
     if not is_init_object:
         init_object_id = next(
-            (item.get("init_object_id") for item in items if "init_object_id" in item),
+            (
+                item.get("init_object_id")
+                for item in metadata_items
+                if "init_object_id" in item
+            ),
             None,
         )
     if init_object_id:
-        init_items = [item for item in items if "init_object_id" in item]
+        init_items = [item for item in metadata_items if "init_object_id" in item]
         init_combined = {
             "object_id": init_object_id,
             "get_urls": get_unique_get_urls(init_items, attribute="init_get_urls"),
@@ -201,16 +221,13 @@ def get_objects_by_id(
         timerange = None
         key_frame_count = None
     else:
-        # A page beyond the last flow reference has no items to fall back on
         timerange = get_item.get("Item", {}).get("timerange") or (
-            (items[0].get("object_timerange") or items[0]["timerange"])
-            if items
-            else None
+            metadata_items[0].get("object_timerange") or metadata_items[0]["timerange"]
         )
         key_frame_count = next(
             (
                 item.get("key_frame_count")
-                for item in items
+                for item in metadata_items
                 if "key_frame_count" in item
             ),
             None,

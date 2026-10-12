@@ -1997,6 +1997,34 @@ def test_Get_Media_Object_Information_HEAD_404(api_client_cognito):
     assert_json_response(response, 404, empty_body=True)
 
 
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+@pytest.mark.parametrize("page_key", ["object_id", "init_object_id"])
+def test_Get_Media_Object_Information_404_page_nonexistent_object(
+    api_client_cognito, stub_video_flow, method, page_key
+):
+    """A valid-looking page cursor cannot make a nonexistent Object appear"""
+    # Arrange
+    object_id = "paged-object-does-not-exist"
+    page = base64.b64encode(
+        json.dumps(
+            {
+                "flow_id": stub_video_flow["id"],
+                "timerange_end": 0,
+                page_key: object_id,
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        method,
+        path,
+        params={"page": page},
+    )
+    # Assert
+    assert_json_response(response, 404, empty_body=method == "HEAD")
+
+
 def test_Get_Media_Object_Information_GET_200(
     api_client_cognito, media_objects, stub_video_flow
 ):
