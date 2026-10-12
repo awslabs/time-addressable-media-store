@@ -24,6 +24,7 @@ from neptune import (
 from schema import Flowsegmentpost
 from utils import (
     calculate_object_timerange,
+    parse_timerange,
     pop_outliers,
     publish_event,
     put_message,
@@ -133,6 +134,33 @@ def get_flow_timerange(flow_id: str) -> str:
 
 
 @tracer.capture_method(capture_response=False)
+def get_overlapping_timerange(flow_id: str, timerange: str) -> str:
+    """Get the extent of the segments in a flow that overlap the specified timerange"""
+
+    # Built once, as building may itself query DynamoDB for the timerange end
+    base_args = get_key_and_args(flow_id, {"timerange": timerange, "limit": 1})
+
+    def _first_overlapping(reverse_order: bool) -> dict | None:
+        args = {**base_args, "ScanIndexForward": not reverse_order}
+        # A FilterExpression can drop the only item read, so keep paging
+        query = segments_table.query(**args)
+        while not query["Items"] and "LastEvaluatedKey" in query:
+            args["ExclusiveStartKey"] = query["LastEvaluatedKey"]
+            query = segments_table.query(**args)
+        return query["Items"][0] if query["Items"] else None
+
+    first_segment = _first_overlapping(reverse_order=False)
+    if first_segment is None:
+        return "()"
+    last_segment = _first_overlapping(reverse_order=True)
+    return str(
+        TimeRange.from_str(first_segment["timerange"]).extend_to_encompass_timerange(
+            TimeRange.from_str(last_segment["timerange"])
+        )
+    )
+
+
+@tracer.capture_method(capture_response=False)
 def get_timerange_expression(
     expression_type: Type[Attr] | Type[Key],
     boundary: TimeRangeBoundary,
@@ -175,9 +203,12 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
             "flow_id": flow_id,
             "timerange_end": int(parameters["page"]),
         }
+        # A start key on the object-id-index must also carry its own key
+        if parameters.get("object_id"):
+            args["ExclusiveStartKey"]["object_id"] = parameters["object_id"]
     # Parse timerange filter out of parameters
     timerange_filter = (
-        TimeRange.from_str(parameters["timerange"])
+        parse_timerange(parameters["timerange"])
         if parameters.get("timerange")
         else None
     )
@@ -255,6 +286,10 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
             args["KeyConditionExpression"] = And(
                 args["KeyConditionExpression"],
                 Key("timerange_end").lte(exact_timerange_end),
+            )
+            # Drop the boundary segment when it starts after the requested range.
+            args["FilterExpression"] = get_timerange_expression(
+                Attr, TimeRangeBoundary.START, timerange_filter
             )
     return args
 

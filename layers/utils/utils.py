@@ -6,6 +6,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from itertools import batched
+from typing import Annotated
 
 import boto3
 
@@ -15,6 +16,10 @@ from aws_lambda_powertools import Tracer
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     ForbiddenError,
+    NotFoundError,
+)
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
 )
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import (
@@ -23,10 +28,14 @@ from aws_lambda_powertools.utilities.data_classes.api_gateway_proxy_event import
 from botocore.config import Config
 from mediatimestamp.immutable import TimeRange, Timestamp
 from params import essence_params
-from pydantic import BaseModel
-from schema import FailedSegment, Flowsegmentpost
+from pydantic import AfterValidator, BaseModel, ValidationError
+from schema import FailedSegment, Flowsegmentpost, Urltaglist
 
 tracer = Tracer()
+
+# API Gateway passes the path still percent-encoded (e.g. "/" as %2F), so string
+# path parameters that may contain such characters use this type to decode them
+DecodedPathStr = Annotated[str, AfterValidator(urllib.parse.unquote)]
 
 events = boto3.client("events")
 sqs = boto3.client("sqs")
@@ -59,22 +68,28 @@ def base_delete_request_dict(
     }
 
 
+def new_metadata_version() -> str:
+    """Returns a new Flow metadata_version: a random UUID, unique to each change"""
+    return str(uuid.uuid4())
+
+
 @tracer.capture_method(capture_response=False)
 def generate_link_url(current_event: APIGatewayProxyEvent, page_value: str) -> str:
     """Generates a link URL relative to the API Gateway request that calls it"""
     host = current_event.request_context.domain_name
     path = current_event.request_context.path
-    query_string = (
-        "&".join(
-            f"{k}={v}"
-            for k, v in current_event.query_string_parameters.items()
-            if k != "page"
-        )
-        + "&"
-        if current_event.query_string_parameters
-        else ""
+    # API Gateway supplies decoded query values, so re-encode them; commas are
+    # left as-is since they only ever separate list values
+    params = {
+        k: v
+        for k, v in (current_event.query_string_parameters or {}).items()
+        if k != "page"
+    }
+    params["page"] = page_value
+    query_string = urllib.parse.urlencode(
+        params, quote_via=urllib.parse.quote, safe=","
     )
-    return f'<https://{host}{path}?{query_string}page={urllib.parse.quote_plus(page_value)}>; rel="next"'
+    return f'<https://{host}{path}?{query_string}>; rel="next"'
 
 
 @tracer.capture_method(capture_response=False)
@@ -249,6 +264,18 @@ def model_dump(
     return model_dict
 
 
+def parse_timerange(value: str) -> TimeRange:
+    """Parses a client-supplied TimeRange string.
+
+    mediatimestamp ignores the brackets on a single-timestamp range, reading e.g.
+    "(5:0)" or "[5:0)" as the instant "[5:0]". A single timestamp with an
+    exclusive bracket contains no time, so it is returned as the empty range.
+    """
+    if "_" not in value and (value.startswith("(") or value.endswith(")")):
+        return TimeRange.never()
+    return TimeRange.from_str(value)
+
+
 @tracer.capture_method(capture_response=False)
 def pop_outliers(timerange: TimeRange, items: list) -> list:
     """Remove ends of a list of Timerange items if they do not fully cover the supplied Timerange"""
@@ -269,6 +296,13 @@ def remove_null(obj: dict | list) -> None:
             remove_null(i)
     elif isinstance(obj, dict):
         for k, v in list(obj.items()):
+            # essence_parameters is required, even when empty, for all but multi Flows
+            if (
+                k == "essence_parameters"
+                and v == {}
+                and obj.get("format") != "urn:x-nmos:format:multi"
+            ):
+                continue
             if v is None or v == {} or v == []:
                 obj.pop(k)
             elif isinstance(v, str):
@@ -309,6 +343,15 @@ def parse_tag_parameters(
         except ValueError:
             continue  # Key's without a "." cannot be tag keys so continue
         if key_prefix in value_prefixes:
+            try:
+                Urltaglist.model_validate(value)
+            except ValidationError as ex:
+                raise BadRequestError(
+                    [
+                        {**error, "loc": ["query", key]}
+                        for error in ex.errors(include_url=False, include_context=False)
+                    ]
+                ) from ex  # 400
             values[key_name] = value
         elif key_prefix in exists_prefixes:
             if value.lower() in ("true", "false"):
@@ -418,6 +461,24 @@ def deserialise_neptune_obj(obj: dict) -> dict:
 
 
 @tracer.capture_method(capture_response=False)
+def parse_essence_parameter(
+    key: str, value, essence_properties: dict, where_literals: list
+) -> None:
+    """Adds an essence parameter filter as a property match or where literal"""
+    match essence_params[key]:
+        case "int":
+            essence_properties[key] = int(value)
+        case "float":
+            essence_properties[key] = float(value)
+        case "bool":
+            if value if isinstance(value, bool) else str(value).lower() == "true":
+                essence_properties[key] = True
+            else:
+                # Omitted boolean essence parameters are treated as false
+                where_literals.append(f"(e.{key} IS NULL OR e.{key} = false)")
+
+
+@tracer.capture_method(capture_response=False)
 def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     """Parses API Gateway parameters into the structure used by OpenCypher query"""
     where_literals = []
@@ -425,16 +486,9 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
     for key, value in query_parameters.items():
         if value is not None:
             if key in essence_params:
-                if essence_params[key] == "int":
-                    return_dict["essence_properties"][key] = int(value)
-                elif essence_params[key] == "float":
-                    return_dict["essence_properties"][key] = float(value)
-                elif essence_params[key] == "bool":
-                    return_dict["essence_properties"][key] = (
-                        value
-                        if isinstance(value, bool)
-                        else str(value).lower() == "true"
-                    )
+                parse_essence_parameter(
+                    key, value, return_dict["essence_properties"], where_literals
+                )
             elif key == "tag_values":
                 for tag_name, tag_value in value.items():
                     prop_name = opencypher_property_name(tag_name)
@@ -453,6 +507,65 @@ def parse_api_gw_parameters(query_parameters: dict) -> tuple[defaultdict, list]:
             else:
                 return_dict["properties"][key] = value
     return return_dict, where_literals
+
+
+def find_null_path(obj, path: tuple = ()) -> tuple | None:
+    """Returns the path to the first null value in a parsed JSON document, or None"""
+    if obj is None:
+        return path
+    if isinstance(obj, dict):
+        items = obj.items()
+    elif isinstance(obj, list):
+        items = enumerate(obj)
+    else:
+        return None
+    for key, value in items:
+        null_path = find_null_path(value, (*path, key))
+        if null_path is not None:
+            return null_path
+    return None
+
+
+def reject_null_body_fields(app, next_middleware):
+    """Powertools middleware rejecting explicit nulls in POST/PUT request bodies.
+
+    No TAMS schema is nullable: optional fields may be omitted but never null.
+    The generated models cannot tell the two apart, so this enforces it.
+    """
+    event = app.current_event
+    if event.http_method in ("POST", "PUT") and event.body:
+        try:
+            body = event.json_body
+        except ValueError:
+            body = None  # Invalid JSON is reported by request validation
+        null_path = find_null_path(body) if body is not None else None
+        if null_path is not None:
+            raise BadRequestError(
+                [
+                    {
+                        "type": "null_not_allowed",
+                        "loc": ["body", *null_path],
+                        "msg": "Input should not be null; omit optional fields instead",
+                        "input": None,
+                    }
+                ]
+            )  # 400
+    return next_middleware(app)
+
+
+@tracer.capture_method(capture_response=False)
+def raise_validation_error(ex: RequestValidationError, http_method: str) -> None:
+    """Raises the TAMS error for a request validation failure.
+
+    A malformed path ID on a GET, HEAD or DELETE is reported as 404, since TAMS
+    defines no 400 response for most of those operations.
+    """
+    errors = ex.errors()
+    if http_method in ("GET", "HEAD", "DELETE") and all(
+        (error.get("loc") or [None])[0] == "path" for error in errors
+    ):
+        raise NotFoundError("The requested ID in the path is invalid.")  # 404
+    raise BadRequestError(errors)  # 400
 
 
 @tracer.capture_method(capture_response=False)
@@ -573,6 +686,35 @@ def validate_frame_rate(video_essence_parameters: dict) -> None:
         raise BadRequestError(
             "When vfr is false or omitted, the frame rate of the Flow is fixed and frame_rate MUST be set."
         )  # 400
+
+
+@tracer.capture_method(capture_response=False)
+def validate_raw_essence_parameters(
+    codec: str | None, essence_parameters: dict
+) -> None:
+    """Enforce the uncompressed (raw) codec rules the TAMS schema can only state in descriptions"""
+    if codec not in constants.RAW_CODECS:
+        return
+    bit_depth = essence_parameters.get("bit_depth")
+    if bit_depth is None:
+        raise BadRequestError(
+            f"When codec is {codec}, essence_parameters.bit_depth MUST be set."
+        )  # 400
+    if codec == "audio/x-raw-float" and bit_depth not in (32, 64):
+        raise BadRequestError(
+            f"When codec is {codec}, essence_parameters.bit_depth MUST be 32 or 64."
+        )  # 400
+    unc_type = essence_parameters.get("unc_parameters", {}).get("unc_type")
+    if unc_type is None:
+        raise BadRequestError(
+            f"When codec is {codec}, essence_parameters.unc_parameters.unc_type MUST be set."
+        )  # 400
+    if unc_type in constants.YUV_UNC_TYPES:
+        for key in ("horiz_chroma_subs", "vert_chroma_subs"):
+            if essence_parameters.get(key) is None:
+                raise BadRequestError(
+                    f"When unc_type is {unc_type}, essence_parameters.{key} MUST be set."
+                )  # 400
 
 
 @tracer.capture_method(capture_response=False)

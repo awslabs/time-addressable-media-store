@@ -6,6 +6,7 @@ from conftest import (
     assert_equal_unordered,
     assert_headers_present,
     assert_json_response,
+    assert_stable_sorted_listing,
     remove_dynamic_props,
 )
 
@@ -290,6 +291,18 @@ def test_List_Sources_GET_200(
             stub_init_source,
         ],
         response_json,
+    )
+
+
+@pytest.mark.parametrize("sort_by", ["updated", "created"])
+@pytest.mark.parametrize("reverse_order", [False, True])
+def test_List_Sources_GET_200_sorted_pages_are_stable(
+    api_client_cognito, sort_by, reverse_order
+):
+    """Paging a sorted listing returns every Source exactly once and in spec order
+    (regression: sorting on a sometimes-unset key repeated and dropped Sources)"""
+    assert_stable_sorted_listing(
+        api_client_cognito, "/sources", sort_by, reverse_order, expected_count=6
     )
 
 

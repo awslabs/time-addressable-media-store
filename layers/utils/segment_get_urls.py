@@ -108,6 +108,13 @@ def get_storage_backends(
     return {k: v for k, v in storage_backends.items() if k in filter_ids}
 
 
+def verbose_storage_fields(storage_backend: dict) -> dict:
+    """Returns the Storage Backend fields added to a verbose get_url, reduced to
+    the Storage Backend schema so internal record fields (e.g. bucket_name) are
+    not exposed."""
+    return model_dump(Storagebackend(**storage_backend))
+
+
 @tracer.capture_method(capture_response=False)
 def create_segment_access_urls(
     segment: dict,
@@ -133,18 +140,15 @@ def create_segment_access_urls(
     if verbose_storage:
         direct_url = {
             **direct_url,
-            **model_dump(Storagebackend(**storage_backend)),
+            **verbose_storage_fields(storage_backend),
             "storage_id": storage_backend["id"],
             "controlled": True,
         }
     get_urls = [direct_url]
     if generate_presigned_urls:
-        presigned_url_template = direct_url.copy()
-        presigned_url_template["label"] = presigned_url_template["label"].replace(
-            ":s3:", ":s3.presigned:"
-        )
-        presigned_url_template["presigned"] = True
-        get_urls.append(presigned_url_template)
+        # A controlled URL carries its Storage Backend's label; the presigned
+        # flag alone distinguishes the pre-signed instance
+        get_urls.append({**direct_url, "presigned": True})
     return get_urls
 
 
@@ -180,9 +184,7 @@ def populate_get_urls(
                 segment.pop("init_get_urls", None)
                 segment["init_object"] = {"object_id": init_id, "get_urls": []}
         return
-    should_create_presigned_urls = (presigned or presigned is None) and (
-        accept_get_urls is None or ":s3.presigned:" in accept_get_urls
-    )
+    should_create_presigned_urls = presigned or presigned is None
     filter_labels = (
         None if accept_get_urls is None else accept_get_urls.split(",")
     )  # Test explictly for None as empty string has special meaning but would be falsey

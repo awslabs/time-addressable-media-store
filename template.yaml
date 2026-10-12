@@ -1258,6 +1258,11 @@ Resources:
                 - !GetAtt CleanupS3Queue.Arn
             - Effect: Allow
               Action:
+                - s3:GetObject
+              Resource:
+                - !Sub ${MediaStorageBucket.Arn}/*
+            - Effect: Allow
+              Action:
                 - neptune-db:ReadDataViaQuery
               Resource: !Sub arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneStack.Outputs.ClusterResourceId}/*
               Condition:

@@ -548,7 +548,7 @@ def test_Webhook_Details_HEAD_200(api_client_cognito, webhook_ids):
     assert_json_response(response, 200, empty_body=True)
 
 
-def test_Webhook_Details_HEAD_400(api_client_cognito):
+def test_Webhook_Details_HEAD_404_bad_id(api_client_cognito):
     # Arrange
     path = "/service/webhooks/bad-id"
     # Act
@@ -557,7 +557,7 @@ def test_Webhook_Details_HEAD_400(api_client_cognito):
         path,
     )
     # Assert
-    assert_json_response(response, 400, empty_body=True)
+    assert_json_response(response, 404, empty_body=True)
 
 
 def test_Webhook_Details_HEAD_404(api_client_cognito):
@@ -590,7 +590,7 @@ def test_Webhook_Details_GET_200(api_client_cognito, webhook_ids, stub_webhook_b
     } == response_json
 
 
-def test_Webhook_Details_GET_400(api_client_cognito):
+def test_Webhook_Details_GET_404_bad_id(api_client_cognito):
     # Arrange
     path = "/service/webhooks/bad-id"
     # Act
@@ -599,11 +599,9 @@ def test_Webhook_Details_GET_400(api_client_cognito):
         path,
     )
     # Assert
-    assert_json_response(response, 400)
+    assert_json_response(response, 404)
     response_json = response.json()
-    assert isinstance(response_json["message"], list)
-    assert 0 < len(response_json["message"])
-    assert response_json["message"][0]["type"] == "string_pattern_mismatch"
+    assert "The requested ID in the path is invalid." == response_json["message"]
 
 
 def test_Webhook_Details_GET_404(api_client_cognito):

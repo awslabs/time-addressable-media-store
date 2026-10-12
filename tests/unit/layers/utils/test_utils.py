@@ -7,6 +7,10 @@ import pytest
 from aws_lambda_powertools.event_handler.exceptions import (
     BadRequestError,
     ForbiddenError,
+    NotFoundError,
+)
+from aws_lambda_powertools.event_handler.openapi.exceptions import (
+    RequestValidationError,
 )
 from mediatimestamp.immutable import TimeRange, Timestamp
 
@@ -183,6 +187,26 @@ class TestUtils:
         with pytest.raises(BadRequestError):
             utils.parse_tag_parameters(params)
 
+    @pytest.mark.parametrize("value", [",", "a,", ",a", "a,,b"])
+    @pytest.mark.parametrize("prefix", ["tag", "flow_tag"])
+    def test_parse_tag_parameters_throws_on_empty_list_item(self, prefix, value):
+        with pytest.raises(BadRequestError):
+            utils.parse_tag_parameters({f"{prefix}.xyz": value})
+
+    def test_parse_tag_parameters_throws_on_empty_list_item_custom_prefix(self):
+        with pytest.raises(BadRequestError):
+            utils.parse_tag_parameters(
+                {"storage_backend_tag.xyz": ","},
+                value_prefixes=("storage_backend_tag",),
+                exists_prefixes=("storage_backend_tag_exists",),
+            )
+
+    @pytest.mark.parametrize("value", ["a", "a,b", "a b,c"])
+    def test_parse_tag_parameters_accepts_valid_list(self, value):
+        values, _ = utils.parse_tag_parameters({"tag.xyz": value})
+
+        assert values == {"xyz": value}
+
     def test_parse_tag_parameters_custom_prefixes_isolate_namespaces(self):
         """storage_backend_tag.{name} must parse only under its own prefixes and
         never collide with the tag.{name} filters sharing the same request (the
@@ -307,6 +331,25 @@ class TestUtils:
         # Ensure misc properties are included appropriately
         assert return_dict["properties"]["misc"] == query_parameters["misc"]
 
+    def test_parse_api_gw_parameters_bool_true_is_property_match(self):
+        return_dict, where_literals = utils.parse_api_gw_parameters(
+            {"init_segments": True}
+        )
+
+        assert return_dict["essence_properties"] == {"init_segments": True}
+        assert where_literals == []
+
+    @pytest.mark.parametrize("value", [False, "false"])
+    def test_parse_api_gw_parameters_bool_false_matches_omitted(self, value):
+        return_dict, where_literals = utils.parse_api_gw_parameters(
+            {"init_segments": value}
+        )
+
+        assert "init_segments" not in return_dict["essence_properties"]
+        assert where_literals == [
+            "(e.init_segments IS NULL OR e.init_segments = false)"
+        ]
+
     def test_parse_api_gw_parameters_tag_value_matches_array_member(self):
         """A tag filter must match a member of an array-valued tag.
 
@@ -340,6 +383,58 @@ class TestUtils:
         result = utils.filter_dict(input_dict, keys_to_remove)
 
         assert result == {"b": 2}
+
+    @pytest.mark.parametrize("http_method", ["GET", "HEAD", "DELETE"])
+    def test_raise_validation_error_path_is_404(self, http_method):
+        ex = RequestValidationError([{"loc": ("path", "flowId"), "msg": "bad"}])
+
+        with pytest.raises(NotFoundError):
+            utils.raise_validation_error(ex, http_method)
+
+    @pytest.mark.parametrize(
+        "http_method, loc",
+        [
+            ("PUT", ("path", "flowId")),
+            ("POST", ("path", "flowId")),
+            ("GET", ("query", "limit")),
+            ("GET", ()),
+        ],
+    )
+    def test_raise_validation_error_is_400(self, http_method, loc):
+        ex = RequestValidationError([{"loc": loc, "msg": "bad"}])
+
+        with pytest.raises(BadRequestError):
+            utils.raise_validation_error(ex, http_method)
+
+    def test_raise_validation_error_mixed_locations_is_400(self):
+        ex = RequestValidationError(
+            [
+                {"loc": ("path", "flowId"), "msg": "bad"},
+                {"loc": ("query", "limit"), "msg": "bad"},
+            ]
+        )
+
+        with pytest.raises(BadRequestError):
+            utils.raise_validation_error(ex, "GET")
+
+    def test_remove_null_preserves_empty_essence_parameters(self):
+        obj = {
+            "format": "urn:x-nmos:format:data",
+            "essence_parameters": {"unc_parameters": {}},
+            "tags": {},
+            "label": None,
+        }
+
+        utils.remove_null(obj)
+
+        assert obj == {"format": "urn:x-nmos:format:data", "essence_parameters": {}}
+
+    def test_remove_null_removes_empty_essence_parameters_for_multi(self):
+        obj = {"format": "urn:x-nmos:format:multi", "essence_parameters": {}}
+
+        utils.remove_null(obj)
+
+        assert obj == {"format": "urn:x-nmos:format:multi"}
 
     @patch("utils.s3")
     def test_get_presigned_url(self, mock_s3):
@@ -683,3 +778,146 @@ class TestUtils:
         entity = {"tags": {"auth_classes": ["class1"]}}
         # Act
         utils.require_auth_classes_tag_update_permission(mock_context, entity, [])
+
+    @pytest.mark.parametrize(
+        "codec, essence_parameters",
+        [
+            # Not a raw codec: nothing is required
+            ("audio/aac", {"sample_rate": 48000}),
+            (None, {}),
+            (
+                "audio/x-raw-int",
+                {"bit_depth": 16, "unc_parameters": {"unc_type": "interleaved"}},
+            ),
+            (
+                "audio/x-raw-float",
+                {"bit_depth": 32, "unc_parameters": {"unc_type": "planar"}},
+            ),
+            (
+                "video/raw",
+                {
+                    "bit_depth": 10,
+                    "unc_parameters": {"unc_type": "v210"},
+                    "horiz_chroma_subs": 2,
+                    "vert_chroma_subs": 1,
+                },
+            ),
+            # RGB and planar packing do not require chroma subsampling
+            ("video/raw", {"bit_depth": 8, "unc_parameters": {"unc_type": "RGB"}}),
+            ("video/raw", {"bit_depth": 8, "unc_parameters": {"unc_type": "planar"}}),
+        ],
+    )
+    def test_validate_raw_essence_parameters_accepts(self, codec, essence_parameters):
+        utils.validate_raw_essence_parameters(codec, essence_parameters)
+
+    @pytest.mark.parametrize(
+        "codec, essence_parameters, missing",
+        [
+            (
+                "audio/x-raw-int",
+                {"unc_parameters": {"unc_type": "interleaved"}},
+                "bit_depth",
+            ),
+            ("audio/x-raw-int", {"bit_depth": 16}, "unc_type"),
+            (
+                "audio/x-raw-float",
+                {"unc_parameters": {"unc_type": "interleaved"}},
+                "bit_depth",
+            ),
+            (
+                "audio/x-raw-float",
+                {"bit_depth": 24, "unc_parameters": {"unc_type": "interleaved"}},
+                "32 or 64",
+            ),
+            ("video/raw", {"unc_parameters": {"unc_type": "RGB"}}, "bit_depth"),
+            ("video/raw", {"bit_depth": 8}, "unc_type"),
+            (
+                "video/raw",
+                {
+                    "bit_depth": 8,
+                    "unc_parameters": {"unc_type": "UYVY"},
+                    "vert_chroma_subs": 1,
+                },
+                "horiz_chroma_subs",
+            ),
+            (
+                "video/raw",
+                {
+                    "bit_depth": 8,
+                    "unc_parameters": {"unc_type": "UYVY"},
+                    "horiz_chroma_subs": 2,
+                },
+                "vert_chroma_subs",
+            ),
+        ],
+    )
+    def test_validate_raw_essence_parameters_rejects(
+        self, codec, essence_parameters, missing
+    ):
+        with pytest.raises(BadRequestError) as ex:
+            utils.validate_raw_essence_parameters(codec, essence_parameters)
+
+        assert missing in str(ex.value)
+
+    @pytest.mark.parametrize(
+        "body, expected",
+        [
+            ({"a": 1, "b": {"c": [1, "x"]}}, None),
+            ([], None),
+            ("text", None),
+            ({"status": None}, ("status",)),
+            ({"a": {"b": None}}, ("a", "b")),
+            ([{"id": "x", "role": None}], (0, "role")),
+            ({"ids": ["a", None]}, ("ids", 1)),
+        ],
+    )
+    def test_find_null_path(self, body, expected):
+        assert utils.find_null_path(body) == expected
+
+    @pytest.mark.parametrize("value", ["(1:0)", "[1:0)", "(1:0]", "()"])
+    def test_parse_timerange_exclusive_single_timestamp_is_empty(self, value):
+        assert utils.parse_timerange(value).is_empty()
+
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            ("[1:0]", "[1:0]"),
+            ("1:0", "[1:0]"),
+            ("(1:0_2:0)", "(1:0_2:0)"),
+            ("_0:0)", "_0:0)"),
+            ("_", "_"),
+        ],
+    )
+    def test_parse_timerange_defers_to_mediatimestamp(self, value, expected):
+        assert str(utils.parse_timerange(value)) == expected
+
+    def test_generate_link_url_encodes_query_values(self):
+        event = MagicMock()
+        event.request_context.domain_name = "api.example.com"
+        event.request_context.path = "/Prod/flows/abc/segments"
+        event.query_string_parameters = {
+            "timerange": "[0:0_5:0)",
+            "flow_tag.reference/x": "alpha,beta",
+            "label": "a b&c+d%e#f",
+            "page": "old-page",
+        }
+
+        result = utils.generate_link_url(event, "eyJhIjogMX0=+/")
+
+        assert result == (
+            "<https://api.example.com/Prod/flows/abc/segments?"
+            "timerange=%5B0%3A0_5%3A0%29"
+            "&flow_tag.reference%2Fx=alpha,beta"
+            "&label=a%20b%26c%2Bd%25e%23f"
+            '&page=eyJhIjogMX0%3D%2B%2F>; rel="next"'
+        )
+
+    def test_generate_link_url_without_query_parameters(self):
+        event = MagicMock()
+        event.request_context.domain_name = "api.example.com"
+        event.request_context.path = "/Prod/flows"
+        event.query_string_parameters = None
+
+        result = utils.generate_link_url(event, "30")
+
+        assert result == '<https://api.example.com/Prod/flows?page=30>; rel="next"'

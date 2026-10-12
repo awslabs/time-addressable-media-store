@@ -1,6 +1,7 @@
 # pylint: disable=too-many-lines
 import base64
 import json
+from urllib.parse import quote
 
 import pytest
 import requests
@@ -21,6 +22,9 @@ from conftest import (
 pytestmark = [
     pytest.mark.acceptance,
 ]
+
+# Contains "/" and a literal "%2F" so the Object path must be percent-encoded
+EXTERNAL_OBJECT_ID = "test/456/literal%2F.ts"
 
 
 @pytest.mark.parametrize(
@@ -542,8 +546,8 @@ def test_Create_Flow_Segment_POST_200_list_partial(
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 1 == len(response_json)
-    assert "BadRequestError" == response_json[0]["error"]["type"]
+    assert 1 == len(response_json["failed_segments"])
+    assert "BadRequestError" == response_json["failed_segments"][0]["error"]["type"]
     expect_webhooks(
         (
             {
@@ -596,7 +600,7 @@ def test_Create_Flow_Segment_POST_200_list_failed(
     # Assert
     assert_json_response(response, 200)
     response_json = response.json()
-    assert 2 == len(response_json)
+    assert 2 == len(response_json["failed_segments"])
 
 
 def test_Create_Flow_Segment_POST_201_with_get_urls_same_store(
@@ -649,7 +653,7 @@ def test_Create_Flow_Segment_POST_201_with_get_urls_external(
 ):
     # Arrange
     path = f"/flows/{stub_multi_flow['id']}/segments"
-    object_id = "test-456"
+    object_id = EXTERNAL_OBJECT_ID
     segment = {
         "object_id": object_id,
         "timerange": "[5:0_6:0)",
@@ -718,7 +722,7 @@ def test_List_Flow_Segments_GET_200_with_get_urls_external(
         "GET",
         path,
         params={
-            "object_id": "test-456",
+            "object_id": EXTERNAL_OBJECT_ID,
             "accept_get_urls": "something-external",
         },
     )
@@ -726,6 +730,24 @@ def test_List_Flow_Segments_GET_200_with_get_urls_external(
     assert_json_response(response, 200)
     response_json = response.json()
     assert 1 == len(response_json)
+
+
+def test_Get_Media_Object_Information_GET_200_encoded_id(
+    api_client_cognito, stub_multi_flow
+):
+    """An Object ID containing "/" and "%" is found when percent-encoded in the path"""
+    # Arrange
+    path = f"/objects/{quote(EXTERNAL_OBJECT_ID, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert EXTERNAL_OBJECT_ID == response_json["id"]
+    assert [stub_multi_flow["id"]] == response_json["referenced_by_flows"]
 
 
 def test_Delete_Flow_Segment_DELETE_204_with_get_urls_same_store(
@@ -770,7 +792,7 @@ def test_Delete_Flow_Segment_DELETE_204_with_get_urls_external(
         "DELETE",
         path,
         params={
-            "object_id": "test-456",
+            "object_id": EXTERNAL_OBJECT_ID,
         },
     )
     # Assert
@@ -1252,7 +1274,34 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_single(
         assert "object_id" in record
         assert "timerange" in record
         assert "get_urls" in record
+        # The direct and pre-signed URLs both carry the Storage Backend label
+        assert 2 == len(record["get_urls"])
+        assert {create_storage_label()} == {u["label"] for u in record["get_urls"]}
+        assert [True] == [
+            u["presigned"] for u in record["get_urls"] if "presigned" in u
+        ]
+
+
+def test_List_Flow_Segments_GET_200_accept_get_urls_single_presigned(
+    api_client_cognito, stub_video_flow
+):
+    """The presigned parameter, not the label, selects the pre-signed URL"""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"accept_get_urls": create_storage_label(), "presigned": "true"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert 30 == len(response_json)
+    for record in response_json:
         assert 1 == len(record["get_urls"])
+        assert record["get_urls"][0]["presigned"] is True
+        assert create_storage_label() == record["get_urls"][0]["label"]
 
 
 def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
@@ -1264,9 +1313,7 @@ def test_List_Flow_Segments_GET_200_accept_get_urls_multiple(
     response = api_client_cognito.request(
         "GET",
         path,
-        params={
-            "accept_get_urls": f"{create_storage_label()},{create_storage_label('presigned')}"
-        },
+        params={"accept_get_urls": f"{create_storage_label()},no_match"},
     )
     # Assert
     assert_json_response(response, 200)
@@ -1366,6 +1413,25 @@ def test_List_Flow_Segments_GET_200_object_id(
     assert object_id == response_json[0]["object_id"]
 
 
+def test_List_Flow_Segments_GET_200_object_id_page(
+    api_client_cognito, media_objects, stub_video_flow
+):
+    """A page key combined with object_id is accepted rather than crashing the
+    object-id-index query (regression: DynamoDB rejected the start key as invalid)"""
+    # Arrange
+    object_id = media_objects[5]["object_id"]
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+        params={"object_id": object_id, "limit": 1, "page": "0"},
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert isinstance(response.json(), list)
+
+
 def test_List_Flow_Segments_GET_200_page(api_client_cognito, stub_video_flow):
     """List flows with page query specified"""
     # Arrange
@@ -1419,6 +1485,31 @@ def test_List_Flow_Segments_GET_200_timerange(api_client_cognito, stub_video_flo
     assert_json_response(response, 200)
     response_json = response.json()
     assert 2 == len(response_json)
+
+
+def test_List_Flow_Segments_GET_200_follow_link_with_timerange(
+    api_client_cognito, stub_video_flow
+):
+    """The Link header URL is usable as-is and keeps the timerange filter"""
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/segments"
+    first_page = api_client_cognito.request(
+        "GET",
+        path,
+        params={"timerange": "[3:5_4:5)", "limit": 1},
+    )
+    assert_json_response(first_page, 200)
+    next_url = first_page.links["next"]["url"]
+    # Act
+    response = requests.get(
+        next_url, headers=api_client_cognito.default_headers, timeout=30
+    )
+    # Assert
+    assert_json_response(response, 200)
+    timeranges = [
+        segment["timerange"] for segment in first_page.json() + response.json()
+    ]
+    assert ["[3:0_4:0)", "[4:0_5:0)"] == timeranges
 
 
 def test_List_Flow_Segments_GET_200_include_object_timerange(
@@ -1703,6 +1794,71 @@ def test_Create_Flow_Segment_POST_400_overlap(
     )
 
 
+@pytest.mark.parametrize("timerange", ["()", "(100:0)", "[100:0)"])
+def test_Create_Flow_Segment_POST_400_empty_timerange(
+    api_client_cognito, media_objects, stub_multi_flow, timerange
+):
+    """An empty timerange, including an exclusive single timestamp, is rejected"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"object_id": media_objects[5]["object_id"], "timerange": timerange},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    assert (
+        "Bad request. The timerange of the segment MUST NOT be empty."
+        == response.json()["message"]
+    )
+
+
+@pytest.mark.parametrize("timerange", ["[100:0_", "_101:0)", "_"])
+def test_Create_Flow_Segment_POST_400_unbounded_timerange(
+    api_client_cognito, media_objects, stub_multi_flow, timerange
+):
+    """A Segment timerange must have both a finite start and finite end"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={"object_id": media_objects[5]["object_id"], "timerange": timerange},
+    )
+    # Assert
+    assert_json_response(response, 400)
+    assert (
+        "Bad request. The timerange of the segment MUST have a finite start and end."
+        == response.json()["message"]
+    )
+
+
+def test_Create_Flow_Segment_POST_400_exclusive_timerange_start(
+    api_client_cognito, media_objects, stub_multi_flow
+):
+    """A Segment timerange must have an inclusive start"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/segments"
+    # Act
+    response = api_client_cognito.request(
+        "POST",
+        path,
+        json={
+            "object_id": media_objects[5]["object_id"],
+            "timerange": "(100:0_101:0)",
+        },
+    )
+    # Assert
+    assert_json_response(response, 400)
+    assert (
+        "Bad request. The timerange start of the segment MUST be inclusive."
+        == response.json()["message"]
+    )
+
+
 def test_Create_Flow_Segment_POST_400_incorrect_flow(
     api_client_cognito, media_objects, stub_multi_flow
 ):
@@ -1841,6 +1997,34 @@ def test_Get_Media_Object_Information_HEAD_404(api_client_cognito):
     assert_json_response(response, 404, empty_body=True)
 
 
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+@pytest.mark.parametrize("page_key", ["object_id", "init_object_id"])
+def test_Get_Media_Object_Information_404_page_nonexistent_object(
+    api_client_cognito, stub_video_flow, method, page_key
+):
+    """A valid-looking page cursor cannot make a nonexistent Object appear"""
+    # Arrange
+    object_id = "paged-object-does-not-exist"
+    page = base64.b64encode(
+        json.dumps(
+            {
+                "flow_id": stub_video_flow["id"],
+                "timerange_end": 0,
+                page_key: object_id,
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    path = f"/objects/{object_id}"
+    # Act
+    response = api_client_cognito.request(
+        method,
+        path,
+        params={"page": page},
+    )
+    # Assert
+    assert_json_response(response, 404, empty_body=method == "HEAD")
+
+
 def test_Get_Media_Object_Information_GET_200(
     api_client_cognito, media_objects, stub_video_flow
 ):
@@ -1923,9 +2107,9 @@ def test_Get_Media_Object_Information_GET_200_get_urls(
     assert_json_response(response, 200)
     response_json = response.json()
     assert "get_urls" in response_json
-    assert 1 == len(response_json["get_urls"])
-    assert "label" in response_json["get_urls"][0]
-    assert label == response_json["get_urls"][0]["label"]
+    # The direct and pre-signed URLs both carry the Storage Backend label
+    assert 2 == len(response_json["get_urls"])
+    assert {label} == {get_url["label"] for get_url in response_json["get_urls"]}
 
 
 def test_Get_Media_Object_Information_GET_200_get_urls_no_match(

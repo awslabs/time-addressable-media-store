@@ -1,4 +1,6 @@
 # pylint: disable=too-many-lines
+from urllib.parse import quote
+
 import pytest
 import requests
 
@@ -8,6 +10,7 @@ from conftest import (
     assert_equal_unordered,
     assert_headers_present,
     assert_json_response,
+    assert_stable_sorted_listing,
     remove_dynamic_props,
     remove_fields,
 )
@@ -15,6 +18,9 @@ from conftest import (
 pytestmark = [
     pytest.mark.acceptance,
 ]
+
+# Contains "/" so the tag name must be percent-encoded in a path
+ENCODED_TAG_NAME = "pytest/encoded"
 
 
 @pytest.mark.parametrize(
@@ -124,7 +130,7 @@ def test_Create_or_Replace_Flow_PUT_201_AUDIO(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(
@@ -159,7 +165,7 @@ def test_Create_or_Replace_Flow_PUT_201_DATA(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(remove_fields(stub_data_flow, "collected_by"), response_json)
@@ -192,7 +198,7 @@ def test_Create_or_Replace_Flow_PUT_201_IMAGE(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(
@@ -227,7 +233,7 @@ def test_Create_or_Replace_Flow_PUT_201_MULTI(
     # Assert
     assert_json_response(response, 201)
     response_json = response.json()
-    for prop in ["created_by", "created"]:
+    for prop in ["created_by", "created", "metadata_version"]:
         assert prop in response_json
         del response_json[prop]
     assert_equal_unordered(stub_multi_flow, response_json)
@@ -292,6 +298,66 @@ def test_Create_or_Replace_Flow_PUT_204(
             "event": {"flow": stub_multi_flow},
         },
     )
+
+
+def test_Create_or_Replace_Flow_PUT_204_metadata_version(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    """A client-supplied metadata_version is kept unless it matches the existing
+    one; a PUT without one, or with the existing one, gets a new version"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}"
+
+    def put_and_get_version(body):
+        response = api_client_cognito.request("PUT", path, json=body)
+        assert_json_response(response, 204, empty_body=True)
+        return api_client_cognito.request("GET", path).json()["metadata_version"]
+
+    # Act
+    client_version = put_and_get_version(
+        {**stub_multi_flow, "metadata_version": "pytest-version"}
+    )
+    same_version = put_and_get_version(
+        {**stub_multi_flow, "metadata_version": "pytest-version"}
+    )
+    empty_version = put_and_get_version({**stub_multi_flow, "metadata_version": ""})
+    same_empty_version = put_and_get_version(
+        {**stub_multi_flow, "metadata_version": ""}
+    )
+    omitted_version = put_and_get_version(stub_multi_flow)
+    # Assert
+    assert "pytest-version" == client_version
+    assert same_version not in ("", "pytest-version")
+    assert empty_version == ""
+    assert same_empty_version not in ("", same_version)
+    assert omitted_version not in ("", same_empty_version)
+    expect_webhooks(
+        "flows/updated",
+        "flows/updated",
+        "flows/updated",
+        "flows/updated",
+        "flows/updated",
+    )
+
+
+def test_Flow_Child_Endpoint_PUT_204_new_metadata_version(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    """Changing Flow metadata via a child endpoint issues a new metadata_version"""
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}"
+    tag_path = f"{path}/tags/pytest_version"
+    before = api_client_cognito.request("GET", path).json()["metadata_version"]
+    # Act
+    put_response = api_client_cognito.request("PUT", tag_path, json="x")
+    after_put = api_client_cognito.request("GET", path).json()["metadata_version"]
+    delete_response = api_client_cognito.request("DELETE", tag_path)
+    after_delete = api_client_cognito.request("GET", path).json()["metadata_version"]
+    # Assert
+    assert_json_response(put_response, 204, empty_body=True)
+    assert_json_response(delete_response, 204, empty_body=True)
+    assert len({before, after_put, after_delete}) == 3
+    expect_webhooks("flows/updated", "flows/updated")
 
 
 def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
@@ -722,6 +788,18 @@ def test_List_Flows_GET_200(
             stub_init_flow,
         ],
         response_json,
+    )
+
+
+@pytest.mark.parametrize("sort_by", ["metadata_updated", "created"])
+@pytest.mark.parametrize("reverse_order", [False, True])
+def test_List_Flows_GET_200_sorted_pages_are_stable(
+    api_client_cognito, sort_by, reverse_order
+):
+    """Paging a sorted listing returns every Flow exactly once and in spec order
+    (regression: sorting on a sometimes-unset key repeated and dropped Flows)"""
+    assert_stable_sorted_listing(
+        api_client_cognito, "/flows", sort_by, reverse_order, expected_count=6
     )
 
 
@@ -1689,6 +1767,56 @@ def test_Create_or_Update_Flow_Tag_PUT_204_update(
     )
 
 
+def test_Create_or_Update_Flow_Tag_PUT_204_encoded_name(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    """A tag name containing "/" is stored decoded when percent-encoded in the path"""
+    # Arrange
+    tag_value = "test"
+    path = f"/flows/{stub_multi_flow['id']}/tags/{quote(ENCODED_TAG_NAME, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=tag_value,
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    stub_multi_flow["tags"][ENCODED_TAG_NAME] = tag_value
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {"flow": stub_multi_flow},
+        },
+    )
+
+
+def test_Flow_Tag_Value_GET_200_encoded_name(api_client_cognito, stub_multi_flow):
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/tags/{quote(ENCODED_TAG_NAME, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert "test" == response.json()
+
+
+def test_List_Flows_GET_200_encoded_tag_name(api_client_cognito, stub_multi_flow):
+    """The decoded tag name is the one matched by a tag.{name} filter"""
+    # Arrange
+    path = "/flows"
+    # Act
+    response = api_client_cognito.request(
+        "GET", path, params={f"tag.{ENCODED_TAG_NAME}": "test"}
+    )
+    # Assert
+    assert_json_response(response, 200)
+    assert [stub_multi_flow["id"]] == [flow["id"] for flow in response.json()]
+
+
 def test_Create_or_Update_Flow_Tag_PUT_400(api_client_cognito, stub_multi_flow):
     # Arrange
     path = f"/flows/{stub_multi_flow['id']}/tags/pytest"
@@ -1752,6 +1880,29 @@ def test_Delete_Flow_Tag_DELETE_204(
     # Assert
     assert_json_response(response, 204, empty_body=True)
     del stub_multi_flow["tags"][tag_name]
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_multi_flow,
+            },
+        },
+    )
+
+
+def test_Delete_Flow_Tag_DELETE_204_encoded_name(
+    api_client_cognito, stub_multi_flow, expect_webhooks
+):
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/tags/{quote(ENCODED_TAG_NAME, safe='')}"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    del stub_multi_flow["tags"][ENCODED_TAG_NAME]
     expect_webhooks(
         {
             "event_type": "flows/updated",

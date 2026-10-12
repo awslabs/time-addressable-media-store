@@ -10,10 +10,7 @@ from aws_lambda_powertools.event_handler import (
     Response,
     content_types,
 )
-from aws_lambda_powertools.event_handler.exceptions import (
-    BadRequestError,
-    NotFoundError,
-)
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import (
     RequestValidationError,
 )
@@ -33,12 +30,15 @@ from schema import Contentformat, Source, Tags, Uuid, Uuidlistempty
 from schema_extra import SourcesSortBy
 from typing_extensions import Annotated
 from utils import (
+    DecodedPathStr,
     generate_link_url,
     get_username,
     model_dump,
     opencypher_property_name,
     parse_tag_parameters,
     publish_event,
+    raise_validation_error,
+    reject_null_body_fields,
 )
 
 tracer = Tracer()
@@ -46,6 +46,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 
 record_type = "source"
@@ -145,7 +146,7 @@ def get_source_tags(
 @tracer.capture_method(capture_response=False)
 def get_source_tag_value(
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
     try:
         tags = query_node_tags(record_type, source_id)
@@ -163,7 +164,7 @@ def get_source_tag_value(
 def put_source_tag_value(
     tag_value: Annotated[str | list[str], Body()],
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
     if not check_node_exists(record_type, source_id):
         raise NotFoundError(
@@ -188,7 +189,7 @@ def put_source_tag_value(
 @tracer.capture_method(capture_response=False)
 def delete_source_tag(
     source_id: Annotated[str, Path(alias="sourceId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
     try:
         item = query_node(record_type, source_id)
@@ -334,7 +335,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
-    raise BadRequestError(ex.errors())  # 400
+    raise_validation_error(ex, app.current_event.http_method)
 
 
 @tracer.capture_method(capture_response=False)

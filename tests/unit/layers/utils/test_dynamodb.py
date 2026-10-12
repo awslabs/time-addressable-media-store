@@ -328,6 +328,21 @@ class TestDynamoDB:
             "timerange_end": int(parameters["page"]),
         }
 
+    def test_get_key_and_args_pagination_with_object_id(self):
+        """A start key on the object-id-index must include the index key as well
+        as the table key, or DynamoDB rejects it (regression test)."""
+        flow_id = "test-flow"
+        parameters = {"limit": 1, "page": "21999999999", "object_id": "test-object"}
+
+        result = dynamodb.get_key_and_args(flow_id, parameters)
+
+        assert result["IndexName"] == "object-id-index"
+        assert result["ExclusiveStartKey"] == {
+            "flow_id": flow_id,
+            "timerange_end": 21999999999,
+            "object_id": "test-object",
+        }
+
     def test_get_key_and_args_max_limit(self):
         flow_id = "test-flow"
         parameters = {"limit": constants.MAX_PAGE_LIMIT + 100}
@@ -477,6 +492,80 @@ class TestDynamoDB:
         # never lower > upper (which DynamoDB would reject as invalid).
         assert len(between_values) == 2
         assert between_values[0] == between_values[1] == 1
+
+    @patch("dynamodb.get_key_and_args")
+    @patch("dynamodb.segments_table")
+    def test_get_overlapping_timerange_returns_segment_extent(
+        self, mock_segments_table, mock_get_key_and_args
+    ):
+        """The extent of the overlapping segments is returned, not the filter
+        clipped to the flow: segments overhanging the filter widen the result.
+        An empty filtered page is skipped by following LastEvaluatedKey."""
+        mock_get_key_and_args.side_effect = lambda *_: {}
+        mock_segments_table.query.side_effect = [
+            {"Items": [], "LastEvaluatedKey": {"timerange_end": 1}},
+            {"Items": [{"timerange": "[8:500000000_9:500000000)"}]},
+            {"Items": [{"timerange": "[9:500000000_10:500000000)"}]},
+        ]
+
+        result = dynamodb.get_overlapping_timerange("test-flow", "[9:0_10:0)")
+
+        assert result == "[8:500000000_10:500000000)"
+
+    @patch("dynamodb.get_key_and_args")
+    @patch("dynamodb.segments_table")
+    def test_get_overlapping_timerange_no_overlap_is_empty(
+        self, mock_segments_table, mock_get_key_and_args
+    ):
+        mock_get_key_and_args.side_effect = lambda *_: {}
+        mock_segments_table.query.return_value = {"Items": []}
+
+        assert dynamodb.get_overlapping_timerange("test-flow", "[9:0_10:0)") == "()"
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_exclusive_single_timestamp_is_empty(
+        self, mock_segments_table
+    ):
+        """ "(1000000000:1)" holds no time; mediatimestamp would read it as the
+        instant "[1000000000:1]", so it must be treated as the empty range and
+        bound the key to the clamped empty window (regression test)."""
+        mock_segments_table.query.return_value = {"Items": []}
+
+        result = dynamodb.get_key_and_args("test-flow", {"timerange": "(1000000000:1)"})
+
+        _, _, key_values = parse_dynamo_expression(result["KeyConditionExpression"])
+        between_values = [v for v in key_values.values() if isinstance(v, int)]
+        assert between_values == [1, 1]
+
+    @patch("dynamodb.segments_table")
+    def test_get_key_and_args_end_only_filters_boundary_segment(
+        self, mock_segments_table
+    ):
+        """An end-only timerange (e.g. "_0:0)") bounds the sort key at the end of
+        the first segment reaching the filter end, and retains the end boundary as
+        a FilterExpression so that segment is dropped when it starts after the
+        requested range (regression test)."""
+        boundary_end_ns = 1_000_000_002
+        mock_segments_table.query.return_value = {
+            "Items": [{"timerange_end": boundary_end_ns}]
+        }
+        parameters = {"timerange": "_0:0)"}
+
+        result = dynamodb.get_key_and_args("test-flow", parameters)
+
+        key_expr, key_names, key_values = parse_dynamo_expression(
+            result["KeyConditionExpression"]
+        )
+        assert "<=" in key_expr
+        assert set(key_names.values()) == {"flow_id", "timerange_end"}
+        assert boundary_end_ns in key_values.values()
+        filter_expr, filter_names, filter_values = parse_dynamo_expression(
+            result["FilterExpression"]
+        )
+        assert set(filter_names.values()) == {"timerange_start"}
+        # Exclusive end: the segment must start strictly before 0.
+        assert "<" in filter_expr and "<=" not in filter_expr
+        assert 0 in filter_values.values()
 
     @patch("dynamodb.segments_table")
     def test_get_key_and_args_object_id_and_timerange_ands_filters(

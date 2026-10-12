@@ -41,7 +41,14 @@ from neptune import (
     update_flow_segments_updated,
 )
 from pydantic import ValidationError
-from schema import Deletionrequest, Flowsegment, Flowsegmentpost, Timerange, Uuid
+from schema import (
+    Deletionrequest,
+    Flowsegment,
+    Flowsegmentbulkfailure,
+    Flowsegmentpost,
+    Timerange,
+    Uuid,
+)
 from segment_get_urls import populate_get_urls
 from typing_extensions import Annotated
 from utils import (
@@ -50,8 +57,11 @@ from utils import (
     generate_link_url,
     model_dump,
     parse_tag_parameters,
+    parse_timerange,
     publish_event,
     put_message,
+    raise_validation_error,
+    reject_null_body_fields,
 )
 
 tracer = Tracer()
@@ -59,6 +69,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 s3_queue = os.environ["S3_QUEUE_URL"]
 del_queue = os.environ["DELETE_QUEUE_URL"]
@@ -103,6 +114,12 @@ def get_flow_segments_by_id(
         Uuid(root=flow_id)
     except ValidationError as ex:
         raise NotFoundError("The flow ID in the path is invalid.") from ex  # 404
+    # Parsed before any early return so HEAD rejects malformed filters as GET does
+    sb_tag_values, sb_tag_exists = parse_tag_parameters(
+        app.current_event.query_string_parameters,
+        value_prefixes=("storage_backend_tag",),
+        exists_prefixes=("storage_backend_tag_exists",),
+    )
     if not check_node_exists("flow", flow_id):
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
@@ -166,11 +183,6 @@ def get_flow_segments_by_id(
             item.setdefault("object_timerange", item["timerange"])
         else:
             item.pop("object_timerange", None)
-    sb_tag_values, sb_tag_exists = parse_tag_parameters(
-        app.current_event.query_string_parameters,
-        value_prefixes=("storage_backend_tag",),
-        exists_prefixes=("storage_backend_tag_exists",),
-    )
     populate_get_urls(
         items,
         param_accept_get_urls,
@@ -214,7 +226,10 @@ def post_flow_segments_by_id(
         if len(failed_segments) == 0:
             return None, HTTPStatus.CREATED.value  # 201
         else:
-            return model_dump(failed_segments), HTTPStatus.OK.value  # 200
+            return (
+                model_dump(Flowsegmentbulkfailure(failed_segments=failed_segments)),
+                HTTPStatus.OK.value,
+            )  # 200
     # Handle single segment requests separately to retain backwards compatibility with previous version of API where list of segments not available.
     else:
         segment_result = process_single_segment(item, flow_segment)
@@ -245,7 +260,7 @@ def delete_flow_segments_by_id(
         )  # 403
     timerange_to_delete = TimeRange.from_str(get_flow_timerange(flow_id))
     if param_timerange:
-        timerange_to_delete = TimeRange.from_str(param_timerange)
+        timerange_to_delete = parse_timerange(param_timerange)
     deletion_request_dict = None
     if param_object_id:
         # Not able to handle return of Delete Request as delete requests do not support "object_id" query parameter
@@ -293,7 +308,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
-    raise BadRequestError(ex.errors())  # 400
+    raise_validation_error(ex, app.current_event.http_method)
 
 
 @tracer.capture_method(capture_response=False)
@@ -320,6 +335,25 @@ def check_overlapping_segments(flow_id, segment_timerange):
 def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
     """Process a single flow segment POST request"""
     item_dict = model_dump(flow_segment)
+    segment_timerange = parse_timerange(item_dict["timerange"])
+    if segment_timerange.is_empty():
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The timerange of the segment MUST NOT be empty.",
+        )
+    if segment_timerange.start is None or segment_timerange.end is None:
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The timerange of the segment MUST have a finite start and end.",
+        )
+    if not segment_timerange.includes_start():
+        return generate_failed_segment(
+            flow_segment.object_id,
+            item_dict["timerange"],
+            "Bad request. The timerange start of the segment MUST be inclusive.",
+        )
     validation = validate_object_id(flow_segment, flow["id"])
     if not validation["valid"]:
         return generate_failed_segment(
@@ -344,7 +378,6 @@ def process_single_segment(flow: dict, flow_segment: Flowsegmentpost) -> None:
             item_dict["timerange"],
             "Bad request. This Flow uses initialisation segments so every Flow Segment MUST reference an init_object_id.",
         )
-    segment_timerange = TimeRange.from_str(item_dict["timerange"])
     if check_overlapping_segments(flow["id"], segment_timerange):
         return generate_failed_segment(
             flow_segment.object_id,

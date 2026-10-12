@@ -28,6 +28,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 from dynamodb import (
     get_default_storage_backend,
     get_flow_timerange,
+    get_overlapping_timerange,
     get_storage_backend,
     storage_table,
 )
@@ -48,6 +49,7 @@ from neptune import (
     set_node_property,
     validate_flow_collection,
 )
+from pydantic import StrictBool, StrictInt
 from schema import (
     Contentformat,
     Deletionrequest,
@@ -70,17 +72,23 @@ from schema import (
 from schema_extra import FlowsSortBy
 from typing_extensions import Annotated
 from utils import (
+    DecodedPathStr,
     base_delete_request_dict,
     direct_s3_url,
     generate_link_url,
     generate_presigned_url,
     get_username,
     model_dump,
+    new_metadata_version,
     opencypher_property_name,
     parse_tag_parameters,
+    parse_timerange,
     publish_event,
     put_message,
+    raise_validation_error,
+    reject_null_body_fields,
     validate_frame_rate,
+    validate_raw_essence_parameters,
 )
 
 tracer = Tracer()
@@ -88,6 +96,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 
 record_type = "flow"
@@ -165,7 +174,7 @@ def get_flows(
         # MAX_TIMERANGE_FILTER_PAGES so a store with many non-matching Flows
         # can't stall past the API Gateway 29s limit; on the bound the empty
         # page + Link is still returned and the client can continue manually.
-        timerange_filter = TimeRange.from_str(param_timerange)
+        timerange_filter = parse_timerange(param_timerange)
 
         def _matches_timerange(item):
             item_tr = TimeRange.from_str(get_flow_timerange(item["id"]))
@@ -223,12 +232,11 @@ def get_flow_by_id(
     except ValueError as e:
         raise NotFoundError("The requested flow does not exist.") from e  # 404
     if param_include_timerange:
-        item["timerange"] = get_flow_timerange(flow_id)
-    # Update timerange if timerange parameter supplied
-    if param_timerange and param_include_timerange:
-        timerange_filter = TimeRange.from_str(param_timerange)
-        item["timerange"] = str(
-            timerange_filter.intersect_with(TimeRange.from_str(item["timerange"]))
+        # With a timerange parameter, report the extent of the overlapping Segments
+        item["timerange"] = (
+            get_overlapping_timerange(flow_id, param_timerange)
+            if param_timerange
+            else get_flow_timerange(flow_id)
         )
     if app.current_event.request_context.http_method == "HEAD":
         return None, HTTPStatus.OK.value  # 200
@@ -274,6 +282,10 @@ def put_flow_by_id(
     # Validate vfr vs frame_rate essence_parameters as pydantic model not able to enforce conditions
     if flow.root.format.value == Contentformat.urn_x_nmos_format_video.value:
         validate_frame_rate(model_dump(flow.root.essence_parameters))
+    flow_root_dict = model_dump(flow.root)
+    validate_raw_essence_parameters(
+        flow_root_dict.get("codec"), flow_root_dict.get("essence_parameters", {})
+    )
     try:
         existing_item = query_node(record_type, flow_id)
         if existing_item.get("read_only"):
@@ -307,6 +319,12 @@ def put_flow_by_id(
         flow.root.created_by = username
     if not flow.root.updated_by and existing_item:
         flow.root.updated_by = username
+    # Keep a client-supplied metadata_version on creation, or on update when it
+    # differs from the existing one; otherwise each change gets a new version
+    if flow.root.metadata_version is None or flow.root.metadata_version == (
+        existing_item.get("metadata_version")
+    ):
+        flow.root.metadata_version = new_metadata_version()
     flow_dict = model_dump(flow)
     if supplied_profile_id:
         flow_dict["profile_id"] = supplied_profile_id
@@ -397,7 +415,7 @@ def get_flow_tags(flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATT
 @tracer.capture_method(capture_response=False)
 def get_flow_tag_value(
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
     try:
         tags = query_node_tags(record_type, flow_id)
@@ -415,7 +433,7 @@ def get_flow_tag_value(
 def put_flow_tag_value(
     tag_value: Annotated[str | list[str], Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
     try:
         item = query_node(record_type, flow_id)
@@ -444,7 +462,7 @@ def put_flow_tag_value(
 @tracer.capture_method(capture_response=False)
 def delete_flow_tag_value(
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
-    tag_name: Annotated[str, Path(alias="name")],
+    tag_name: Annotated[DecodedPathStr, Path(alias="name")],
 ):
     try:
         item = query_node(record_type, flow_id)
@@ -692,7 +710,7 @@ def get_flow_max_bit_rate(
 @app.put("/flows/<flowId>/max_bit_rate")
 @tracer.capture_method(capture_response=False)
 def put_flow_max_bit_rate(
-    max_bit_rate: Annotated[int, Body()],
+    max_bit_rate: Annotated[StrictInt, Body(ge=0)],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -760,7 +778,7 @@ def get_flow_avg_bit_rate(
 @app.put("/flows/<flowId>/avg_bit_rate")
 @tracer.capture_method(capture_response=False)
 def put_flow_avg_bit_rate(
-    avg_bit_rate: Annotated[int, Body()],
+    avg_bit_rate: Annotated[StrictInt, Body(ge=0)],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     try:
@@ -836,7 +854,7 @@ def get_flow_read_only(
 @app.put("/flows/<flowId>/read_only")
 @tracer.capture_method(capture_response=False)
 def put_flow_read_only(
-    read_only: Annotated[bool, Body()],
+    read_only: Annotated[StrictBool, Body()],
     flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
 ):
     if not check_node_exists(record_type, flow_id):
@@ -937,7 +955,7 @@ def lambda_handler(event: dict, context: LambdaContext) -> dict:
 
 @app.exception_handler(RequestValidationError)
 def handle_validation_error(ex: RequestValidationError):
-    raise BadRequestError(ex.errors())  # 400
+    raise_validation_error(ex, app.current_event.http_method)
 
 
 @tracer.capture_method(capture_response=False)

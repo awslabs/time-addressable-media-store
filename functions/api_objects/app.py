@@ -36,11 +36,13 @@ from schema import Object, Objectsinstancespost, Uuid
 from segment_get_urls import populate_get_urls
 from typing_extensions import Annotated
 from utils import (
+    DecodedPathStr,
     generate_link_url,
     get_unique_get_urls,
     model_dump,
     parse_tag_parameters,
     put_message,
+    reject_null_body_fields,
 )
 
 tracer = Tracer()
@@ -48,6 +50,7 @@ logger = Logger()
 app = APIGatewayRestResolver(
     enable_validation=True, cors=CORSConfig(expose_headers=["*"])
 )
+app.use(middlewares=[reject_null_body_fields])
 metrics = Metrics()
 
 duplication_queue = os.environ["DUPLICATION_QUEUE_URL"]
@@ -58,7 +61,7 @@ s3_queue = os.environ["S3_QUEUE_URL"]
 @app.get("/objects/<objectId>")
 @tracer.capture_method(capture_response=False)
 def get_objects_by_id(
-    object_id: Annotated[str, Path(alias="objectId")],
+    object_id: Annotated[DecodedPathStr, Path(alias="objectId")],
     param_verbose_storage: Annotated[
         Optional[bool], Query(alias="verbose_storage")
     ] = None,
@@ -90,27 +93,39 @@ def get_objects_by_id(
     # from; otherwise try the media index first and fall back to init.
     if param_page is not None and page_targets_init_index(param_page):
         is_init_object = True
-        items, last_evaluated_key, limit_used = query_segments_by_init_object_id(
-            object_id,
-            limit=param_limit,
-            page=param_page,
-        )
+        query_segments = query_segments_by_init_object_id
     else:
         is_init_object = False
-        items, last_evaluated_key, limit_used = query_segments_by_object_id(
+        query_segments = query_segments_by_object_id
+    items, last_evaluated_key, limit_used = query_segments(
+        object_id,
+        limit=param_limit,
+        page=param_page,
+    )
+    if not items and param_page is None:
+        is_init_object = True
+        query_segments = query_segments_by_init_object_id
+        items, last_evaluated_key, limit_used = query_segments(
             object_id,
             limit=param_limit,
-            page=param_page,
         )
-        if len(items) == 0 and param_page is None:
-            items, last_evaluated_key, limit_used = query_segments_by_init_object_id(
-                object_id,
-                limit=param_limit,
+    # An empty page does not distinguish a page beyond the final reference
+    # from a nonexistent Object. Query the same index without the cursor to
+    # verify existence and recover Object-global metadata.
+    metadata_items = items
+    if not metadata_items and param_page is not None:
+        metadata_items, _, _ = query_segments(object_id, limit=1)
+        if not metadata_items:
+            alternate_query = (
+                query_segments_by_object_id
+                if is_init_object
+                else query_segments_by_init_object_id
             )
-            if items:
-                is_init_object = True
-            else:
-                raise NotFoundError("The requested Object does not exist.")  # 404
+            alternate_items, _, _ = alternate_query(object_id, limit=1)
+            if alternate_items:
+                raise BadRequestError("Invalid page parameter value")  # 400
+    if not metadata_items:
+        raise NotFoundError("The requested Object does not exist.")  # 404
     custom_headers = {}
     if last_evaluated_key:
         next_key = base64.b64encode(
@@ -118,9 +133,8 @@ def get_objects_by_id(
         ).decode("utf-8")
         custom_headers["X-Paging-NextKey"] = next_key
         custom_headers["Link"] = generate_link_url(app.current_event, next_key)
-    # Set Paging Limit header if paging limit being used is not the one specified
-    if last_evaluated_key or param_limit != limit_used:
-        custom_headers["X-Paging-Limit"] = str(limit_used)
+    # Always set Paging Limit header, as referenced_by_flows is always paged
+    custom_headers["X-Paging-Limit"] = str(limit_used)
     if app.current_event.request_context.http_method == "HEAD":
         return Response(
             status_code=HTTPStatus.OK.value,  # 200
@@ -137,19 +151,23 @@ def get_objects_by_id(
         # uncontrolled instances in init_get_urls.
         combined_item = {
             "object_id": object_id,
-            "get_urls": get_unique_get_urls(items, attribute="init_get_urls"),
+            "get_urls": get_unique_get_urls(metadata_items, attribute="init_get_urls"),
             "storage_ids": list(
-                {sid for item in items for sid in item.get("init_storage_ids", [])}
+                {
+                    sid
+                    for item in metadata_items
+                    for sid in item.get("init_storage_ids", [])
+                }
             ),
         }
     else:
         combined_item = {
             "object_id": object_id,
-            "get_urls": get_unique_get_urls(items),
+            "get_urls": get_unique_get_urls(metadata_items),
             "storage_ids": list(
                 {
                     storage_id
-                    for item in items
+                    for item in metadata_items
                     for storage_id in item.get("storage_ids", [])
                 }
             ),
@@ -169,11 +187,15 @@ def get_objects_by_id(
     init_object_id = None
     if not is_init_object:
         init_object_id = next(
-            (item.get("init_object_id") for item in items if "init_object_id" in item),
+            (
+                item.get("init_object_id")
+                for item in metadata_items
+                if "init_object_id" in item
+            ),
             None,
         )
     if init_object_id:
-        init_items = [item for item in items if "init_object_id" in item]
+        init_items = [item for item in metadata_items if "init_object_id" in item]
         init_combined = {
             "object_id": init_object_id,
             "get_urls": get_unique_get_urls(init_items, attribute="init_get_urls"),
@@ -199,15 +221,13 @@ def get_objects_by_id(
         timerange = None
         key_frame_count = None
     else:
-        timerange = (
-            get_item.get("Item", {}).get("timerange")
-            or items[0].get("object_timerange")
-            or items[0]["timerange"]
+        timerange = get_item.get("Item", {}).get("timerange") or (
+            metadata_items[0].get("object_timerange") or metadata_items[0]["timerange"]
         )
         key_frame_count = next(
             (
                 item.get("key_frame_count")
-                for item in items
+                for item in metadata_items
                 if "key_frame_count" in item
             ),
             None,
@@ -236,7 +256,10 @@ def get_objects_by_id(
     return Response(
         status_code=HTTPStatus.OK.value,  # 200
         content_type=content_types.APPLICATION_JSON,
-        body=model_dump(schema_item),
+        # referenced_by_flows is required, even when this page holds no references
+        body=model_dump(
+            schema_item, preserve_empty_list_fields={"referenced_by_flows"}
+        ),
         headers=custom_headers,
     )
 
@@ -245,7 +268,7 @@ def get_objects_by_id(
 @tracer.capture_method(capture_response=False)
 def post_objects_by_id(
     object_instance: Annotated[Objectsinstancespost, Body()],
-    object_id: Annotated[str, Path(alias="objectId")],
+    object_id: Annotated[DecodedPathStr, Path(alias="objectId")],
 ):
     items, is_init_object = resolve_object_segments(object_id)
     if len(items) == 0:
@@ -278,14 +301,7 @@ def post_objects_by_id(
     elif hasattr(object_instance.root, "url"):
         storage_backends = list_storage_backends()
         storage_labels = set(item["label"] for item in storage_backends)
-        presigned_labels = set(
-            item["label"].replace(":s3:", ":s3.presigned:")
-            for item in storage_backends
-            if ":s3:" in item["label"]
-        )
-        if object_instance.root.label and object_instance.root.label in (
-            storage_labels | presigned_labels
-        ):
+        if object_instance.root.label and object_instance.root.label in storage_labels:
             raise BadRequestError(
                 "The specified label is already in use by a storage backend."
             )  # 400
@@ -310,7 +326,7 @@ def post_objects_by_id(
 @app.delete("/objects/<objectId>/instances")
 @tracer.capture_method(capture_response=False)
 def delete_objects_by_id(
-    object_id: Annotated[str, Path(alias="objectId")],
+    object_id: Annotated[DecodedPathStr, Path(alias="objectId")],
     param_label: Annotated[Optional[str], Query(alias="label")] = None,
     param_storage_id: Annotated[Optional[str], Query(alias="storage_id")] = None,
 ):
