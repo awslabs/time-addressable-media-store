@@ -7,7 +7,12 @@ import boto3
 import pytest
 
 # pylint: disable=no-name-in-module
-from conftest import DEFAULT_STORAGE_ID, STORE_NAME, serialise_dict
+from conftest import (
+    ALTERNATIVE_STORAGE_ID,
+    DEFAULT_STORAGE_ID,
+    STORE_NAME,
+    serialise_dict,
+)
 
 pytestmark = [
     pytest.mark.functional,
@@ -410,6 +415,77 @@ def test_segments_added_using_controlled_storage(
     for key, value in message_body["item"].items():
         if value:
             assert value == webhook_item[key]
+
+
+# pylint: disable=redefined-outer-name
+def test_segments_added_init_urls_include_verbose_storage_metadata(
+    lambda_context, webhooks, mock_neptune_client, monkeypatch
+):
+    """Verbose webhook URLs include metadata for an init Object's backend."""
+    # Arrange
+    webhook_item = {
+        "id": str(uuid.uuid4()),
+        "status": "started",
+        "events": ["flows/segments_added"],
+        "url": "test-url",
+        "verbose_storage": True,
+    }
+    mock_neptune_client.execute_open_cypher_query.return_value = {
+        "results": [{"webhook": serialise_dict(webhook_item)}]
+    }
+    captured_messages = []
+
+    def capture_post_event(
+        _event,
+        _item,
+        get_urls=None,
+        init_get_urls=None,
+        include_object_timerange=False,
+    ):
+        captured_messages.append(
+            {
+                "get_urls": get_urls,
+                "init_get_urls": init_get_urls,
+                "include_object_timerange": include_object_timerange,
+            }
+        )
+
+    monkeypatch.setattr(webhooks, "post_event", capture_post_event)
+    event = {
+        "detail-type": "flows/segments_added",
+        "resources": [f"tams:flow:{SAMPLE_FLOW_ID}"],
+        "detail": {
+            "flow_id": SAMPLE_FLOW_ID,
+            "segments": [
+                {
+                    "object_id": str(uuid.uuid4()),
+                    "init_object_id": str(uuid.uuid4()),
+                    "timerange": "[0:0_6:0)",
+                    "timerange_start": 0,
+                    "timerange_end": 5999999999,
+                    "storage_ids": [DEFAULT_STORAGE_ID],
+                    "init_storage_ids": [ALTERNATIVE_STORAGE_ID],
+                }
+            ],
+        },
+    }
+
+    # Act
+    webhooks.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert len(captured_messages) == 1
+    init_get_urls = captured_messages[0]["init_get_urls"]
+    assert len(init_get_urls) == 2
+    for get_url in init_get_urls:
+        assert get_url["storage_id"] == ALTERNATIVE_STORAGE_ID
+        assert get_url["provider"] == "aws"
+        assert get_url["region"] == "alternative-region"
+        assert get_url["store_product"] == "s3"
+        assert get_url["store_type"] == "http_object_store"
+        assert get_url["controlled"] is True
+        for internal in ("record_type", "id", "default_storage", "bucket_name"):
+            assert internal not in get_url
 
 
 @pytest.mark.parametrize(

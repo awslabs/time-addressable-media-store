@@ -91,7 +91,10 @@ def lambda_handler(event: EventBridgeEvent, context: LambdaContext):
         storage_ids = {
             storage_id
             for segment in event.detail["segments"]
-            for storage_id in segment.get("storage_ids", [])
+            for storage_id in (
+                *segment.get("storage_ids", []),
+                *segment.get("init_storage_ids", []),
+            )
         } - {default_storage_backend["id"]}
         storage_mapping = {
             default_storage_backend["id"]: verbose_storage_fields(
