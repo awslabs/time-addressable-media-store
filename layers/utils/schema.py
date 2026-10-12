@@ -244,6 +244,15 @@ class EssenceParameters1(BaseModel):
     )
 
 
+class SegmentDuration(BaseModel):
+    """
+    The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
+    """
+
+    numerator: PositiveInt = Field(..., description="numerator")
+    denominator: PositiveInt | None = Field(1, description="denominator")
+
+
 class Format2(StrEnum):
     """
     The primary content type URN for the Flow.
@@ -323,15 +332,6 @@ class Flowstatus(StrEnum):
     ingesting = "ingesting"
     replication_in_progress = "replication_in_progress"
     closed_complete = "closed_complete"
-
-
-class SegmentDuration(BaseModel):
-    """
-    The target Flow Segment duration in seconds. The duration for each Segment may vary around this target value. See also the [Setting Flow Bit Rate Properties](https://github.com/bbc/tams/blob/main/docs/appnotes/0013-setting-flow-bit-rate-properties.md) AppNote for how this property can be used to calculate buffer sizes.
-    """
-
-    numerator: PositiveInt = Field(..., description="numerator")
-    denominator: PositiveInt | None = Field(1, description="denominator")
 
 
 class Flowtechnical(BaseModel):
@@ -1455,6 +1455,14 @@ class StoragebackendslistItem(Storagebackend):
         None,
         description="If set to `true`, this is the default storage backend. The default storage backend will be used if the client does not specify a storage backend id when requesting the allocation of storage. If this parameter is not set, assume `false`. Service instances may either set one storage backend as default, or none - indicating that clients must always specify a storage backend.",
     )
+    store_type: StoreType = Field(
+        ...,
+        description="The generic Storage Backend type. Used to identify the required workflow for reading and writing media. Any `store_product` should be compatible, as much is required for basic interoperability between TAMS implementations, with their associated generic `store_type`.",
+    )
+    provider: str = Field(
+        ..., description="The cloud (or other) provider of the Storage Backend"
+    )
+    store_product: str = Field(..., description="The storage product name.")
 
 
 class Storagebackendslist(RootModel[list[StoragebackendslistItem]]):
