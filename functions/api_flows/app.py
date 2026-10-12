@@ -321,7 +321,7 @@ def put_flow_by_id(
         flow.root.updated_by = username
     # Keep a client-supplied metadata_version on creation, or on update when it
     # differs from the existing one; otherwise each change gets a new version
-    if not flow.root.metadata_version or flow.root.metadata_version == (
+    if flow.root.metadata_version is None or flow.root.metadata_version == (
         existing_item.get("metadata_version")
     ):
         flow.root.metadata_version = new_metadata_version()

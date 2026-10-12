@@ -320,12 +320,24 @@ def test_Create_or_Replace_Flow_PUT_204_metadata_version(
     same_version = put_and_get_version(
         {**stub_multi_flow, "metadata_version": "pytest-version"}
     )
+    empty_version = put_and_get_version({**stub_multi_flow, "metadata_version": ""})
+    same_empty_version = put_and_get_version(
+        {**stub_multi_flow, "metadata_version": ""}
+    )
     omitted_version = put_and_get_version(stub_multi_flow)
     # Assert
     assert "pytest-version" == client_version
     assert same_version not in ("", "pytest-version")
-    assert omitted_version not in ("", same_version)
-    expect_webhooks("flows/updated", "flows/updated", "flows/updated")
+    assert empty_version == ""
+    assert same_empty_version not in ("", same_version)
+    assert omitted_version not in ("", same_empty_version)
+    expect_webhooks(
+        "flows/updated",
+        "flows/updated",
+        "flows/updated",
+        "flows/updated",
+        "flows/updated",
+    )
 
 
 def test_Flow_Child_Endpoint_PUT_204_new_metadata_version(

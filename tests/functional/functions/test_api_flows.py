@@ -683,3 +683,69 @@ def test_PUT_flow_property_accepts_correct_body_type(
 
     # Assert
     assert response["statusCode"] == HTTPStatus.NOT_FOUND.value
+
+
+@pytest.mark.parametrize(
+    "flow_exists,expected_status",
+    [
+        (False, HTTPStatus.CREATED.value),
+        (True, HTTPStatus.NO_CONTENT.value),
+    ],
+)
+# pylint: disable=redefined-outer-name,too-many-arguments,too-many-positional-arguments
+def test_PUT_flow_preserves_explicit_empty_metadata_version(
+    lambda_context,
+    api_event_factory,
+    api_flows,
+    monkeypatch,
+    flow_exists,
+    expected_status,
+):
+    """
+    Verifies that an explicitly supplied empty metadata_version is preserved on
+    both Flow creation and update rather than treated as an omitted value.
+    """
+    # Arrange
+    flow_id = str(uuid.uuid4())
+    source_id = str(uuid.uuid4())
+    flow_body = {
+        "id": flow_id,
+        "source_id": source_id,
+        "format": "urn:x-nmos:format:multi",
+        "metadata_version": "",
+    }
+    stored_flow = {}
+
+    def query_node(_record_type, _record_id):
+        if not flow_exists:
+            raise ValueError
+        return {
+            "id": flow_id,
+            "source_id": source_id,
+            "format": "urn:x-nmos:format:multi",
+            "metadata_version": "existing-version",
+        }
+
+    def merge_source_flow(flow_dict, _existing_item):
+        stored_flow.update(flow_dict)
+        return flow_dict
+
+    monkeypatch.setattr(api_flows, "query_node", query_node)
+    monkeypatch.setattr(api_flows, "merge_source_flow", merge_source_flow)
+    monkeypatch.setattr(api_flows, "get_username", lambda _request_context: "pytest")
+    monkeypatch.setattr(api_flows, "get_event_resources", lambda _item: [])
+    monkeypatch.setattr(api_flows, "publish_event", lambda *_args: None)
+    event = api_event_factory(
+        "PUT",
+        f"/flows/{flow_id}",
+        json_body=flow_body,
+    )
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == expected_status
+    assert stored_flow["metadata_version"] == ""
+    if not flow_exists:
+        assert json.loads(response["body"])["metadata_version"] == ""
