@@ -31,6 +31,34 @@ Parameters:
     Default: ""
     AllowedPattern: '|subnet-[a-z0-9]+'
 
+  DnsServerCidr1:
+    Description: '[Optional] IPv4 CIDR of DNS server 1 of an existing VPC whose DHCP options set custom DNS servers rather than the Amazon provided DNS (for example 10.0.0.2/32). The VPC Lambdas are allowed to query it on port 53, over UDP and TCP. Ignored when the stack creates the VPC. Leave blank otherwise.'
+    Type: String
+    Default: ""
+    AllowedPattern: '|((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(1[6-9]|2[0-9]|3[0-2])'
+    ConstraintDescription: must be blank or an IPv4 CIDR with valid octets and a prefix length between /16 and /32, for example 10.0.0.2/32.
+
+  DnsServerCidr2:
+    Description: '[Optional] IPv4 CIDR of DNS server 2 of an existing VPC whose DHCP options set custom DNS servers rather than the Amazon provided DNS (for example 10.0.0.2/32). The VPC Lambdas are allowed to query it on port 53, over UDP and TCP. Ignored when the stack creates the VPC. Leave blank otherwise.'
+    Type: String
+    Default: ""
+    AllowedPattern: '|((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(1[6-9]|2[0-9]|3[0-2])'
+    ConstraintDescription: must be blank or an IPv4 CIDR with valid octets and a prefix length between /16 and /32, for example 10.0.0.2/32.
+
+  DnsServerCidr3:
+    Description: '[Optional] IPv4 CIDR of DNS server 3 of an existing VPC whose DHCP options set custom DNS servers rather than the Amazon provided DNS (for example 10.0.0.2/32). The VPC Lambdas are allowed to query it on port 53, over UDP and TCP. Ignored when the stack creates the VPC. Leave blank otherwise.'
+    Type: String
+    Default: ""
+    AllowedPattern: '|((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(1[6-9]|2[0-9]|3[0-2])'
+    ConstraintDescription: must be blank or an IPv4 CIDR with valid octets and a prefix length between /16 and /32, for example 10.0.0.2/32.
+
+  DnsServerCidr4:
+    Description: '[Optional] IPv4 CIDR of DNS server 4 of an existing VPC whose DHCP options set custom DNS servers rather than the Amazon provided DNS (for example 10.0.0.2/32). The VPC Lambdas are allowed to query it on port 53, over UDP and TCP. Ignored when the stack creates the VPC. Leave blank otherwise.'
+    Type: String
+    Default: ""
+    AllowedPattern: '|((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(1[6-9]|2[0-9]|3[0-2])'
+    ConstraintDescription: must be blank or an IPv4 CIDR with valid octets and a prefix length between /16 and /32, for example 10.0.0.2/32.
+
   NeptuneDBInstanceClass:
     Description: The DBInstanceClass to be used for the Neptune Database
     Type: String
@@ -80,6 +108,11 @@ Mappings:
 
 Conditions:
   CreateVpc: !Equals [!Ref VpcId, ""]
+
+  AllowCustomDns1: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr1, ""]]]
+  AllowCustomDns2: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr2, ""]]]
+  AllowCustomDns3: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr3, ""]]]
+  AllowCustomDns4: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr4, ""]]]
 
   CreateWaf: !Equals [!Ref DeployWaf, "Yes"]
 
@@ -494,6 +527,70 @@ Resources:
           IpProtocol: tcp
           ToPort: 8182
           FromPort: 8182
+        - !If
+          - AllowCustomDns1
+          - Description: Egress to DNS server 1 of the VPC over UDP
+            CidrIp: !Ref DnsServerCidr1
+            IpProtocol: udp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
+        - !If
+          - AllowCustomDns1
+          - Description: Egress to DNS server 1 of the VPC over TCP
+            CidrIp: !Ref DnsServerCidr1
+            IpProtocol: tcp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
+        - !If
+          - AllowCustomDns2
+          - Description: Egress to DNS server 2 of the VPC over UDP
+            CidrIp: !Ref DnsServerCidr2
+            IpProtocol: udp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
+        - !If
+          - AllowCustomDns2
+          - Description: Egress to DNS server 2 of the VPC over TCP
+            CidrIp: !Ref DnsServerCidr2
+            IpProtocol: tcp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
+        - !If
+          - AllowCustomDns3
+          - Description: Egress to DNS server 3 of the VPC over UDP
+            CidrIp: !Ref DnsServerCidr3
+            IpProtocol: udp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
+        - !If
+          - AllowCustomDns3
+          - Description: Egress to DNS server 3 of the VPC over TCP
+            CidrIp: !Ref DnsServerCidr3
+            IpProtocol: tcp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
+        - !If
+          - AllowCustomDns4
+          - Description: Egress to DNS server 4 of the VPC over UDP
+            CidrIp: !Ref DnsServerCidr4
+            IpProtocol: udp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
+        - !If
+          - AllowCustomDns4
+          - Description: Egress to DNS server 4 of the VPC over TCP
+            CidrIp: !Ref DnsServerCidr4
+            IpProtocol: tcp
+            ToPort: 53
+            FromPort: 53
+          - !Ref AWS::NoValue
 
   ServiceFunction:
     Type: AWS::Serverless::Function
