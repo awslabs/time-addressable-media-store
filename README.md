@@ -37,18 +37,15 @@ The Serverless Application Model Command Line Interface (SAM CLI) is an extensio
 
 To use the SAM CLI, you need the following tools.
 
-- SAM CLI 1.168 or later - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
+- SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
 - Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
 
 To build and deploy your application for the first time, run the following in your shell:
 
 ```bash
-export SAM_CLI_ENABLE_LANGUAGE_EXTENSIONS=1
 sam build --use-container
 sam deploy --guided
 ```
-
-The template uses the `AWS::LanguageExtensions` transform, which the SAM CLI only processes when `SAM_CLI_ENABLE_LANGUAGE_EXTENSIONS=1` is set (or `--language-extensions` is passed). Do not update the stack with the `--use-previous-template` option: the transform would reuse the old parameter values.
 
 **NOTE: The Neptune database takes approximately 20mins to create. Neptune also requires a VPC which is why there are VPC parameters mentioned below.**
 
@@ -59,7 +56,7 @@ The first command will build the source of your application. The second command 
 - **VpcId**: Specify an existing VPC Id, leave blank to have one created.
 - **VpcAZs**: Specify a comma-separated list of availability zones (for example `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds. Leave blank if VPC being created.
 - **PrivateSubnetIds**: Specify a comma-delimited list of the Private Subnet Ids to be used in the existing VPC. **NOTE: These MUST be *PRIVATE* Subnets. When placed in a Public subnet Lambdas do not receive Public IPs and all network routing will fail. A Public subnet is determined by the default route being to an Internet Gateway.**
-- **DnsServerCidrs**: Only for an existing VPC (`VpcId` set) whose DHCP options set custom DNS servers rather than the Amazon provided DNS. Specify a comma-delimited list of the CIDRs of the DNS servers, for example `10.0.0.2/32,10.0.0.3/32`, so that the VPC Lambdas can query them on port 53 over UDP and TCP. Each value must be an IPv4 CIDR with a prefix length between /16 and /32. Leave blank otherwise. Ignored when the stack creates the VPC, which uses the Amazon provided DNS. **NOTE: This parameter only covers IPv4 DNS servers.**
+- **DnsServerCidr1** to **DnsServerCidr4**: Only for an existing VPC (`VpcId` set) whose DHCP options set custom DNS servers rather than the Amazon provided DNS. Specify the CIDR of each DNS server, for example `10.0.0.2/32`, so that the VPC Lambdas can query them on port 53 over UDP and TCP. The Lambda security group otherwise allows only HTTPS and Neptune egress, and name resolution times out. Each value must be an IPv4 CIDR with a prefix length between /16 and /32. Leave the others blank. Ignored when the stack creates the VPC, which uses the Amazon provided DNS. **NOTE: These parameters only cover IPv4 DNS servers. A VPC whose DHCP options list IPv6 DNS servers is not supported.**
 - **NeptuneDBInstanceClass**: Neptune Cluster Instance class, for example `db.serverless` or `db.r7g.large`
 - **NeptuneServerlessConfiguration**: Neptune Serverless Scaling Configuration. Must be a list of two values, MinCapacity and MaxCapacity, separated by commas. Valid values between 1–128.
 - **DeployWaf**: Specify whether you want the solution behind a WAF.
