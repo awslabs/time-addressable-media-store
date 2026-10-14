@@ -104,14 +104,17 @@ Mappings:
   Solution:
     Constants:
       ApiVersion: "8.2"
-      ServiceVersion: 6.3.0
+      ServiceVersion: 7.0.0
 
 Conditions:
   CreateVpc: !Equals [!Ref VpcId, ""]
 
   AllowCustomDns1: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr1, ""]]]
+
   AllowCustomDns2: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr2, ""]]]
+
   AllowCustomDns3: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr3, ""]]]
+
   AllowCustomDns4: !And [!Not [!Condition CreateVpc], !Not [!Equals [!Ref DnsServerCidr4, ""]]]
 
   CreateWaf: !Equals [!Ref DeployWaf, "Yes"]
