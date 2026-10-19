@@ -289,6 +289,26 @@ pytestmark = [
             ["tams-api/read", "tams-api/delete"],
         ),
         (
+            "/flows/10000000-0000-1000-8000-000000000000/status",
+            "HEAD",
+            ["tams-api/write", "tams-api/delete"],
+        ),
+        (
+            "/flows/10000000-0000-1000-8000-000000000000/status",
+            "GET",
+            ["tams-api/write", "tams-api/delete"],
+        ),
+        (
+            "/flows/10000000-0000-1000-8000-000000000000/status",
+            "PUT",
+            ["tams-api/read", "tams-api/delete"],
+        ),
+        (
+            "/flows/10000000-0000-1000-8000-000000000000/status",
+            "DELETE",
+            ["tams-api/read", "tams-api/delete"],
+        ),
+        (
             "/flows/10000000-0000-1000-8000-000000000000/segments",
             "HEAD",
             ["tams-api/write", "tams-api/delete"],

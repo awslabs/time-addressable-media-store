@@ -622,6 +622,8 @@ def test_POST_storage_returns_400_when_flow_missing_required_container_attribute
         ("avg_bit_rate", True),
         ("avg_bit_rate", "128"),
         ("avg_bit_rate", -1),
+        ("status", "invalid"),
+        ("status", 1),
     ],
 )
 # pylint: disable=redefined-outer-name
@@ -656,6 +658,7 @@ def test_PUT_flow_property_returns_400_when_body_type_is_coerced(
         ("max_bit_rate", 0),
         ("avg_bit_rate", 128),
         ("avg_bit_rate", 0),
+        ("status", "closed_complete"),
     ],
 )
 # pylint: disable=redefined-outer-name,unused-argument
