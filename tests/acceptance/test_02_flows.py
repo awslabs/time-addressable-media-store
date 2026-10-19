@@ -796,8 +796,8 @@ def test_List_Flows_GET_200(
 def test_List_Flows_GET_200_sorted_pages_are_stable(
     api_client_cognito, sort_by, reverse_order
 ):
-    """Paging a sorted listing returns every Flow exactly once and in spec order
-    (regression: sorting on a sometimes-unset key repeated and dropped Flows)"""
+    """Paging a sorted listing returns every Flow exactly once and in spec order,
+    including when the sort key is unset on some Flows"""
     assert_stable_sorted_listing(
         api_client_cognito, "/flows", sort_by, reverse_order, expected_count=6
     )
@@ -937,7 +937,7 @@ def test_List_Flows_GET_200_frame_width(
 
 
 def test_List_Flows_GET_200_init_segments(api_client_cognito, stub_init_flow):
-    """List flows with label query specified"""
+    """List flows with init_segments query specified"""
     # Arrange
     path = "/flows"
     # Act
@@ -1101,18 +1101,10 @@ def test_List_Flows_GET_200_tag_name(api_client_cognito, stub_multi_flow):
 def test_List_Flows_GET_200_tag_name_array(api_client_cognito, stub_multi_flow):
     """List flows with tag.{name} matching one member of an array-valued tag
 
-    Tag values may be arrays from 8.2. There is no array-specific code path:
-    tags are stored JSON-serialised, so ["this", "that"] is stored as the text
-    '["this", "that"]', and the filter searches for the quote-wrapped value
-    '"that"', which is a substring of it. The same quoting is what stops a
-    partial value matching, so a change to either half would silently break
-    membership -- and nothing else pins it, since every other tag filter test
-    uses a scalar.
-
-    "that" is used rather than "this" deliberately: matching a non-first member
-    shows this is genuine membership and not a prefix match on the serialised
-    form. It also avoids the value used by tag.test above, so a regression that
-    confused the two tags could not pass by coincidence.
+    Tags are stored JSON-serialised and the filter matches the quote-wrapped
+    value as a substring; this is the only tag filter test using an array value.
+    "that" (a non-first member, unused by tag.test) proves genuine membership
+    rather than a prefix match or a cross-tag coincidence.
     """
     # Arrange
     path = "/flows"
@@ -1164,7 +1156,7 @@ def test_List_Flows_GET_400(api_client_cognito):
 
 
 def test_List_Flows_GET_400_codec(api_client_cognito):
-    """List flows with codec query specified"""
+    """List flows with codec query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1179,7 +1171,7 @@ def test_List_Flows_GET_400_codec(api_client_cognito):
 
 
 def test_List_Flows_GET_400_collected_by_ids(api_client_cognito, stub_multi_flow):
-    """List flows with collected_by_ids query specified"""
+    """List flows with collected_by_ids query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1211,7 +1203,7 @@ def test_List_Flows_GET_400_collected_by_ids_malformed(api_client_cognito):
 
 
 def test_List_Flows_GET_400_format(api_client_cognito):
-    """List flows with format query specified"""
+    """List flows with format query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1226,7 +1218,7 @@ def test_List_Flows_GET_400_format(api_client_cognito):
 
 
 def test_List_Flows_GET_400_frame_height(api_client_cognito):
-    """List flows with frame_height query specified"""
+    """List flows with frame_height query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1241,7 +1233,7 @@ def test_List_Flows_GET_400_frame_height(api_client_cognito):
 
 
 def test_List_Flows_GET_400_frame_width(api_client_cognito):
-    """List flows with frame_width query specified"""
+    """List flows with frame_width query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1256,7 +1248,7 @@ def test_List_Flows_GET_400_frame_width(api_client_cognito):
 
 
 def test_List_Flows_GET_400_init_segments(api_client_cognito):
-    """List flows with frame_width query specified"""
+    """List flows with an invalid init_segments value returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1269,7 +1261,7 @@ def test_List_Flows_GET_400_init_segments(api_client_cognito):
 
 
 def test_List_Flows_GET_400_label(api_client_cognito):
-    """List flows with label query specified"""
+    """List flows with label query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1284,7 +1276,7 @@ def test_List_Flows_GET_400_label(api_client_cognito):
 
 
 def test_List_Flows_GET_400_limit(api_client_cognito):
-    """List flows with limit query specified"""
+    """List flows with limit query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1299,7 +1291,7 @@ def test_List_Flows_GET_400_limit(api_client_cognito):
 
 
 def test_List_Flows_GET_400_page(api_client_cognito):
-    """List flows with page query specified"""
+    """List flows with page query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1314,7 +1306,7 @@ def test_List_Flows_GET_400_page(api_client_cognito):
 
 
 def test_List_Flows_GET_400_source_id(api_client_cognito, stub_data_flow):
-    """List flows with source_id query specified"""
+    """List flows with source_id query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1341,7 +1333,7 @@ def test_List_Flows_GET_400_status(api_client_cognito):
 
 
 def test_List_Flows_GET_400_tag_name(api_client_cognito):
-    """List flows with tag.{name} query specified"""
+    """List flows with tag.{name} query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1356,7 +1348,7 @@ def test_List_Flows_GET_400_tag_name(api_client_cognito):
 
 
 def test_List_Flows_GET_400_tag_exists_name(api_client_cognito):
-    """List flows with tag_exists.{name} query specified"""
+    """List flows with tag_exists.{name} query and an invalid timerange returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -1371,7 +1363,7 @@ def test_List_Flows_GET_400_tag_exists_name(api_client_cognito):
 
 
 def test_List_Flows_GET_400_timerange(api_client_cognito):
-    """List flows with tag_exists.{name} query specified"""
+    """List flows with timerange query and an invalid format returns 400"""
     # Arrange
     path = "/flows"
     # Act
@@ -2463,7 +2455,7 @@ def test_Flow_Flow_Collection_ordering(
     stub_image_flow,
     expect_webhooks,
 ):
-    """flow_collection is an ordered list (§3.9): the order PUT is the order
+    """flow_collection is an ordered list: the order PUT is the order
     returned, on both the sub-resource and the whole Flow, and the derived
     source_collection follows the same order. Reverses then restores the
     fixture order so downstream tests are unaffected."""
@@ -3031,13 +3023,10 @@ def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
     assert "The requested flow does not exist." == response_json["message"]
 
 
-# ---- Flow creation from a Profile (§3.3) ----
-# stub_profile is created in test_01; these build a Flow from it (a profile-only
-# PUT body -> the Profile's flow_metadata is materialised onto the Flow), verify
-# the AppNote0020 link behaviours, then delete it -- a self-contained block at the
-# end of the file so it leaves no residue for later tests. Webhook expectations
-# are registered count-only (the Flow's id is not asserted against a body), which
-# keeps test_06's counts balanced without constructing materialised bodies.
+# ---- Flow creation from a Profile ----
+# Builds a Flow from stub_profile (created in test_01), checks the AppNote0020
+# link behaviours, then deletes it, leaving no residue for later tests. Webhooks
+# are expected count-only to keep test_06's counts balanced.
 NONEXISTENT_PROFILE_ID = "20000000-0000-1000-8000-00000000000a"
 
 
@@ -3110,11 +3099,8 @@ def test_Create_Flow_From_Profile_PUT_400_mutual_exclusion(
     assert_json_response(response, 400)
 
 
-# §3.5: profile_id filter on /flows. The GET-200 case needs a Flow linked to the
-# Profile, so it lives here in the create-from-Profile block (the linked Flow
-# created above, before it is unlinked/deleted below, is the only one linked to
-# stub_profile -> the filter returns exactly it). The HEAD/400 cases do not need
-# a matching Flow but are grouped here to keep the §3.5 tests together.
+# profile_id filter on /flows. Placed here because the profile-created
+# Flow above is the only one linked to stub_profile until it is unlinked below.
 def test_List_Flows_GET_200_profile_id(
     api_client_cognito, stub_profile, stub_profile_flow
 ):

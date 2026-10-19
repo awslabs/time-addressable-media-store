@@ -50,13 +50,10 @@ def delete_segment_items(
 ) -> dict | None:
     """Loop supplied items and delete, early return on error, append to object_ids supplied on success.
 
-    `resources` may hold the pre-resolved flows/segments_deleted event resources
-    (source, collected-by, etc.). This is required when the Flow is being
-    deleted: by the time its segments are removed the Flow (and its
-    source/collection edges) no longer exists, so enhance_resources could not
-    resolve them here - which would defeat source_ids / source_collected_by_ids
-    / flow_collected_by_ids webhook filtering. When not supplied (segment-only
-    deletion, Flow still exists) the resources are resolved live per flow_id.
+    `resources` holds pre-resolved flows/segments_deleted event resources. It is
+    required when the Flow is being deleted, as its source/collection edges are
+    gone by then and webhook filtering on them would fail. Otherwise resources
+    are resolved per flow_id.
     """
     delete_error = None
     for item in items:
@@ -166,7 +163,7 @@ def get_timerange_expression(
     boundary: TimeRangeBoundary,
     filter_value: TimeRange,
 ) -> Attr | Key:
-    """Returns a DynamoDB expression, for Key or Filter, to add the specfied timerange condition."""
+    """Returns a DynamoDB expression, for Key or Filter, to add the specified timerange condition."""
     other_boundary = (
         TimeRangeBoundary.START
         if boundary == TimeRangeBoundary.END
@@ -245,24 +242,18 @@ def get_key_and_args(flow_id: str, parameters: dict) -> dict:
             args["FilterExpression"] = filter_conditions[0]
     elif timerange_filter:
         if timerange_filter.start and timerange_filter.end:
-            # Bound the sort key on BOTH sides so pagination cannot scan past the
-            # requested range. Segments in a Flow never overlap, so the first
-            # segment with timerange_end >= the filter end is the only one above
-            # the range that could still overlap it; every later segment starts
-            # after the filter end and would be dropped by the FilterExpression
-            # anyway. BETWEEN is inclusive, so fold the start boundary's
-            # inclusivity into the lower bound the same way timerange_start is
-            # stored on write (see process_single_segment).
+            # Bound the sort key on both sides so pagination cannot scan past the
+            # range. Segments never overlap, so the first segment with
+            # timerange_end >= the filter end is the last that could overlap it.
+            # BETWEEN is inclusive, so fold start inclusivity into the lower
+            # bound as timerange_start is stored (see process_single_segment).
             lower = timerange_filter.start.to_nanosec() + (
                 0 if timerange_filter.includes_start() else 1
             )
             upper = get_exact_timerange_end(flow_id, timerange_filter.end.to_nanosec())
-            # A non-empty range always has lower <= upper. An empty range (e.g.
-            # "()" or "[5:0_5:0)") normalises to start == end yet is not eternity,
-            # so it reaches here with lower > upper. DynamoDB rejects BETWEEN when
-            # lower > upper with a ValidationException, so clamp upper up to lower:
-            # the retained FilterExpression drops every candidate anyway, leaving
-            # the empty result an empty range must produce.
+            # An empty range (e.g. "()" or "[5:0_5:0)") gives lower > upper, which
+            # DynamoDB BETWEEN rejects. Clamp upper; the FilterExpression still
+            # drops every candidate, giving the required empty result.
             upper = max(upper, lower)
             args["KeyConditionExpression"] = And(
                 args["KeyConditionExpression"],
@@ -390,7 +381,7 @@ def delete_flow_segments(
 
 @tracer.capture_method(capture_response=False)
 def get_exact_timerange_end(flow_id: str, timerange_end: int) -> int:
-    """Get the exact timerange end of a segment the overlaps with the specified timerange end value"""
+    """Get the exact timerange end of a segment that overlaps with the specified timerange end value"""
     items = segments_table.query(
         KeyConditionExpression=And(
             Key("flow_id").eq(flow_id), Key("timerange_end").gte(timerange_end)

@@ -437,11 +437,8 @@ def deserialise_neptune_obj(obj: dict) -> dict:
         elif prop_name in ("flow_collection", "source_collection") and isinstance(
             prop_value, list
         ):
-            # Ordered lists: each item carries the collected_by edge's `index`
-            # (its position at write time -- see generate_flow_collection_query).
-            # Sort by it and strip it so the API sees an ordered collection
-            # without the internal index. source_collection is derived from the
-            # same flow-level collected_by edges, so it orders by the same index.
+            # Items carry the collected_by edge's `index` (set by
+            # generate_flow_collection_query); sort by it, then strip it.
             items = [deserialise_neptune_obj(item) for item in prop_value]
             items.sort(key=lambda item: item.get("index", 0))
             for item in items:

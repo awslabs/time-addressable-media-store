@@ -63,7 +63,6 @@ def _remove_nested_field(obj, field_path: str) -> None:
     """Remove nested field using dot notation (e.g., 'event.flow.created_at').
     Supports arrays using [] notation (e.g., 'event.segments[].get_urls[].url').
     """
-    # Normalize: remove [] and split on dots
     keys = field_path.replace("[]", "").split(".")
 
     def _remove_from_path(current, remaining_keys):
@@ -72,16 +71,13 @@ def _remove_nested_field(obj, field_path: str) -> None:
         key = remaining_keys[0]
         rest = remaining_keys[1:]
         if isinstance(current, list):
-            # Remove from all items in the list
             for item in current:
                 _remove_from_path(item, remaining_keys)
         elif isinstance(current, dict):
             if len(remaining_keys) == 1:
-                # Last key - remove it
                 if key in current:
                     del current[key]
             else:
-                # Navigate deeper
                 if key in current:
                     _remove_from_path(current[key], rest)
 
@@ -92,7 +88,6 @@ def _field_exists(obj, field_path: str) -> bool:
     """Check if a nested field exists using dot notation.
     Supports arrays using [] notation (e.g., 'event.segments[].get_urls[].url').
     """
-    # Normalize: remove [] and split on dots
     keys = field_path.replace("[]", "").split(".")
 
     def _check_path(current, remaining_keys):
@@ -101,7 +96,6 @@ def _field_exists(obj, field_path: str) -> bool:
         key = remaining_keys[0]
         rest = remaining_keys[1:]
         if isinstance(current, list):
-            # Check all items in the list
             if not current:  # Empty list
                 return False
             return all(_check_path(item, remaining_keys) for item in current)
@@ -126,9 +120,7 @@ def parse_webhook_events(log_events):
             api_event = json.loads(message)
             body = json.loads(api_event.get("body", "{}"))
         except json.JSONDecodeError:
-            # Skip malformed JSON
             continue
-        # Skip empty body objects
         if not body or body == {}:
             continue
         webhooks[api_event["pathParameters"]["identifier"]].append(
@@ -160,33 +152,26 @@ def validate_webhook_body_matches(body_expectations, actual_webhooks):
     validation_errors = []
 
     for expectation in body_expectations:
-        # Extract expectation details
         expected_body = expectation["body"]
         extra_ignored_value_fields = expectation.get("extra_ignored_value_fields", [])
-        # optional_fields: value ignored AND presence NOT required (unlike
-        # ignored-value fields, which must be present). Use for fields a given
-        # event legitimately may omit, e.g. updated_by/metadata_updated on a
-        # segment-triggered flows/updated event.
+        # Value ignored and presence not required, for fields an event may omit,
+        # e.g. updated_by/metadata_updated on a segment-triggered flows/updated.
         optional_fields = expectation.get("optional_fields", [])
         test_name = expectation.get("test_name", "unknown")
         event_type = expectation["event_type"]
 
-        # Get ignored-value fields for this event type
         ignored_value_fields = WEBHOOK_IGNORED_VALUE_FIELDS.get(event_type, [])
 
-        # Merge with any extra ignored-value fields from the test, then subtract
-        # optional_fields: an optional field's VALUE is still ignored, but its
-        # presence is NOT required, so it must not remain in the present-required
-        # ignored_value_fields set (even if it appears in the standard list).
+        # Optional fields are dropped from the set whose presence is required,
+        # even if listed in WEBHOOK_IGNORED_VALUE_FIELDS.
         ignored_value_fields = list(
             set(ignored_value_fields + extra_ignored_value_fields)
             - set(optional_fields)
         )
 
-        # Extract resource ID from expected body for filtering
         expected_resource_id = get_resource_id(expected_body, event_type)
 
-        # Find all unmatched webhooks of this type with matching resource ID, sorted by timestamp
+        # Unmatched webhooks of this type and resource ID, oldest first
         candidates = sorted(
             [
                 (idx, webhook)
@@ -208,45 +193,37 @@ def validate_webhook_body_matches(body_expectations, actual_webhooks):
             validation_errors.append(error)
             continue
 
-        # Try to find a matching webhook
         match_found = False
         for idx, webhook in candidates:
             actual_body = webhook["body"]
 
-            # Deep copy
             expected_copy = copy.deepcopy(expected_body)
             actual_copy = copy.deepcopy(actual_body)
 
             # Ignored-value fields MUST be present; a missing one disqualifies
-            # this candidate. optional_fields are exempt from this check.
+            # this candidate.
             missing_fields = []
             for field_path in ignored_value_fields:
                 if not _field_exists(actual_copy, field_path):
                     missing_fields.append(field_path)
 
             if missing_fields:
-                # Field is missing - this candidate doesn't match
                 continue
 
-            # Remove ignored-value fields (presence asserted above) and
-            # optional_fields (presence not required) so neither's value is
-            # compared.
+            # Neither ignored-value nor optional fields have their value compared
             for field_path in ignored_value_fields + optional_fields:
                 _remove_nested_field(expected_copy, field_path)
                 _remove_nested_field(actual_copy, field_path)
 
-            # Check if this webhook matches
             diff = DeepDiff(expected_copy, actual_copy, ignore_order=True)
 
             if not diff:
-                # Match found!
                 matched_indices.add(idx)
                 match_found = True
                 logger.debug(f"✅ Matched {event_type} [{test_name}]")
                 break
 
         if not match_found:
-            # None of the candidates matched - log detailed error
             error = (
                 f"{event_type} [{test_name}]: No webhook body matched expected content"
             )
@@ -266,7 +243,6 @@ def validate_webhook_body_matches(body_expectations, actual_webhooks):
                 expected_copy = copy.deepcopy(expected_body)
                 actual_copy = copy.deepcopy(actual_body)
 
-                # Check if excluded fields exist
                 missing_fields = []
                 for field_path in ignored_value_fields:
                     if not _field_exists(actual_copy, field_path):

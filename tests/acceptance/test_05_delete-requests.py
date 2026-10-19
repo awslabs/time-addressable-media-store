@@ -101,7 +101,7 @@ def test_Delete_Flow_Segment_DELETE_202_object_id():
 
 
 def test_Delete_Flow_Segment_DELETE_204_object_id(api_client_cognito, stub_video_flow):
-    """List segments with object_id query specified"""
+    """Delete segments with object_id query specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -511,7 +511,7 @@ def test_Delete_Flow_DELETE_204_MULTI(
 def test_Delete_Flow_DELETE_202_INIT(
     api_client_cognito, delete_requests, stub_init_flow, expect_webhooks
 ):
-    """204 returned as stub_image_flow has no segments"""
+    """202 returned as stub_init_flow has segments"""
     # Arrange
     path = f"/flows/{stub_init_flow['id']}"
     # Act

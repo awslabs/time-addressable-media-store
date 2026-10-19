@@ -353,12 +353,10 @@ class TestUtils:
     def test_parse_api_gw_parameters_tag_value_matches_array_member(self):
         """A tag filter must match a member of an array-valued tag.
 
-        Tag values may be arrays from spec 8.2, but there is no array-specific
-        branch in parse_api_gw_parameters. It works because serialise_tags_dict
-        stores every value as JSON and the filter searches for the value wrapped
-        in quotes, which is a substring of the serialised array. That is an
-        implicit contract between two functions, so it is asserted directly
-        against json.dumps output rather than against a hand-written literal.
+        Tag values may be arrays from TAMS API v8.2, with no array-specific branch
+        in parse_api_gw_parameters: serialise_tags_dict stores values as JSON and the
+        filter searches for the quoted value, a substring of the serialised array.
+        That implicit contract is asserted against json.dumps output.
         """
         _, where_literals = utils.parse_api_gw_parameters(
             {"tag_values": {"colour": "green"}}

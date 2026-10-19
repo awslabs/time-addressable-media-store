@@ -134,7 +134,7 @@ def api_client_factory(api_endpoint, token_factory):
 @pytest.fixture(scope="session")
 # pylint: disable=redefined-outer-name
 def api_client_cognito(api_client_factory):
-    """API client with all scopes for backward compatibility."""
+    """API client with all scopes."""
     return api_client_factory()
 
 
@@ -202,7 +202,7 @@ def stub_profile():
 
 @pytest.fixture(scope="session")
 def stub_profile_flow(stub_profile):
-    # A Flow created from stub_profile (§3.3). Profile-only PUT body: the technical
+    # A Flow created from stub_profile. Profile-only PUT body: the technical
     # metadata is materialised from the Profile's flow_metadata (video). Uses fresh
     # ids so it doesn't collide with the stub flows/sources; created and deleted
     # within its own test block.
@@ -655,7 +655,6 @@ def webhook_events_collected(session, webhook_test_data):
 
     logger.info("🔍 Collecting webhook deliveries for validation...")
 
-    # Get the log group name and start time stored during setup
     metadata = webhook_test_data["metadata"]
     log_group_name = metadata.get("log_group_name")
     start_time = metadata.get("start_time")
@@ -665,16 +664,13 @@ def webhook_events_collected(session, webhook_test_data):
         return
 
     try:
-        # Wait for async webhook delivery
         logger.info("Waiting 30s for async webhook delivery...")
         time.sleep(30)
 
-        # Collect CloudWatch logs
         logger.info(f"Collecting logs from {log_group_name}...")
         log_events = collect_cloudwatch_logs(session, log_group_name, start_time)
         logger.info(f"Found {len(log_events)} log events")
 
-        # Parse webhook events from logs
         webhook_events = parse_webhook_events(log_events)
         total_count = sum(len(events) for events in webhook_events.values())
         logger.info(
@@ -683,7 +679,6 @@ def webhook_events_collected(session, webhook_test_data):
         for identifier, events in webhook_events.items():
             logger.info(f"  - {identifier}: {len(events)} deliveries")
 
-        # Store events in webhook_test_data
         for identifier, webhook_info in webhook_test_data["webhooks"].items():
             webhook_info["events"] = webhook_events.get(identifier, [])
 
@@ -817,14 +812,12 @@ def remove_fields(record, *fields):
 
 def remove_dynamic_props(records):
     """Remove dynamic properties from records (single dict or list of dicts)."""
-    # Handle single dict
     if isinstance(records, dict):
         for prop in DYNAMIC_PROPS:
             if prop in records:
                 del records[prop]
         return records
 
-    # Handle list of dicts
     for prop in DYNAMIC_PROPS:
         for record in records:
             if prop in record:
@@ -970,7 +963,6 @@ def collect_cloudwatch_logs(session, log_group_name, start_time):
             response = logs.filter_log_events(**kwargs)
             events.extend(response.get("events", []))
 
-            # Check for pagination
             next_token = response.get("nextToken")
             if not next_token:
                 break

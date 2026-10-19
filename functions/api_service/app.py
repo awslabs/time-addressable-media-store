@@ -413,9 +413,8 @@ def post_profile_by_id(
     profile.created = datetime.now(timezone.utc)
     if not profile.created_by:
         profile.created_by = get_username(app.current_event.request_context)
-    # Use the project model_dump (exclude_unset / exclude_none) rather than the raw
-    # pydantic dump, so unset defaults (e.g. essence_parameters.vfr=False) are not
-    # persisted or echoed back -- mirrors how put_flow_by_id dumps a Flow.
+    # Project model_dump (exclude_unset / exclude_none) so unset defaults (e.g.
+    # essence_parameters.vfr=False) are not persisted or echoed back.
     item = merge_profile(model_dump(profile))
     return model_dump(Profile(**item)), HTTPStatus.CREATED.value  # 201
 

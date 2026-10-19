@@ -225,7 +225,7 @@ def test_Allocate_Flow_Storage_POST_201_presigned_false(
 
 
 def test_Allocate_Flow_Storage_POST_400_request(api_client_cognito, stub_multi_flow):
-    """Bad request body"""
+    """Missing request body"""
     # Arrange
     path = f"/flows/{stub_multi_flow['id']}/storage"
     # Act
@@ -889,7 +889,7 @@ def test_List_Flow_Segments_HEAD_200_object_id(
 
 
 def test_List_Flow_Segments_HEAD_200_page(api_client_cognito, stub_video_flow):
-    """List flows with page query specified"""
+    """List segments with page query specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -903,7 +903,7 @@ def test_List_Flow_Segments_HEAD_200_page(api_client_cognito, stub_video_flow):
 
 
 def test_List_Flow_Segments_HEAD_200_reverse_order(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with reverse_order query specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -917,7 +917,7 @@ def test_List_Flow_Segments_HEAD_200_reverse_order(api_client_cognito, stub_vide
 
 
 def test_List_Flow_Segments_HEAD_200_timerange(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with timerange query specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -946,7 +946,7 @@ def test_List_Flow_Segments_HEAD_400(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_HEAD_400_accept_get_urls(
     api_client_cognito, stub_video_flow
 ):
-    """List segments with accept_get_urls query specified"""
+    """List segments with accept_get_urls query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -960,7 +960,7 @@ def test_List_Flow_Segments_HEAD_400_accept_get_urls(
 
 
 def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with limit query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -976,7 +976,7 @@ def test_List_Flow_Segments_HEAD_400_limit(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_HEAD_400_object_id(
     api_client_cognito, media_objects, stub_video_flow
 ):
-    """List segments with object_id query specified"""
+    """List segments with object_id query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -993,7 +993,7 @@ def test_List_Flow_Segments_HEAD_400_object_id(
 
 
 def test_List_Flow_Segments_HEAD_400_page(api_client_cognito, stub_video_flow):
-    """List flows with page query specified"""
+    """List segments with page query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1007,7 +1007,7 @@ def test_List_Flow_Segments_HEAD_400_page(api_client_cognito, stub_video_flow):
 
 
 def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with reverse_order query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1021,7 +1021,7 @@ def test_List_Flow_Segments_HEAD_400_reverse_order(api_client_cognito, stub_vide
 
 
 def test_List_Flow_Segments_HEAD_400_timerange(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with timerange query and bad limit specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1047,7 +1047,7 @@ def test_List_Flow_Segments_HEAD_404(api_client_cognito):
 
 
 def test_List_Flow_Segments_HEAD_404_limit(api_client_cognito):
-    """List segments with limit query specified"""
+    """List segments for invalid flow ID with limit query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1061,7 +1061,7 @@ def test_List_Flow_Segments_HEAD_404_limit(api_client_cognito):
 
 
 def test_List_Flow_Segments_HEAD_404_accept_get_urls(api_client_cognito):
-    """List segments with accept_get_urls query specified"""
+    """List segments for invalid flow ID with accept_get_urls query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1075,7 +1075,7 @@ def test_List_Flow_Segments_HEAD_404_accept_get_urls(api_client_cognito):
 
 
 def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito, media_objects):
-    """List segments with object_id query specified"""
+    """List segments for invalid flow ID with object_id query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1089,7 +1089,7 @@ def test_List_Flow_Segments_HEAD_404_object_id(api_client_cognito, media_objects
 
 
 def test_List_Flow_Segments_HEAD_404_page(api_client_cognito):
-    """List flows with page query specified"""
+    """List segments for invalid flow ID with page query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1103,7 +1103,7 @@ def test_List_Flow_Segments_HEAD_404_page(api_client_cognito):
 
 
 def test_List_Flow_Segments_HEAD_404_reverse_order(api_client_cognito):
-    """List segments with limit query specified"""
+    """List segments for invalid flow ID with reverse_order query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1117,7 +1117,7 @@ def test_List_Flow_Segments_HEAD_404_reverse_order(api_client_cognito):
 
 
 def test_List_Flow_Segments_HEAD_404_timerange(api_client_cognito):
-    """List segments with limit query specified"""
+    """List segments for invalid flow ID with timerange query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1170,7 +1170,7 @@ def test_Flow_Details_GET_200_timerange(api_client_cognito, stub_video_flow):
 
 
 def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
-    """List flows with timerange query specified"""
+    """List flows with eternity timerange query specified"""
     # Arrange
     path = "/flows"
     # Act
@@ -1182,7 +1182,7 @@ def test_List_Flows_GET_200_timerange_eternity(api_client_cognito):
 
 
 def test_List_Flows_GET_200_timerange_never(api_client_cognito):
-    """List flows with timerange query specified"""
+    """List flows with never timerange query specified"""
     # Arrange
     path = "/flows"
     # Act
@@ -1416,8 +1416,8 @@ def test_List_Flow_Segments_GET_200_object_id(
 def test_List_Flow_Segments_GET_200_object_id_page(
     api_client_cognito, media_objects, stub_video_flow
 ):
-    """A page key combined with object_id is accepted rather than crashing the
-    object-id-index query (regression: DynamoDB rejected the start key as invalid)"""
+    """A page key combined with object_id is accepted as a valid start key for
+    the object-id-index query"""
     # Arrange
     object_id = media_objects[5]["object_id"]
     path = f"/flows/{stub_video_flow['id']}/segments"
@@ -1433,7 +1433,7 @@ def test_List_Flow_Segments_GET_200_object_id_page(
 
 
 def test_List_Flow_Segments_GET_200_page(api_client_cognito, stub_video_flow):
-    """List flows with page query specified"""
+    """List segments with page query specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1449,7 +1449,7 @@ def test_List_Flow_Segments_GET_200_page(api_client_cognito, stub_video_flow):
 
 
 def test_List_Flow_Segments_GET_200_reverse_order(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with reverse_order query specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1472,7 +1472,7 @@ def test_List_Flow_Segments_GET_200_reverse_order(api_client_cognito, stub_video
 
 
 def test_List_Flow_Segments_GET_200_timerange(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with timerange query specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1515,7 +1515,7 @@ def test_List_Flow_Segments_GET_200_follow_link_with_timerange(
 def test_List_Flow_Segments_GET_200_include_object_timerange(
     api_client_cognito, stub_multi_flow
 ):
-    """List segment including object_timerange"""
+    """List segments with include_object_timerange query specified"""
     # Arrange
     path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act
@@ -1549,7 +1549,7 @@ def test_List_Flow_Segments_GET_400(api_client_cognito, stub_video_flow):
 
 
 def test_List_Flow_Segments_GET_400_limit(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with limit query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1568,7 +1568,7 @@ def test_List_Flow_Segments_GET_400_limit(api_client_cognito, stub_video_flow):
 def test_List_Flow_Segments_GET_400_object_id(
     api_client_cognito, media_objects, stub_video_flow
 ):
-    """List segments with object_id query specified"""
+    """List segments with object_id query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1588,7 +1588,7 @@ def test_List_Flow_Segments_GET_400_object_id(
 
 
 def test_List_Flow_Segments_GET_400_page(api_client_cognito, stub_video_flow):
-    """List flows with page query specified"""
+    """List segments with page query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1605,7 +1605,7 @@ def test_List_Flow_Segments_GET_400_page(api_client_cognito, stub_video_flow):
 
 
 def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with reverse_order query and bad timerange specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1622,7 +1622,7 @@ def test_List_Flow_Segments_GET_400_reverse_order(api_client_cognito, stub_video
 
 
 def test_List_Flow_Segments_GET_400_timerange(api_client_cognito, stub_video_flow):
-    """List segments with limit query specified"""
+    """List segments with timerange query and bad limit specified"""
     # Arrange
     path = f"/flows/{stub_video_flow['id']}/segments"
     # Act
@@ -1653,7 +1653,7 @@ def test_List_Flow_Segments_GET_404(api_client_cognito):
 
 
 def test_List_Flow_Segments_GET_404_limit(api_client_cognito):
-    """List segments with limit query specified"""
+    """List segments for invalid flow ID with limit query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1669,7 +1669,7 @@ def test_List_Flow_Segments_GET_404_limit(api_client_cognito):
 
 
 def test_List_Flow_Segments_GET_404_object_id(api_client_cognito, media_objects):
-    """List segments with object_id query specified"""
+    """List segments for invalid flow ID with object_id query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1685,7 +1685,7 @@ def test_List_Flow_Segments_GET_404_object_id(api_client_cognito, media_objects)
 
 
 def test_List_Flow_Segments_GET_404_page(api_client_cognito):
-    """List flows with page query specified"""
+    """List segments for invalid flow ID with page query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1701,7 +1701,7 @@ def test_List_Flow_Segments_GET_404_page(api_client_cognito):
 
 
 def test_List_Flow_Segments_GET_404_reverse_order(api_client_cognito):
-    """List segments with limit query specified"""
+    """List segments for invalid flow ID with reverse_order query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1717,7 +1717,7 @@ def test_List_Flow_Segments_GET_404_reverse_order(api_client_cognito):
 
 
 def test_List_Flow_Segments_GET_404_timerange(api_client_cognito):
-    """List segments with limit query specified"""
+    """List segments for invalid flow ID with timerange query specified"""
     # Arrange
     path = "/flows/invalid-id/segments"
     # Act
@@ -1862,7 +1862,7 @@ def test_Create_Flow_Segment_POST_400_exclusive_timerange_start(
 def test_Create_Flow_Segment_POST_400_incorrect_flow(
     api_client_cognito, media_objects, stub_multi_flow
 ):
-    """Object must already exist in S3"""
+    """Object allocated for a different flow cannot be used"""
     # Arrange
     path = f"/flows/{stub_multi_flow['id']}/segments"
     # Act

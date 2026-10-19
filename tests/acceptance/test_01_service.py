@@ -845,7 +845,7 @@ def test_Service_StorageBackends_GET_400_bad_tag_exists(api_client_cognito):
     assert_json_response(response, 400)
 
 
-# ---- Profiles (§3.2) ----
+# ---- Profiles ----
 # stub_profile has a fresh random id and unique label per session; Profiles are
 # immutable and cannot be deleted, so these must not assume an empty store or a
 # fixed id. Tests below the create test depend on it having run (file order).
