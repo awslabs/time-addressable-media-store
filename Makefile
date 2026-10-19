@@ -8,7 +8,7 @@ else
 SHELL := /bin/bash
 endif
 
-.PHONY: help api-spec fetch-tams-repo clean test test-unit test-functional test-acceptance test-all lint format cfn-lint cfn-nag cfn-format build deploy package validate local-api local-invoke
+.PHONY: help api-spec fetch-tams-repo tams-changes tams-bump clean test test-unit test-functional test-acceptance test-all lint format cfn-lint cfn-nag cfn-format build deploy package validate local-api local-invoke
 
 TAMS_REPO_PATH=https://github.com/bbc/tams
 STACK_NAME ?= tams
@@ -35,6 +35,8 @@ help:
 	@echo "Available targets:"
 	@echo "  api-spec           - Generate API schema from TAMS repository"
 	@echo "  fetch-tams-repo    - Fetch TAMS repository as a zip file"
+	@echo "  tams-changes       - List bbc/tams changes (PRs, ADRs, AppNotes) since api/TAMS_UPSTREAM_SHA"
+	@echo "  tams-bump          - Set api/TAMS_UPSTREAM_SHA to TAMS_REF (default: main)"
 	@echo "  build              - Build the SAM application"
 	@echo "  package            - Package the SAM application"
 	@echo "  deploy             - Deploy the SAM application (use STACK_NAME)"
@@ -55,6 +57,7 @@ help:
 	@echo ""
 	@echo "Options:"
 	@echo "  TAMS_TAG           - Specify a tag for api-spec (e.g., make api-spec TAMS_TAG=v1.0.0)"
+	@echo "  TAMS_REF           - bbc/tams commit, tag or branch for tams-changes/tams-bump (default: main)"
 	@echo "  STACK_NAME         - CloudFormation stack name (default: tams)"
 	@echo "  FUNCTION_NAME      - Lambda function name for local-invoke"
 	@echo "  EVENT_FILE         - Event file for local-invoke"
@@ -78,6 +81,12 @@ api-spec: api/build/tams
 	uv run python ./api/build/generate_spec.py
 	uv run datamodel-codegen --input ./api/build/openapi.yaml --input-file-type openapi --output ./layers/utils/schema.py --output-model-type pydantic_v2.BaseModel  --disable-timestamp --target-python-version 3.14 --use-schema-description --use-double-quotes
 	rm -rf ./api/build/tams
+
+tams-changes:
+	uv run python ./api/build/upstream_changes.py changes "$(TAMS_REF)"
+
+tams-bump:
+	uv run python ./api/build/upstream_changes.py bump "$(TAMS_REF)"
 
 build: api-spec
 	@echo "Building SAM application..."
