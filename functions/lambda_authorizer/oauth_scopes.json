@@ -368,6 +368,24 @@
             "tams-api/delete"
         ]
     },
+    "/flows/{flowId}/status": {
+        "HEAD": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "GET": [
+            "tams-api/admin",
+            "tams-api/read"
+        ],
+        "PUT": [
+            "tams-api/admin",
+            "tams-api/write"
+        ],
+        "DELETE": [
+            "tams-api/admin",
+            "tams-api/write"
+        ]
+    },
     "/objects/{objectId}": {
         "HEAD": [
             "tams-api/admin",

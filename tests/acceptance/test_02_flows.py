@@ -66,6 +66,10 @@ ENCODED_TAG_NAME = "pytest/encoded"
         ("/flows/{flowId}/segments", "HEAD"),
         ("/flows/{flowId}/segments", "POST"),
         ("/flows/{flowId}/storage", "POST"),
+        ("/flows/{flowId}/status", "DELETE"),
+        ("/flows/{flowId}/status", "GET"),
+        ("/flows/{flowId}/status", "HEAD"),
+        ("/flows/{flowId}/status", "PUT"),
     ],
 )
 def test_auth_401(verb, path, api_endpoint):
@@ -3021,6 +3025,231 @@ def test_Set_Flow_Read_Only_PUT_404(api_client_cognito):
     assert_json_response(response, 404)
     response_json = response.json()
     assert "The requested flow does not exist." == response_json["message"]
+
+
+def test_Flow_Status_HEAD_200(api_client_cognito, stub_multi_flow):
+    # Arrange
+    path = f"/flows/{stub_multi_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200, empty_body=True)
+
+
+def test_Flow_Status_HEAD_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/status"
+    # Act
+    response = api_client_cognito.request(
+        "HEAD",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 404, empty_body=True)
+
+
+def test_Flow_Status_GET_200(api_client_cognito, stub_data_flow):
+    # Arrange
+    path = f"/flows/{stub_data_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 200)
+    response_json = response.json()
+    assert stub_data_flow["status"] == response_json
+
+
+def test_Flow_Status_GET_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/status"
+    # Act
+    response = api_client_cognito.request(
+        "GET",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
+
+
+def test_Create_or_Update_Flow_Status_PUT_204_create(
+    api_client_cognito, stub_video_flow, expect_webhooks
+):
+    # Arrange
+    value = "ingesting"
+    path = f"/flows/{stub_video_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=value,
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    stub_video_flow["status"] = value
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_video_flow,
+            },
+        },
+    )
+
+
+def test_Create_or_Update_Flow_Status_PUT_204_update(
+    api_client_cognito, stub_video_flow, expect_webhooks
+):
+    # Arrange
+    # Updates the status set by the _create test; it is removed again by the
+    # DELETE test so stub_data_flow stays the only Flow with a status.
+    value = "awaiting_content"
+    path = f"/flows/{stub_video_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json=value,
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    stub_video_flow["status"] = value
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_video_flow,
+            },
+        },
+    )
+
+
+def test_Create_or_Update_Flow_Status_PUT_400(api_client_cognito, stub_video_flow):
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        data="test",
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_Create_or_Update_Flow_Status_PUT_400_invalid_status(
+    api_client_cognito, stub_video_flow
+):
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json="not_a_status",
+    )
+    # Assert
+    assert_json_response(response, 400)
+    response_json = response.json()
+    assert isinstance(response_json["message"], list)
+    assert 0 < len(response_json["message"])
+
+
+def test_Create_or_Update_Flow_Status_PUT_403(api_client_cognito, stub_audio_flow):
+    # Arrange
+    path = f"/flows/{stub_audio_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json="ingesting",
+    )
+    # Assert
+    assert_json_response(response, 403)
+    response_json = response.json()
+    assert (
+        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        == response_json["message"]
+    )
+
+
+def test_Create_or_Update_Flow_Status_PUT_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/status"
+    # Act
+    response = api_client_cognito.request(
+        "PUT",
+        path,
+        json="ingesting",
+    )
+    # Assert
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested Flow does not exist." == response_json["message"]
+
+
+def test_Delete_Flow_Status_DELETE_204(
+    api_client_cognito, stub_video_flow, expect_webhooks
+):
+    # Arrange
+    path = f"/flows/{stub_video_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 204, empty_body=True)
+    del stub_video_flow["status"]
+    expect_webhooks(
+        {
+            "event_type": "flows/updated",
+            "event": {
+                "flow": stub_video_flow,
+            },
+        },
+    )
+
+
+def test_Delete_Flow_Status_DELETE_403(api_client_cognito, stub_audio_flow):
+    # Arrange
+    path = f"/flows/{stub_audio_flow['id']}/status"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 403)
+    response_json = response.json()
+    assert (
+        "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        == response_json["message"]
+    )
+
+
+def test_Delete_Flow_Status_DELETE_404(api_client_cognito):
+    # Arrange
+    path = f"/flows/{ID_404}/status"
+    # Act
+    response = api_client_cognito.request(
+        "DELETE",
+        path,
+    )
+    # Assert
+    assert_json_response(response, 404)
+    response_json = response.json()
+    assert "The requested flow ID in the path is invalid." == response_json["message"]
 
 
 # ---- Flow creation from a Profile ----

@@ -1196,6 +1196,30 @@ Resources:
             RestApiId: !Ref Api
             Path: /flows/{flowId}/storage
             Method: Post
+        headFlowsFlowidStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/status
+            Method: Head
+        getFlowsFlowidStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/status
+            Method: Get
+        putFlowsFlowidStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/status
+            Method: Put
+        deleteFlowsFlowidStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /flows/{flowId}/status
+            Method: Delete
 
   FlowSegmentsFunction:
     Type: AWS::Serverless::Function
