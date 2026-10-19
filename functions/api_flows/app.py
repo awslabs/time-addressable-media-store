@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import json
 import os
 import uuid
@@ -851,6 +852,70 @@ def put_flow_read_only(
     item_dict = set_node_property(
         record_type, flow_id, username, {"flow.read_only": read_only}
     )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.head("/flows/<flowId>/status")
+@app.get("/flows/<flowId>/status")
+@tracer.capture_method(capture_response=False)
+def get_flow_status(flowId: Annotated[str, Path(pattern=UUID_PATTERN)]):
+    try:
+        status = query_node_property(record_type, flowId, "status")
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if app.current_event.request_context.http_method == "HEAD":
+        return None, HTTPStatus.OK.value  # 200
+    return json.dumps(status), HTTPStatus.OK.value  # 200
+
+
+@app.put("/flows/<flowId>/status")
+@tracer.capture_method(capture_response=False)
+def put_flow_status(
+    status: Annotated[Flowstatus, Body()],
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
+    try:
+        item = query_node(record_type, flow_id)
+    except ValueError as e:
+        raise NotFoundError("The requested Flow does not exist.") from e  # 404
+    if item.get("read_only"):
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(
+        record_type, flow_id, username, {"flow.status": status.value}
+    )
+    publish_event(
+        f"{record_type}s/updated",
+        {record_type: item_dict},
+        get_event_resources(item_dict),
+    )
+    return None, HTTPStatus.NO_CONTENT.value  # 204
+
+
+@app.delete("/flows/<flowId>/status")
+@tracer.capture_method(capture_response=False)
+def delete_flow_status(
+    flow_id: Annotated[str, Path(alias="flowId", pattern=UUID_PATTERN)],
+):
+    try:
+        item = query_node(record_type, flow_id)
+    except ValueError as e:
+        raise NotFoundError(
+            "The requested flow ID in the path is invalid."
+        ) from e  # 404
+    if item.get("read_only"):
+        raise ForbiddenError(
+            "Forbidden. You do not have permission to modify this flow. It may be marked read-only."
+        )  # 403
+    username = get_username(app.current_event.request_context)
+    item_dict = set_node_property(record_type, flow_id, username, {"flow.status": None})
     publish_event(
         f"{record_type}s/updated",
         {record_type: item_dict},
