@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 def mock_neptune_client():
     """
     Mock the Neptune client by patching the neptune module's client directly.
-    This is required since at the time of writing moto does not support `execute_open_cypher_query` API on Neptune client.
+    Required as moto does not support the Neptune `execute_open_cypher_query` API.
     Returns:
         MagicMock: A mock Neptune client that can be configured in tests
     """
@@ -154,7 +154,6 @@ def aws_credentials():
     with mock AWS credentials for all tests.
     """
     with mock_aws():
-        # Set up AWS credentials
         os.environ["AWS_ACCESS_KEY_ID"] = "testing"
         os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
         os.environ["AWS_SESSION_TOKEN"] = "testing"
@@ -172,7 +171,6 @@ def s3_bucket():
     Returns:
         Bucket: An S3 bucket resource for test use
     """
-    # Create S3 bucket
     client = boto3.client("s3", region_name=os.environ["AWS_DEFAULT_REGION"])
     client.create_bucket(
         Bucket=os.environ["BUCKET"],
@@ -197,7 +195,6 @@ def service_table():
     Returns:
         Table: A DynamoDB table resource for test use
     """
-    # Create DynamoDB table
     client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
     client.create_table(
         TableName=os.environ["SERVICE_TABLE"],
@@ -265,7 +262,6 @@ def segments_table():
     Returns:
         Table: A DynamoDB table resource for test use
     """
-    # Create DynamoDB table
     client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
     client.create_table(
         TableName=os.environ["SEGMENTS_TABLE"],
@@ -315,7 +311,6 @@ def storage_table():
     Returns:
         Table: A DynamoDB table resource for test use
     """
-    # Create DynamoDB table
     client = boto3.client("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
     client.create_table(
         TableName=os.environ["STORAGE_TABLE"],
@@ -339,11 +334,7 @@ def webhooks_queue():
     Create and manage a test SQS Queue for webhooks.
 
     Creates a webhooks SQS Queue before tests run and cleans it up afterward.
-
-    Returns:
-        Table: A DynamoDB table resource for test use
     """
-    # Create SQS Queue
     client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
     response = client.create_queue(QueueName="webhooks-queue")
     os.environ["WEBHOOKS_QUEUE_URL"] = response["QueueUrl"]
@@ -361,7 +352,6 @@ def error_queue():
     Returns:
         str: The SQS queue URL for test use
     """
-    # Create SQS Queue
     client = boto3.client("sqs", region_name=os.environ["AWS_DEFAULT_REGION"])
     response = client.create_queue(QueueName="error-queue")
     os.environ["ERROR_QUEUE_URL"] = response["QueueUrl"]
@@ -374,7 +364,7 @@ def ignore_warnings():
     """
     Suppress specific warnings during test execution for cleaner test output.
 
-    Currently ignores UserWarnings from the AWS Lambda Powertools metrics module.
+    Ignores UserWarnings from the AWS Lambda Powertools metrics module.
     """
     warnings.filterwarnings(
         "ignore", category=UserWarning, module="aws_lambda_powertools.metrics"

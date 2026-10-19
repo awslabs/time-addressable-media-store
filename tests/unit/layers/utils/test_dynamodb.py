@@ -287,7 +287,7 @@ class TestDynamoDB:
         result = dynamodb.get_timerange_expression(Key, boundary, time_range)
 
         expected_value = getattr(time_range, other_boundary.value).to_nanosec()
-        # Form the expected result. We LessThan here regardless of inputs, but it doesn't impact the test
+        # lt is used regardless of inputs; only names and values are compared
         expected_condition = Key(f"timerange_{boundary.value}").lt(expected_value)
 
         _, expected_names, expected_values = parse_dynamo_expression(expected_condition)
@@ -330,7 +330,7 @@ class TestDynamoDB:
 
     def test_get_key_and_args_pagination_with_object_id(self):
         """A start key on the object-id-index must include the index key as well
-        as the table key, or DynamoDB rejects it (regression test)."""
+        as the table key, or DynamoDB rejects it."""
         flow_id = "test-flow"
         parameters = {"limit": 1, "page": "21999999999", "object_id": "test-object"}
 
@@ -466,12 +466,10 @@ class TestDynamoDB:
     def test_get_key_and_args_empty_range_clamps_between_bounds(
         self, mock_segments_table
     ):
-        """An empty range (e.g. "[5:0_5:0)") normalises to () with start == end ==
-        0 yet is not eternity, so it reaches the both-bounds branch. The
-        exclusive-start fold makes lower = 1 while the empty flow yields upper =
-        0, so lower > upper. DynamoDB rejects BETWEEN when lower > upper, so upper
-        is clamped up to lower; the retained FilterExpression then yields the
-        empty result an empty range must produce (regression test)."""
+        """An empty range (e.g. "[5:0_5:0)") reaches the both-bounds branch with
+        lower = 1 and upper = 0. DynamoDB rejects BETWEEN when lower > upper, so
+        upper is clamped to lower and the retained FilterExpression yields the
+        empty result."""
         instant_ns = 5 * 3600 * 1_000_000_000  # 5h
         # An empty flow: get_exact_timerange_end finds no segment and echoes the
         # requested end back. The empty range normalises to end == 0, so the raw
@@ -488,8 +486,7 @@ class TestDynamoDB:
 
         _, _, key_values = parse_dynamo_expression(result["KeyConditionExpression"])
         between_values = [v for v in key_values.values() if isinstance(v, int)]
-        # Both BETWEEN operands collapse to the same clamped value: lower == upper,
-        # never lower > upper (which DynamoDB would reject as invalid).
+        # Both BETWEEN operands collapse to the same clamped value.
         assert len(between_values) == 2
         assert between_values[0] == between_values[1] == 1
 
@@ -528,7 +525,7 @@ class TestDynamoDB:
     ):
         """ "(1000000000:1)" holds no time; mediatimestamp would read it as the
         instant "[1000000000:1]", so it must be treated as the empty range and
-        bound the key to the clamped empty window (regression test)."""
+        bound the key to the clamped empty window."""
         mock_segments_table.query.return_value = {"Items": []}
 
         result = dynamodb.get_key_and_args("test-flow", {"timerange": "(1000000000:1)"})
@@ -544,7 +541,7 @@ class TestDynamoDB:
         """An end-only timerange (e.g. "_0:0)") bounds the sort key at the end of
         the first segment reaching the filter end, and retains the end boundary as
         a FilterExpression so that segment is dropped when it starts after the
-        requested range (regression test)."""
+        requested range."""
         boundary_end_ns = 1_000_000_002
         mock_segments_table.query.return_value = {
             "Items": [{"timerange_end": boundary_end_ns}]
@@ -573,7 +570,7 @@ class TestDynamoDB:
     ):
         """object_id + a both-bounded timerange applies BOTH timerange
         conditions as a single ANDed FilterExpression on the object-id-index
-        (regression test: the second condition must not overwrite the first)."""
+        (the second condition must not overwrite the first)."""
         flow_id = "test-flow"
         now = datetime.now()
         time_range = TimeRange(
@@ -625,7 +622,7 @@ class TestDynamoDB:
         self, mock_segments_table
     ):
         """object_id + an end-only timerange applies a single timerange_start
-        filter (regression: previously the timerange was silently ignored)."""
+        filter."""
         flow_id = "test-flow"
         now = datetime.now()
         time_range = TimeRange.from_end(
@@ -843,7 +840,7 @@ class TestDynamoDB:
             item_dict={},
         )
 
-        # Verify error status was
+        # Verify error status was set
         assert mock_merge_delete_request.called
         assert mock_merge_delete_request.call_args[0][0]["status"] == "error"
 
@@ -965,7 +962,7 @@ class TestDynamoDB:
     def test_validate_object_id_new_object_with_init_object_id(
         self, mock_storage_table
     ):
-        """First use of new object with init_object_id stores it in put_item"""
+        """First use of new object with init_object_id queues it in a put claim"""
         segment = Flowsegmentpost(
             object_id="abc",
             timerange="_",
@@ -991,7 +988,7 @@ class TestDynamoDB:
 
     @patch("dynamodb.storage_table")
     def test_validate_object_id_first_use_with_init_object_id(self, mock_storage_table):
-        """First use with expire_at stores init_object_id in update_item"""
+        """First use with expire_at queues init_object_id in an update claim"""
         segment = Flowsegmentpost(
             object_id="abc",
             timerange="_",
@@ -1142,7 +1139,8 @@ class TestDynamoDB:
     def test_validate_object_id_init_object_first_use_marks_as_init(
         self, mock_storage_table
     ):
-        """init_object_id first use with matching flow marks object as init"""
+        """init_object_id first use with matching flow queues a claim marking
+        the object as init"""
         segment = Flowsegmentpost(
             object_id="abc",
             timerange="_",
@@ -1273,7 +1271,7 @@ class TestDynamoDB:
     def test_delete_flow_storage_record_still_referenced_as_init(
         self, mock_storage_table, mock_segments_table
     ):
-        """An object no longer used as a media object but still referenced as an init object must NOT be deleted."""
+        """An object still referenced as an init object must not be deleted."""
         mock_segments_table.query.side_effect = [
             {"Count": 0},  # object-id-index — no media references
             {"Count": 2},  # init-object-id-index — still used as init by 2 segments

@@ -299,8 +299,8 @@ def test_List_Sources_GET_200(
 def test_List_Sources_GET_200_sorted_pages_are_stable(
     api_client_cognito, sort_by, reverse_order
 ):
-    """Paging a sorted listing returns every Source exactly once and in spec order
-    (regression: sorting on a sometimes-unset key repeated and dropped Sources)"""
+    """Paging a listing sorted on a sometimes-unset key returns every Source
+    exactly once and in spec order"""
     assert_stable_sorted_listing(
         api_client_cognito, "/sources", sort_by, reverse_order, expected_count=6
     )
@@ -561,7 +561,7 @@ def test_List_Sources_GET_200_tag_name(api_client_cognito, stub_multi_source):
 def test_List_Sources_GET_200_tag_name_array(api_client_cognito, stub_multi_source):
     """List sources with tag.{name} matching one member of an array-valued tag
 
-    Tag values may be arrays from 8.2. There is no array-specific code path:
+    Tag values may be arrays from TAMS API v8.2. There is no array-specific code path:
     tags are stored JSON-serialised, so ["this", "that"] is stored as the text
     '["this", "that"]', and the filter searches for the quote-wrapped value
     '"that"', which is a substring of it. The same quoting is what stops a
@@ -622,7 +622,7 @@ def test_List_Sources_GET_400(api_client_cognito):
 
 
 def test_List_Sources_GET_400_collected_by_ids(api_client_cognito, stub_multi_source):
-    """List sources with collected_by_ids query specified"""
+    """List sources with collected_by_ids query and an invalid format returns 400"""
     # Arrange
     path = "/sources"
     # Act
@@ -656,7 +656,7 @@ def test_List_Sources_GET_400_collected_by_ids_malformed(api_client_cognito):
 
 
 def test_List_Sources_GET_400_format(api_client_cognito):
-    """List sources with format query specified"""
+    """List sources with format query and an invalid limit returns 400"""
     # Arrange
     path = "/sources"
     # Act
@@ -673,7 +673,7 @@ def test_List_Sources_GET_400_format(api_client_cognito):
 
 
 def test_List_Sources_GET_400_label(api_client_cognito):
-    """List sources with label query specified"""
+    """List sources with label query and an invalid format returns 400"""
     # Arrange
     path = "/sources"
     # Act
@@ -690,7 +690,7 @@ def test_List_Sources_GET_400_label(api_client_cognito):
 
 
 def test_List_Sources_GET_400_limit(api_client_cognito):
-    """List sources with limit query specified"""
+    """List sources with limit query and an invalid format returns 400"""
     # Arrange
     path = "/sources"
     # Act
@@ -707,7 +707,7 @@ def test_List_Sources_GET_400_limit(api_client_cognito):
 
 
 def test_List_Sources_GET_400_page(api_client_cognito):
-    """List sources with page query specified"""
+    """List sources with page query and an invalid format returns 400"""
     # Arrange
     path = "/sources"
     # Act
@@ -724,7 +724,7 @@ def test_List_Sources_GET_400_page(api_client_cognito):
 
 
 def test_List_Sources_GET_400_tag_name(api_client_cognito):
-    """List sources with tag.{name} query specified"""
+    """List sources with tag.{name} query and an invalid format returns 400"""
     # Arrange
     path = "/sources"
     # Act
@@ -741,7 +741,7 @@ def test_List_Sources_GET_400_tag_name(api_client_cognito):
 
 
 def test_List_Sources_GET_400_tag_exists_name(api_client_cognito):
-    """List sources with tag_exists.{name} query specified"""
+    """List sources with tag_exists.{name} query and an invalid format returns 400"""
     # Arrange
     path = "/sources"
     # Act

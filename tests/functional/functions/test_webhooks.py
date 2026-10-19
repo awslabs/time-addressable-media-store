@@ -404,8 +404,8 @@ def test_segments_added_using_controlled_storage(
             assert "store_type" in get_url
             assert "storage_id" in get_url
             assert "controlled" in get_url
-            # Internal storage backend record fields must not leak into get_urls
-            # (regression: they failed the get_url schema and broke delivery)
+            # Internal storage backend record fields must not leak into get_urls,
+            # as they fail the get_url schema and break delivery
             for internal in ("record_type", "id", "default_storage", "bucket_name"):
                 assert internal not in get_url
 
@@ -812,8 +812,8 @@ def test_segments_added_using_legacy_storage(
             assert "store_type" in get_url
             assert "storage_id" in get_url
             assert "controlled" in get_url
-            # Internal storage backend record fields must not leak into get_urls
-            # (regression: they failed the get_url schema and broke delivery)
+            # Internal storage backend record fields must not leak into get_urls,
+            # as they fail the get_url schema and break delivery
             for internal in ("record_type", "id", "default_storage", "bucket_name"):
                 assert internal not in get_url
 
@@ -1152,8 +1152,8 @@ def test_uncollected_event_matches_empty_collected_by_filter(
     """An event carrying no collected_by resources must reach webhooks whose
     collected_by filter is an empty array as well as those with no filter.
 
-    From 8.2 an empty array is not "no filter": it limits events to resources
-    collected by nothing, so both are valid matches here. The two stay
+    From TAMS API v8.2 an empty array is not "no filter": it limits events to
+    resources collected by nothing, so both are valid matches here. The two stay
     distinguishable in the graph because serialise_neptune_obj stores an empty
     list as the text "[]" rather than collapsing it to NULL.
     """

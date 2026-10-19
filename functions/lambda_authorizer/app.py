@@ -34,7 +34,7 @@ _oidc_config_cache_time: dict[str, float] = {}
 jwks_cache_ttl = int(os.environ.get("JWKS_CACHE_TTL", 86400))
 allowed_issuers = os.environ.get("ALLOWED_ISSUERS", "").split(",")
 
-# Load at module initialization instead of lazy loading
+# Loaded once at module initialization
 file_path = os.path.join(os.path.dirname(__file__), "oauth_scopes.json")
 with open(file_path, "r", encoding="utf-8") as f:
     _oauth_scopes = json.load(f)

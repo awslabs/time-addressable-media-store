@@ -230,7 +230,7 @@ def post_flow_segments_by_id(
                 model_dump(Flowsegmentbulkfailure(failed_segments=failed_segments)),
                 HTTPStatus.OK.value,
             )  # 200
-    # Handle single segment requests separately to retain backwards compatibility with previous version of API where list of segments not available.
+    # Single segment requests keep the original (pre-bulk) API behaviour.
     else:
         segment_result = process_single_segment(item, flow_segment)
         if segment_result:
