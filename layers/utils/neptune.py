@@ -191,11 +191,9 @@ def generate_profile_query(
 ) -> cymple.builder.NodeAvailable:
     """Returns an Open Cypher Match query to return specified Profile.
 
-    The technical metadata is decomposed like a Flow's: a flow_metadata node holds
-    the scalar technical fields (format, codec, container, ...) as directly-queryable
-    properties, with essence_parameters as a child node (the existing node type).
-    So format/codec filters match the flow_metadata node and essence filters the
-    essence_parameters node -- no JSON blob.
+    As for a Flow, scalar technical fields (format, codec, ...) live on a
+    flow_metadata node and essence_parameters on its child node, so filters
+    match those nodes directly.
     """
     query = (
         qb.match()
@@ -410,10 +408,8 @@ def query_flow_collection(flow_id: str) -> list:
             .get()
         )
         results = execute_open_cypher_query(query)
-        # This path deserialises each collection item on its own, so (unlike the
-        # whole-Flow read) it does not go through deserialise_neptune_obj's
-        # flow_collection branch -- order by the collected_by edge `index` and
-        # strip it here so the ordered list is returned without the internal key.
+        # Items are deserialised individually, bypassing deserialise_neptune_obj's
+        # flow_collection branch, so order by the edge `index` and strip it here.
         items = [
             deserialise_neptune_obj(item)
             for item in results["results"][0]["flow_collection"]
@@ -454,7 +450,7 @@ def build_order_by(
     Returns `(columns, id_ascending)` for `order_by`. Note cymple's `order_by`
     applies the ASC/DESC keyword only to the LAST column, so every column except
     the `id` tie-breaker carries its direction inline and `id` takes the
-    returned flag. See the cymple-order-by-multicolumn limitation.
+    returned flag.
     """
     col = sort_by or default_col
     # Datetime keys default newest-first (DESC); string keys default ascending (ASC)
@@ -466,7 +462,7 @@ def build_order_by(
     # first (reverse_order).
     null_direction = "DESC" if reverse_order else "ASC"
     # NULLs are kept out of every sort key: Neptune does not order them stably,
-    # so SKIP/LIMIT pages repeated and dropped records. Unset values all sort as
+    # so SKIP/LIMIT pages would repeat and drop records. Unset values all sort as
     # the same constant (every sort column is a string), leaving id to order them.
     is_null = f"{ref_name}.{col} IS NULL"
     return [
@@ -796,9 +792,8 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
     )
     if existing_dict:
         existing_flow_collection = existing_dict.get("flow_collection", [])
-        # If there is a flow collection and it has changed delete it so that it is
-        # set correctly with the merge. Order matters (flow_collection is an
-        # ordered list), so this is order-sensitive: a pure reorder is a change.
+        # Delete a changed flow collection so the merge sets it correctly.
+        # flow_collection is ordered, so a pure reorder counts as a change.
         if existing_flow_collection and DeepDiff(
             flow_collection, existing_flow_collection, ignore_order=False
         ):
@@ -866,10 +861,9 @@ def merge_flow(flow_dict: dict, existing_dict: dict) -> dict:
         existing_dict.get("source_id")
         and flow_dict["source_id"] != existing_dict["source_id"]
     ):
-        # Resolve the old source's collected-by resources before removing the
-        # represents edge (and possibly deleting the source), so a sources/deleted
-        # event keeps the resources webhook collection filters match on. This
-        # yields only source-typed resources (no flow was passed).
+        # Resolve the old source's collected-by resources before the represents
+        # edge (and possibly the source) is removed, so a sources/deleted event
+        # keeps the resources webhook collection filters match on.
         old_source_resources = enhance_resources(
             [f"tams:source:{existing_dict['source_id']}"]
         )
@@ -977,12 +971,9 @@ def merge_webhook(webhook_dict: dict, existing_dict: dict) -> None:
 def merge_profile(profile_dict: dict) -> dict:
     """Create a TAMS Profile in the Neptune Database.
 
-    Profiles are immutable, so this only ever creates -- callers must reject an
-    attempt to recreate an existing Profile before calling (there is no update or
-    null-diff logic as there is for webhooks). The technical metadata is decomposed
-    the same way a Flow's is: a flow_metadata node holds the scalar technical fields
-    (format, codec, container, ...) as directly-queryable properties, with
-    essence_parameters as a child node -- not a JSON blob.
+    Profiles are immutable, so this only creates; callers must reject recreating
+    an existing Profile. Technical metadata is stored as for a Flow: a
+    flow_metadata node with an essence_parameters child node.
     """
     tags = profile_dict.get("tags", {})
     flow_metadata = profile_dict.get("flow_metadata") or {}
@@ -1114,7 +1105,7 @@ def set_node_property(
 def set_flow_collection(
     flow_id: str, username: str, flow_collection: list, update_metadata: bool = True
 ) -> dict:
-    """Set the specfified flow to have the specified flow_collection and set flow
+    """Set the specified flow to have the specified flow_collection and set flow
     metadata_updated, metadata_version and updated_by properties.
 
     update_metadata=False only replaces the collection, for callers (merge_flow)
@@ -1269,7 +1260,7 @@ def merge_source_flow(flow_dict: dict, existing_dict: dict) -> dict:
 def generate_flow_collection_query(
     flow_collection: list, set_dict: dict | None = None
 ) -> cymple.builder.SetAvailable | None:
-    """Returns a QueryBuilder that creates the specfied flow collection."""
+    """Returns a QueryBuilder that creates the specified flow collection."""
     if not set_dict:
         set_dict = {}
     if not flow_collection:

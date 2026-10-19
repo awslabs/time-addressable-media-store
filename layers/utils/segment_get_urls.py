@@ -58,7 +58,7 @@ def create_presigned_urls_parallel(url_set: set[str]) -> dict[str, str]:
     """Generate presigned URLs in parallel using ThreadPoolExecutor.
 
     Args:
-        urls: Set of s3 URLs to generate presigned URLs for
+        url_set: Set of s3 URLs to generate presigned URLs for
 
     Returns:
         Dict mapping original URLs to presigned URLs
@@ -187,7 +187,7 @@ def populate_get_urls(
     should_create_presigned_urls = presigned or presigned is None
     filter_labels = (
         None if accept_get_urls is None else accept_get_urls.split(",")
-    )  # Test explictly for None as empty string has special meaning but would be falsey
+    )  # Test explicitly for None as empty string has special meaning but would be falsey
     storage_backends = get_storage_backends(
         accept_storage_ids,
         storage_backend_tag_values,
