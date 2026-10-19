@@ -364,7 +364,7 @@ def test_Create_or_Replace_Flow_PUT_400(api_client_cognito):
     """Invalid body"""
     # Arrange
     flow_id = "10000000-0000-1000-8000-000000000004"
-    path = "/flows/{flow_id}"
+    path = f"/flows/{flow_id}"
     body = {
         "id": flow_id,
     }
@@ -741,7 +741,7 @@ def test_List_Flows_HEAD_400_tag_exists_name(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "HEAD", path, params={"tag_exists.text": "false", "timerange": "bad"}
+        "HEAD", path, params={"tag_exists.test": "false", "timerange": "bad"}
     )
     # Assert
     assert_json_response(response, 400, empty_body=True)
@@ -1353,7 +1353,7 @@ def test_List_Flows_GET_400_tag_exists_name(api_client_cognito):
     path = "/flows"
     # Act
     response = api_client_cognito.request(
-        "GET", path, params={"tag_exists.text": "false", "timerange": "bad"}
+        "GET", path, params={"tag_exists.test": "false", "timerange": "bad"}
     )
     # Assert
     assert_json_response(response, 400)
