@@ -159,7 +159,6 @@ def test_collected_source_webhook(webhook_test_data, stub_multi_source):
             for segment in body["event"]["segments"]:
                 if "get_urls" in segment:
                     for get_url in segment["get_urls"]:
-                        # Verbose storage includes fields like store_type, provider, region, store_product, controlled
                         verbose_fields = [
                             "store_type",
                             "provider",
@@ -180,15 +179,15 @@ def test_uncollected_flow_webhook(webhook_test_data, stub_multi_flow):
     """Validate an empty flow_collected_by_ids limits events to Flows uncollected
     *at the time of the event*.
 
-    An empty array is not "no filter": per 8.2 it means "only Flows not collected by
-    any Flow Collection". Being collected is not a fixed property of a Flow, though --
-    the four collected Flows are created before the collecting Flow exists, so their
-    flows/created events are legitimately delivered here. So this does not assert a
-    fixed set of Flow IDs. What must hold is that no single event reaches both this
-    webhook and test-events-collected-flow: an event either carries flow-collected-by
-    resources or it does not, and stub_multi_flow is the only Flow Collection in the
-    fixture set. A regression treating [] as absent would deliver every Flow's events
-    here and break that.
+    An empty array is not "no filter": per TAMS API v8.2 it means "only Flows not
+    collected by any Flow Collection". Being collected is not a fixed property of a
+    Flow, though -- the four collected Flows are created before the collecting Flow
+    exists, so their flows/created events are legitimately delivered here. So this
+    does not assert a fixed set of Flow IDs. What must hold is that no single event
+    reaches both this webhook and test-events-collected-flow: an event either carries
+    flow-collected-by resources or it does not, and stub_multi_flow is the only Flow
+    Collection in the fixture set. A regression treating [] as absent would deliver
+    every Flow's events here and break that.
 
     Where the Flow object is in the body it carries the Flow's collected_by as it was
     at the time of the event, which is the property being filtered on, so that is

@@ -165,15 +165,11 @@ def get_flows(
     }
     items, next_page, limit_used = query_flows(query_params)
     if param_timerange:
-        # A Flow's timerange isn't stored on the Neptune node -- it's derived
-        # from the segments table -- so timerange filtering happens here in
-        # Python after the DB page is fetched. If every result on the page is
-        # discarded, `next_page` is still set, so returning it as-is produces
-        # an empty body with a Link header (issue #125). Skip fully-filtered
-        # pages until we find matches or run out, bounded by
-        # MAX_TIMERANGE_FILTER_PAGES so a store with many non-matching Flows
-        # can't stall past the API Gateway 29s limit; on the bound the empty
-        # page + Link is still returned and the client can continue manually.
+        # A Flow's timerange is derived from the segments table, not stored in
+        # Neptune, so it is filtered here after each page is fetched. Skip pages
+        # the filter empties entirely (up to MAX_TIMERANGE_FILTER_PAGES, to stay
+        # within the API Gateway 29s limit) rather than returning an empty body
+        # with a Link header; on the bound the empty page + Link is returned.
         timerange_filter = parse_timerange(param_timerange)
 
         def _matches_timerange(item):
@@ -251,14 +247,10 @@ def put_flow_by_id(
 ):
     if flow.root.id.root != flow_id:
         raise NotFoundError("The requested Flow ID in the path is invalid.")  # 404
-    # The profile_id is read from the raw body rather than the parsed model: when
-    # both profile_id and technical metadata are supplied the model resolves to a
-    # non-profile variant and silently discards profile_id, so the parsed model
-    # cannot distinguish that case from a valid technical-metadata-only request.
-    # An empty string is the explicit "unlink from Profile" signal (AppNote0020):
-    # it is ignored by the technical variant, falls through to the normal update
-    # path below, and merge_flow clears the stored profile_id (absent from the new
-    # properties), so no special handling is needed for it here.
+    # profile_id is read from the raw body: when technical metadata is also
+    # supplied the model resolves to a non-profile variant and drops profile_id.
+    # An empty string means "unlink from Profile" (AppNote0020) and needs no
+    # special handling: merge_flow clears the stored profile_id as it is absent.
     supplied_profile_id = (app.current_event.json_body or {}).get("profile_id")
     if supplied_profile_id:
         if not isinstance(flow.root, Flowput3):
@@ -271,11 +263,9 @@ def put_flow_by_id(
             raise BadRequestError(
                 "Bad request. The requested profile_id does not exist."
             ) from e  # 400
-        # Materialise the Profile's technical metadata onto the Flow (the store
-        # de-normalises the parameters so reads look the same however the Flow was
-        # created). Re-validate as the matching technical variant with profile_id
-        # stripped -- no technical variant carries it -- so the normal create logic
-        # below runs unchanged; profile_id is re-attached to the stored dict.
+        # Materialise the Profile's technical metadata onto the Flow so reads look
+        # the same however it was created. profile_id is stripped (no technical
+        # variant carries it) and re-attached to the stored dict below.
         materialised = {**model_dump(flow.root), **profile["flow_metadata"]}
         materialised.pop("profile_id", None)
         flow = Flowput(**materialised)
@@ -357,11 +347,9 @@ def delete_flow_by_id(
     # Get flow timerange, if timerange is empty delete flow sync, otherwise return a delete request
     flow_timerange = TimeRange.from_str(get_flow_timerange(flow_id))
     if flow_timerange.is_empty():
-        # Resolve the event resources (source + collection membership) while the
-        # Flow still exists; deleting it first would drop the collected-by
-        # resources that webhook collection filters match on. The sources/deleted
-        # event takes only the source-typed entries so it doesn't route to
-        # flow-filtered webhooks.
+        # Resolve event resources before the delete removes the collected-by
+        # edges webhook filters match on. sources/deleted takes only the
+        # source-typed entries so it doesn't route to flow-filtered webhooks.
         event_resources = get_event_resources(item)
         source_id = delete_flow(flow_id)
         if source_id:

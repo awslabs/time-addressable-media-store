@@ -17,8 +17,7 @@ class TestBuildOrderBy:
     build_order_by feeds cymple's order_by, which applies the ASC/DESC keyword
     only to the LAST column. Every column except the id tie-breaker must
     therefore carry its direction inline, and id takes the returned flag.
-    These tests assert both the column list and the flag so a regression
-    to the broken single-direction form is caught.
+    These tests assert both the column list and the flag.
 
     The leading "is NULL" (0/1) term implements the spec fallback rule: records
     with an unset sort value sort after those with one by default, and before
@@ -123,8 +122,7 @@ class TestBuildOrderBy:
     @pytest.mark.parametrize("reverse_order", [False, True])
     def test_sort_keys_never_yield_null(self, reverse_order):
         # Neptune does not order NULLs stably under SKIP/LIMIT, so every sort
-        # key must map an unset value to a constant (regression: pages repeated
-        # and dropped records when sorting on a sometimes-unset column).
+        # key must map an unset value to a constant or pages repeat and drop records.
         cols, _ = build_order_by(
             "flow", "metadata_updated", reverse_order, {"created", "metadata_updated"}
         )
@@ -164,21 +162,15 @@ class TestBuildOrderBy:
 class TestCollectedByWhereLiteral:
     """Tests for collected_by_where_literal.
 
-    The filter is three-state and every state is driven by the raw query string,
-    so None and "" must stay distinct: absent means "apply no filter", empty
-    means "only entities that nothing collects". Both are falsy, so a truthiness
-    check (`if not collected_by_ids`) would collapse them and silently turn an
-    unfiltered list request into an uncollected-only one. That split is asserted
-    explicitly rather than left to coincidence.
+    None and "" must stay distinct: absent applies no filter, empty selects only
+    entities that nothing collects. Both are falsy, so a truthiness check
+    (`if not collected_by_ids`) would collapse them.
 
-    The returned literal is appended to a list of WHERE clauses that are joined
-    with AND, so the id form must be bracketed as a single unit -- unbracketed,
-    `a OR b` would bind as `... AND a OR b` and widen the result set. Hence the
-    assertions on exact bracketing rather than on substrings. The uncollected
-    form needs no brackets because `NOT exists(...)` is already a single term.
+    The literal is ANDed with other WHERE clauses, so the id form must be
+    bracketed as a single unit or `a OR b` would bind as `... AND a OR b` and
+    widen the result set. `NOT exists(...)` is already a single term.
 
-    The patterns are the real ones from query_flows, so the expected values are
-    the literals actually sent to Neptune.
+    The patterns are the real ones from query_flows.
     """
 
     NOT_COLLECTED = "(flow)-[:collected_by]->(:flow)"
@@ -199,7 +191,7 @@ class TestCollectedByWhereLiteral:
         )
 
     def test_none_and_empty_string_are_not_equivalent(self):
-        # Both are falsy but only "" is a filter; guards the collapse regression.
+        # Both are falsy but only "" is a filter.
         assert collected_by_where_literal(
             None, self.NOT_COLLECTED, self.by_id
         ) != collected_by_where_literal("", self.NOT_COLLECTED, self.by_id)
@@ -253,7 +245,7 @@ class TestMetadataVersion:
         self, mock_execute, mock_base, mock_query_node
     ):
         """Emptying the collection has no edge SET to carry the metadata, so it
-        is set in the edge-delete query (regression: nothing was updated)"""
+        is set in the edge-delete query."""
         neptune.set_flow_collection("flow-id", "user", [])
 
         mock_execute.assert_called_once()

@@ -37,23 +37,15 @@ def record_handler(
     body = json.loads(record.body)
     # If delete request has never been started and instructs flow deletion then delete the flow
     if body["delete_flow"] and body["status"] == "created":
-        # Resolve the flows/segments_deleted event resources (source and
-        # collected-by) while the Flow still exists, and carry them on the SQS
-        # message across any continuation invocations. Once the Flow is deleted
-        # below its source/collection edges are gone, so the per-segment
-        # flows/segments_deleted events could not otherwise resolve these -
-        # which would defeat source_ids / source_collected_by_ids /
-        # flow_collected_by_ids webhook filtering. Stripped before persistence
-        # in merge_delete_request so it never touches the Delete Request record.
+        # Resolve event resources (source and collected-by) while the Flow still
+        # exists and carry them on the SQS message across continuations, so
+        # webhook source/collection filters still match after deletion. Stripped
+        # in merge_delete_request so it is never persisted.
         body["segments_deleted_resources"] = enhance_resources(
             [f"tams:flow:{body['flow_id']}"]
         )
-        # Delete the flow
         source_id = delete_flow(body["flow_id"])
-        # The Flow (and its collection edges) are now gone, so re-resolving would
-        # drop the collected-by resources that webhook collection filters match
-        # on. Reuse the set resolved before deletion above (flow + source +
-        # flow/source collected-by); the sources/deleted event takes only the
+        # Reuse the pre-deletion resources; sources/deleted takes only the
         # source-typed entries so it doesn't route to flow-filtered webhooks.
         deleted_resources = body["segments_deleted_resources"]
         if source_id:
@@ -69,7 +61,7 @@ def record_handler(
                 {"source_id": source_id},
                 [r for r in deleted_resources if r.startswith("tams:source")],
             )
-    # Now proceed with deleting the flow segments
+    # Proceed with deleting the flow segments
     body["status"] = "started"
     set_node_property_base(
         "delete_request", body["id"], {"delete_request.status": body["status"]}
