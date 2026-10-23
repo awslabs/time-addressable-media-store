@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: Time-addressable Media Store (TAMS) API with Microsoft Entra ID Authorizer
+
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - I3011
+        - E3031
+        - E3033
+        - W1030
+        - E1019
+        - E6101
+
+Parameters:
+  # Entra ID Authorizer Parameters
+  TenantId:
+    Description: Microsoft Entra ID Tenant ID (Directory ID GUID, e.g., be189d14-1d13-4148-9edf-47fff7e918a8)
+    Type: String
+    Default: ""
+
+  AllowedAudiences:
+    Description: "[Optional] Comma-separated list of allowed JWT audiences (e.g., api://tams-api or your App Registration Client ID). Leave blank to disable audience verification."
+    Type: String
+    Default: ""
+
+  AllowedIssuers:
+    Description: "[Optional] Comma-separated list of explicit allowed issuer URLs. If blank, defaults to standard Entra ID v2.0 and v1.0 issuers for TenantId."
+    Type: String
+    Default: ""
+
+  JwksCacheTtl:
+    Description: Time-to-live (in seconds) for caching OIDC discovery and JWKS public keys.
+    Type: Number
+    Default: 86400
+
+  LogLevel:
+    Description: Logging level for Lambda Powertools (DEBUG, INFO, WARNING, ERROR)
+    Type: String
+    Default: INFO
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARNING
+      - ERROR
+
+  # TAMS Core API Parameters
+  VpcId:
+    Description: The ID of an existing VPC, if one exists. Leave blank to have one created.
+    Type: String
+    Default: ""
+    AllowedPattern: '|vpc-[a-z0-9]+'
+
+  VpcAZs:
+    Description: Comma-separated list of availability zones (e.g. `us-east-1a,us-east-1b`) to use when a VPC is specified. The number of AZs must match the number of private subnets specified in PrivateSubnetIds.
+    Type: CommaDelimitedList
+    Default: ""
+
+  PrivateSubnetIds:
+    Description: Comma-separated list of private subnets (e.g. subnet-abc123,subnet-def456) to use when a VPC is specified. Must provide exactly one subnet per Availability Zone specified in VpcAZs.
+    Type: CommaDelimitedList
+    Default: ""
+
+  NeptuneDBInstanceClass:
+    Description: The DBInstanceClass to be used for the Neptune Database
+    Type: String
+    Default: db.serverless
+    AllowedPattern: ^db\.(serverless|[a-z0-9]+\.[a-z0-9]+)$
+
+  NeptuneServerlessConfiguration:
+    Description: Neptune Serverless Scaling Configuration. Only used when NeptuneDBInstanceClass is db.serverless.
+    Type: String
+    Default: 1,128
+    ConstraintDescription: ServerlessScalingConfiguration must be a comma-separated pair of MinCapacity and MaxCapacity. MinCapacity valid values are 1-128, MaxCapacity valid values are 2-128. Both support half-step increments (e.g. 8, 8.5, 9).
+    AllowedPattern: ^(128|12[0-7](\.5)?|1[01][0-9](\.5)?|[1-9][0-9](\.5)?|[1-9](\.5)?),(128|12[0-7](\.5)?|1[01][0-9](\.5)?|[1-9][0-9](\.5)?|[2-9](\.5)?)$
+
+  DeployWaf:
+    Description: Configure whether a WAF should be deployed infront of the API.
+    Type: String
+    AllowedValues:
+      - "Yes"
+      - "No"
+    Default: "Yes"
+
+  JwtIssuerUrl:
+    Description: '[Optional] The url for the issuer of the JWT tokens you wish to authenticate with. Leave this blank if you wish to deploy Cognito for auth.'
+    Type: String
+    Default: ""
+
+Resources:
+  EntraAuthorizerStack:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: entra_authorizer.yaml
+      Parameters:
+        TenantId: !Ref TenantId
+        AllowedAudiences: !Ref AllowedAudiences
+        AllowedIssuers: !Ref AllowedIssuers
+        JwksCacheTtl: !Ref JwksCacheTtl
+        LogLevel: !Ref LogLevel
+
+  TamsApiStack:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: template.yaml
+      Parameters:
+        VpcId: !Ref VpcId
+        VpcAZs: !Join [',', !Ref VpcAZs]
+        PrivateSubnetIds: !Join [',', !Ref PrivateSubnetIds]
+        NeptuneDBInstanceClass: !Ref NeptuneDBInstanceClass
+        NeptuneServerlessConfiguration: !Ref NeptuneServerlessConfiguration
+        DeployWaf: !Ref DeployWaf
+        JwtIssuerUrl: !Ref JwtIssuerUrl
+        LambdaAuthorizerArn: !GetAtt EntraAuthorizerStack.Outputs.AuthorizerFunctionArn
+
+Outputs:
+  # Entra Authorizer Outputs
+  AuthorizerFunctionArn:
+    Description: The ARN of the Entra ID Lambda Authorizer Function
+    Value: !GetAtt EntraAuthorizerStack.Outputs.AuthorizerFunctionArn
+    Export:
+      Name: !Sub ${AWS::StackName}-AuthorizerFunctionArn
+
+  AuthorizerFunctionAliasArn:
+    Description: The ARN of the Live Alias for the Entra ID Lambda Authorizer
+    Value: !GetAtt EntraAuthorizerStack.Outputs.AuthorizerFunctionAliasArn
+    Export:
+      Name: !Sub ${AWS::StackName}-AuthorizerFunctionAliasArn
+
+  AuthorizerFunctionRoleArn:
+    Description: The ARN of the Entra ID Authorizer IAM execution role
+    Value: !GetAtt EntraAuthorizerStack.Outputs.AuthorizerFunctionRoleArn
+    Export:
+      Name: !Sub ${AWS::StackName}-AuthorizerFunctionRoleArn
+
+  # TAMS Core API Outputs
+  ApiEndpoint:
+    Description: API Gateway Endpoint URL
+    Value: !GetAtt TamsApiStack.Outputs.ApiEndpoint
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiEndpoint
+
+  UserPoolId:
+    Description: Cognito User Pool ID (if created)
+    Value: !GetAtt TamsApiStack.Outputs.UserPoolId
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolId
+
+  TokenUrl:
+    Description: Cognito Token URL (if created)
+    Value: !GetAtt TamsApiStack.Outputs.TokenUrl
+    Export:
+      Name: !Sub ${AWS::StackName}-TokenUrl
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID (if created)
+    Value: !GetAtt TamsApiStack.Outputs.UserPoolClientId
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolClientId
+
+  MediaStorageBucket:
+    Description: S3 Bucket for Media Storage
+    Value: !GetAtt TamsApiStack.Outputs.MediaStorageBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-MediaStorageBucket
+
+  FlowSegmentsTable:
+    Description: DynamoDB Table for Flow Segments
+    Value: !GetAtt TamsApiStack.Outputs.FlowSegmentsTable
+    Export:
+      Name: !Sub ${AWS::StackName}-FlowSegmentsTable
+
+  FlowStorageTable:
+    Description: DynamoDB Table for Flow Storage
+    Value: !GetAtt TamsApiStack.Outputs.FlowStorageTable
+    Export:
+      Name: !Sub ${AWS::StackName}-FlowStorageTable
+
+  CleanupS3QueueUrl:
+    Description: SQS Queue URL for S3 Cleanup
+    Value: !GetAtt TamsApiStack.Outputs.CleanupS3QueueUrl
+    Export:
+      Name: !Sub ${AWS::StackName}-CleanupS3QueueUrl
+
+  NeptuneEndpoint:
+    Description: Neptune DB Cluster Endpoint
+    Value: !GetAtt TamsApiStack.Outputs.NeptuneEndpoint
+    Export:
+      Name: !Sub ${AWS::StackName}-NeptuneEndpoint
+
+  NeptuneClusterResourceId:
+    Description: Neptune DB Cluster Resource ID
+    Value: !GetAtt TamsApiStack.Outputs.NeptuneClusterResourceId
+    Export:
+      Name: !Sub ${AWS::StackName}-NeptuneClusterResourceId
+
+  LambdaSubnetIds:
+    Description: Lambda VPC Subnet IDs
+    Value: !GetAtt TamsApiStack.Outputs.LambdaSubnetIds
+    Export:
+      Name: !Sub ${AWS::StackName}-LambdaSubnetIds
+
+  LambdaSecurityGroup:
+    Description: Lambda Security Group ID
+    Value: !GetAtt TamsApiStack.Outputs.LambdaSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-LambdaSecurityGroup
+
+  UtilsLayerArn:
+    Description: TAMS Utils Lambda Layer ARN
+    Value: !GetAtt TamsApiStack.Outputs.UtilsLayerArn
+    Export:
+      Name: !Sub ${AWS::StackName}-UtilsLayerArn
+
+  DefaultStorageId:
+    Description: Default Storage Backend ID
+    Value: !GetAtt TamsApiStack.Outputs.DefaultStorageId
+    Export:
+      Name: !Sub ${AWS::StackName}-DefaultStorageId
+
+  AdditionalStorageCrStorageBackendFunctionArn:
+    Description: Custom Resource Storage Backend Function ARN
+    Value: !GetAtt TamsApiStack.Outputs.AdditionalStorageCrStorageBackendFunctionArn
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-CrStorageBackendFunctionArn
+
+  AdditionalStorageFlowsFunctionRole:
+    Description: IAM Role for Flows Function
+    Value: !GetAtt TamsApiStack.Outputs.AdditionalStorageFlowsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-FlowsFunctionRole
+
+  AdditionalStorageFlowSegmentsFunctionRole:
+    Description: IAM Role for Flow Segments Function
+    Value: !GetAtt TamsApiStack.Outputs.AdditionalStorageFlowSegmentsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-FlowSegmentsFunctionRole
+
+  AdditionalStorageObjectsFunctionRole:
+    Description: IAM Role for Objects Function
+    Value: !GetAtt TamsApiStack.Outputs.AdditionalStorageObjectsFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-ObjectsFunctionRole
+
+  AdditionalStorageWebhooksFunctionRole:
+    Description: IAM Role for Webhooks Function
+    Value: !GetAtt TamsApiStack.Outputs.AdditionalStorageWebhooksFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-WebhooksFunctionRole
+
+  AdditionalStorageObjectDuplicationFunctionRole:
+    Description: IAM Role for Object Duplication Function
+    Value: !GetAtt TamsApiStack.Outputs.AdditionalStorageObjectDuplicationFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-ObjectDuplicationFunctionRole
+
+  AdditionalStorageSqsObjectCleanupFunctionRole:
+    Description: IAM Role for SQS Object Cleanup Function
+    Value: !GetAtt TamsApiStack.Outputs.AdditionalStorageSqsObjectCleanupFunctionRole
+    Export:
+      Name: !Sub ${AWS::StackName}-AdditionalStorage-SqsObjectCleanupFunctionRole

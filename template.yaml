@@ -162,7 +162,7 @@ Resources:
   Api:
     Type: AWS::Serverless::Api
     Properties:
-      Name: Time-addressable Media Store
+      Name: !Sub TAMS-${AWS::StackName}
       Description: |
         The Time-addressable Media Store (TAMS) is used for storing segmented media flows.
         The TAMS consists of a media store for the media flow segment objects and a service providing

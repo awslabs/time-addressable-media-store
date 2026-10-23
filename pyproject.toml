@@ -6,7 +6,9 @@ name = "time-addressable-media-store"
 version = "0.0.0"
 readme = "README.md"
 requires-python = ">=3.14,<4.0.0"
-dependencies = []
+dependencies = [
+    "boto3-stubs~=1.43.79",
+]
 
 [dependency-groups]
 dev = [

@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: Dedicated Microsoft Entra ID Lambda Authorizer for TAMS API
+
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - I3011
+        - E3031
+        - E3033
+        - W1030
+        - E1019
+        - E6101
+
+Parameters:
+  TenantId:
+    Description: Microsoft Entra ID Tenant ID (Directory ID GUID, e.g., be189d14-1d13-4148-9edf-47fff7e918a8)
+    Type: String
+    Default: ""
+
+  AllowedAudiences:
+    Description: "[Optional] Comma-separated list of allowed JWT audiences (e.g., api://tams-api or your App Registration Client ID). Leave blank to disable audience verification."
+    Type: String
+    Default: ""
+
+  AllowedIssuers:
+    Description: "[Optional] Comma-separated list of explicit allowed issuer URLs. If blank, defaults to standard Entra ID v2.0 and v1.0 issuers for TenantId."
+    Type: String
+    Default: ""
+
+  JwksCacheTtl:
+    Description: Time-to-live (in seconds) for caching OIDC discovery and JWKS public keys.
+    Type: Number
+    Default: 86400
+
+  LogLevel:
+    Description: Logging level for Lambda Powertools (DEBUG, INFO, WARNING, ERROR)
+    Type: String
+    Default: INFO
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARNING
+      - ERROR
+
+Resources:
+  EntraAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: VPC not required for Entra ID authorizer
+          - id: W92
+            reason: ReservedConcurrentExecutions not required
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-authorizer
+      CodeUri: authorizers/entra_id/
+      Handler: app.lambda_handler
+      Runtime: python3.14
+      Architectures:
+        - arm64
+      MemorySize: 1024
+      Timeout: 30
+      AutoPublishAlias: live
+      SnapStart:
+        ApplyOn: PublishedVersions
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python314-arm64:37
+      Environment:
+        Variables:
+          POWERTOOLS_LOG_LEVEL: !Ref LogLevel
+          POWERTOOLS_SERVICE_NAME: tams-entra-authorizer
+          POWERTOOLS_METRICS_NAMESPACE: TAMS
+          TENANT_ID: !Ref TenantId
+          ALLOWED_AUDIENCES: !Ref AllowedAudiences
+          ALLOWED_ISSUERS: !Ref AllowedIssuers
+          JWKS_CACHE_TTL: !Ref JwksCacheTtl
+
+Outputs:
+  AuthorizerFunctionArn:
+    Description: The ARN of the Entra ID Lambda Authorizer Function
+    Value: !GetAtt EntraAuthorizerFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-AuthorizerFunctionArn
+
+  AuthorizerFunctionAliasArn:
+    Description: The ARN of the Live Alias for the Entra ID Lambda Authorizer (Recommended for LambdaAuthorizerArn in TAMS)
+    Value: !Ref EntraAuthorizerFunction.Alias
+    Export:
+      Name: !Sub ${AWS::StackName}-AuthorizerFunctionAliasArn
+
+  AuthorizerFunctionRoleArn:
+    Description: The ARN of the Entra ID Authorizer IAM execution role
+    Value: !GetAtt EntraAuthorizerFunctionRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-AuthorizerFunctionRoleArn
