@@ -1839,6 +1839,11 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-ApiEndpoint
 
+  ApiId:
+    Value: !Ref Api
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiId
+
   UserPoolId:
     Value: !If [CreateCognito, !GetAtt CognitoStack.Outputs.UserPoolId, '-']
     Export:
