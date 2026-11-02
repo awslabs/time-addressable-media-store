@@ -17,6 +17,7 @@ from dynamodb import (
     get_storage_backend,
     query_segments_by_init_object_id,
     query_segments_by_object_id,
+    storage_table,
 )
 
 tracer = Tracer()
@@ -53,6 +54,12 @@ def record_handler(record: SQSRecord) -> None:
         elif len(storage_ids) == 0:
             # Empty list means no S3 cleanup needed, just flow storage record
             delete_flow_storage_record(object_id)
+
+        # A record with expire_at is a live allocation awaiting upload (e.g. the
+        # object_id was re-requested after a TTL expiry), so leave it alone.
+        storage_item = storage_table.get_item(Key={"id": object_id}).get("Item")
+        if storage_item and storage_item.get("expire_at") is not None:
+            continue
 
         # An object may be referenced as a media object (object_id) or as an
         # init object (init_object_id). Both keep the object alive, so check

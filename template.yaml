@@ -344,6 +344,8 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expire_at
         Enabled: true
+      StreamSpecification:
+        StreamViewType: OLD_IMAGE
 
   MediaStorageBucket:
     DeletionPolicy: RetainExceptOnCreate
@@ -429,6 +431,52 @@ Resources:
     Properties:
       VisibilityTimeout: 900
       MessageRetentionPeriod: 86400
+
+  ExpiredStorageCleanupPipeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pipes.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: pipe
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeStream
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:ListStreams
+                Resource: !GetAtt FlowStorageTable.StreamArn
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !GetAtt CleanupS3Queue.Arn
+
+  ExpiredStorageCleanupPipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      RoleArn: !GetAtt ExpiredStorageCleanupPipeRole.Arn
+      Source: !GetAtt FlowStorageTable.StreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+          BatchSize: 1
+        FilterCriteria:
+          Filters:
+            - Pattern: '{"eventName": ["REMOVE"], "userIdentity": {"type": ["Service"], "principalId": ["dynamodb.amazonaws.com"]}, "dynamodb": {"OldImage": {"storage_id": {"S": [{"exists": true}]}}}}'
+      Target: !GetAtt CleanupS3Queue.Arn
+      TargetParameters:
+        InputTemplate: '[["<$.dynamodb.Keys.id.S>", ["<$.dynamodb.OldImage.storage_id.S>"]]]'
 
   WebhooksDeliveryQueue:
     Type: AWS::SQS::Queue
