@@ -749,3 +749,45 @@ def test_PUT_flow_preserves_explicit_empty_metadata_version(
     assert stored_flow["metadata_version"] == ""
     if not flow_exists:
         assert json.loads(response["body"])["metadata_version"] == ""
+
+
+# pylint: disable=redefined-outer-name
+def test_DELETE_flow_persists_delete_request_before_enqueueing(
+    lambda_context,
+    api_event_factory,
+    api_flows,
+    monkeypatch,
+):
+    """
+    Verifies that DELETE /flows/{flowId} with a non-empty timerange writes the
+    delete request to Neptune before sending it to the delete queue, so the
+    worker never receives a message for a node that does not yet exist.
+    """
+    # Arrange
+    flow_id = str(uuid.uuid4())
+    calls = []
+    monkeypatch.setattr(api_flows, "query_node", lambda *_args: {"id": flow_id})
+    monkeypatch.setattr(api_flows, "get_flow_timerange", lambda _flow_id: "[0:0_10:0)")
+    monkeypatch.setattr(
+        api_flows,
+        "merge_delete_request",
+        lambda item: calls.append(("merge_delete_request", item["id"])),
+    )
+    monkeypatch.setattr(
+        api_flows,
+        "put_message",
+        lambda _queue, item: calls.append(("put_message", item["id"])),
+    )
+    event = api_event_factory("DELETE", f"/flows/{flow_id}")
+    event["requestContext"]["authorizer"] = {"username": "pytest"}
+
+    # Act
+    response = api_flows.lambda_handler(event, lambda_context)
+
+    # Assert
+    assert response["statusCode"] == HTTPStatus.ACCEPTED.value
+    request_id = json.loads(response["body"])["id"]
+    assert calls == [
+        ("merge_delete_request", request_id),
+        ("put_message", request_id),
+    ]
