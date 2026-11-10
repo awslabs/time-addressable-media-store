@@ -420,6 +420,20 @@ Resources:
     Properties:
       VisibilityTimeout: 900
       MessageRetentionPeriod: 86400
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeleteRequestQueueDLQ.Arn
+        maxReceiveCount: 3
+
+  DeleteRequestQueueDLQ:
+    Type: AWS::SQS::Queue
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W48
+            reason: Encryption not required
+    Properties:
+      VisibilityTimeout: 900
+      MessageRetentionPeriod: 1209600
 
   CleanupS3Queue:
     Type: AWS::SQS::Queue
