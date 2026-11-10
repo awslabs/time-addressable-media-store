@@ -31,7 +31,7 @@ If you are choosing to use an existing VPC then you should ensure that the subne
 
 ## Deploy the sample application
 
-**NOTE: When deploying this solution please be sure to get the latest version from the [Releases](https://github.com/awslabs/time-addressable-media-store/releases) page in GitHub. The `main` branch often contains pre-release code that may not be fully stable.**
+**NOTE: When deploying this solution please be sure to get the latest version from the [Releases](https://github.com/awslabs/time-addressable-media-store/releases) page in GitHub. The `main` branch often contains pre-release code that may not be fully stable. It also follows the TAMS spec's own `main` branch, so it can implement spec changes that are not yet in a published TAMS spec version. Each release implements a published TAMS spec version, stated in its release notes. See [Branching and releases](docs/BRANCHING_AND_RELEASES.md).**
 
 The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
 
