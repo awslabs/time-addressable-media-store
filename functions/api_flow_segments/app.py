@@ -283,8 +283,10 @@ def delete_flow_segments_by_id(
         "timerange_to_delete": str(timerange_to_delete),
         "timerange_remaining": str(timerange_to_delete),
     }
-    put_message(del_queue, deletion_request_dict)
+    # Persist before enqueueing so the worker never receives a message for a
+    # delete request that does not yet exist in Neptune.
     merge_delete_request(deletion_request_dict)
+    put_message(del_queue, deletion_request_dict)
     if deletion_request_dict is not None:
         return Response(
             status_code=HTTPStatus.ACCEPTED.value,  # 202

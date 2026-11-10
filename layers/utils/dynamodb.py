@@ -375,8 +375,10 @@ def delete_flow_segments(
     timerange_remaining = timerange_to_delete.intersect_with(resume_after)
     item_dict["timerange_remaining"] = str(timerange_remaining)
     item_dict["updated"] = datetime.now().strftime(constants.DATETIME_FORMAT)
-    put_message(del_queue, item_dict)
+    # Persist before enqueueing so a fast continuation cannot have its newer
+    # status overwritten by this (older) write.
     merge_delete_request(item_dict)
+    put_message(del_queue, item_dict)
 
 
 @tracer.capture_method(capture_response=False)

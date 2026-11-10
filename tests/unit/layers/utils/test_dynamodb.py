@@ -813,6 +813,51 @@ class TestDynamoDB:
         )
         assert queued["timerange_remaining"] == str(expected_remaining)
 
+    @patch("dynamodb.put_message")
+    @patch("dynamodb.delete_segment_items")
+    @patch("dynamodb.segments_table")
+    @patch("dynamodb.merge_delete_request")
+    def test_delete_flow_segments_continuation_persists_before_enqueueing(
+        self,
+        mock_merge_delete_request,
+        mock_segments_table,
+        mock_delete_segment_items,
+        mock_put_message,
+        time_range_one_day,
+    ):
+        """When more segments remain, the continuation must be written to
+        Neptune before it is enqueued, so a fast next invocation cannot have
+        its newer status overwritten by this older write."""
+        mock_segments_table.query.return_value = {
+            "Items": [
+                {"flow_id": "1", "timerange": time_range_one_day.to_sec_nsec_range()}
+            ],
+            "LastEvaluatedKey": {"flow_id": "1", "timerange_end": 1},
+        }
+        mock_delete_segment_items.return_value = None
+        mock_context = MagicMock()
+        mock_context.get_remaining_time_in_millis.return_value = (
+            constants.LAMBDA_TIME_REMAINING - 1
+        )
+        parent = MagicMock()
+        parent.attach_mock(mock_merge_delete_request, "merge_delete_request")
+        parent.attach_mock(mock_put_message, "put_message")
+
+        dynamodb.delete_flow_segments(
+            flow_id="test-flow",
+            parameters={},
+            timerange_to_delete=time_range_one_day,
+            context=mock_context,
+            s3_queue="s3-queue",
+            del_queue="del-queue",
+            item_dict={"id": "dr-1"},
+        )
+
+        assert [c[0] for c in parent.mock_calls] == [
+            "merge_delete_request",
+            "put_message",
+        ]
+
     @patch("dynamodb.delete_segment_items")
     @patch("dynamodb.segments_table")
     @patch("dynamodb.merge_delete_request")
