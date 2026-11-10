@@ -28,6 +28,9 @@ MIN_OBJECT_TIMEOUT_SECS = 3600
 MIN_PRESIGNED_URL_TIMEOUT_SECS = 3600
 SERVICE_INFO_ID = "1"
 DDB_MAX_RETRIES = 3
+# MUST match maxReceiveCount on DeleteRequestQueue's RedrivePolicy in template.yaml.
+# On the final receive the worker records the error on the delete request.
+DELETE_REQUEST_MAX_RECEIVE_COUNT = 3
 ADMIN_SCOPE = "tams-api/admin"
 # Uncompressed codecs that require bit_depth and unc_parameters.unc_type
 RAW_CODECS = {"audio/x-raw-int", "audio/x-raw-float", "video/raw"}
