@@ -1,7 +1,10 @@
 import json
 import os
+import traceback
+from datetime import datetime, timezone
 from typing import Optional
 
+import constants
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.batch import (
     BatchProcessor,
@@ -16,6 +19,7 @@ from neptune import (
     check_delete_source,
     delete_flow,
     enhance_resources,
+    merge_delete_request,
     set_node_property_base,
 )
 from utils import publish_event
@@ -35,6 +39,47 @@ def record_handler(
 ) -> None:
     """Processes a single SQS record"""
     body = json.loads(record.body)
+    try:
+        process_delete_request(body, lambda_context)
+    except Exception as e:
+        # Only the final attempt records the error; earlier attempts are retried.
+        # Re-raise either way so the message is retried or moved to the DLQ.
+        if (
+            int(record.attributes.approximate_receive_count)
+            >= constants.DELETE_REQUEST_MAX_RECEIVE_COUNT
+        ):
+            record_delete_request_error(body, e)
+        raise
+
+
+@tracer.capture_method(capture_response=False)
+def record_delete_request_error(body: dict, exc: Exception) -> None:
+    """Sets the delete request to error status with details of the exception"""
+    now = datetime.now(timezone.utc).strftime(constants.DATETIME_FORMAT)
+    try:
+        merge_delete_request(
+            {
+                **body,
+                "status": "error",
+                "updated": now,
+                "error": {
+                    "type": type(exc).__name__,
+                    "summary": f"Delete request failed after {constants.DELETE_REQUEST_MAX_RECEIVE_COUNT} attempts: {exc}",
+                    "traceback": traceback.format_exception(exc),
+                    "time": now,
+                },
+            }
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        # Do not mask the original failure; the message still goes to the DLQ.
+        logger.exception("Unable to record error on delete request %s", body["id"])
+
+
+@tracer.capture_method(capture_response=False)
+def process_delete_request(
+    body: dict, lambda_context: Optional[LambdaContext] = None
+) -> None:
+    """Performs the flow and/or flow segment deletion for a delete request"""
     # If delete request has never been started and instructs flow deletion then delete the flow
     if body["delete_flow"] and body["status"] == "created":
         # Resolve event resources (source and collected-by) while the Flow still
